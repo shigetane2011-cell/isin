@@ -1,0 +1,41 @@
+# index.html を GitHub Pages に配信する。
+# main に push するたびに走る。configure-pages の enablement で
+# Pages 自体の有効化も行うので、リポジトリ設定を手で触る必要はない。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 配信は同時に1本だけ走らせる。走行中のものは中断しない。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # リポジトリ直下をそのまま配信する。index.html が単一HTMLで
+      # 外部リソースを読まないため、ビルド工程は要らない。
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
