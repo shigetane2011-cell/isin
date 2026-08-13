@@ -10,7 +10,10 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # github-pages 環境の既定の保護ルールは、デフォルトブランチからの
+    # デプロイしか許さない。デフォルトを main に変えるまでは作業ブランチ
+    # 側からも配信できるよう、両方を対象にしておく。
+    branches: [main, claude/upload-check-dyoblv]
   workflow_dispatch:
 
 permissions:
