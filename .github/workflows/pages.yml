@@ -1,6 +1,11 @@
 # index.html を GitHub Pages に配信する。
-# main に push するたびに走る。configure-pages の enablement で
-# Pages 自体の有効化も行うので、リポジトリ設定を手で触る必要はない。
+# main に push するたびに走る。
+#
+# ジョブを build / deploy に分けてあるのは意図的。
+# environment: github-pages はジョブの開始時に解決されるが、その環境は
+# Pages が有効化されて初めて作られる。1ジョブに詰めると、有効化を行う
+# configure-pages が走る前に environment の解決で失敗する。
+# 先に build 側で有効化を済ませておけば、deploy 側では環境が存在する。
 name: Deploy to GitHub Pages
 
 on:
@@ -19,14 +24,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
+      # enablement: true でリポジトリ設定を手で触らずに Pages を有効化する。
       - uses: actions/configure-pages@v5
         with:
           enablement: true
@@ -37,5 +40,12 @@ jobs:
         with:
           path: .
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
