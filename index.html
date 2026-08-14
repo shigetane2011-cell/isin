@@ -2756,7 +2756,7 @@ function headerHTML(){
         ? `全 <b>${E.MAX_TURN}</b> ターン 終了`
         : `第 <b>${st.turn}</b> ターン / 残り <b>${E.MAX_TURN - st.turn + 1}</b>`}</span>
       <span>時代ランク <b>${E.ERAS[E.eraOf(st)]}</b></span>
-      <span>探り 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
+      <span>聞き出し 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
     </div></header>`;
 }
 
@@ -3068,20 +3068,36 @@ function viewStance(){
   }
   const wb0 = E.waryOf(st.currents, ui.charId);
   const said = [];
-  if (ui.asked !== null)
-    said.push(`<div class="say"><span class="q">「${esc(E.QUESTIONS[ui.asked].chip)}か」</span><br>${
-      esc(E.replyOf(ui.charId, ui.asked))}
-      <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[ui.asked].name)}</b>は
-      <span class="uibadge">〔${esc(E.CATS[ui.asked].motives[c.correct[ui.asked]])}〕</span></div></div>`);
+  /* 聞き出せた分だけ返answerを出す。一問だけなら1つ、さらに聞き出せば3つとも。 */
+  const heard = new Set();
+  if (ui.asked !== null) heard.add(ui.asked);
+  if (ui.probed || guidedTurn()) { heard.add(0); heard.add(1); heard.add(2); }
+  for (const i of [0,1,2]) if (heard.has(i))
+    said.push(`<div class="say"><span class="q">「${esc(E.QUESTIONS[i].chip)}か」</span><br>${
+      esc(E.replyOf(ui.charId, i))}
+      <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[i].name)}</b>は
+      <span class="uibadge">〔${esc(E.CATS[i].motives[c.correct[i]])}〕</span></div></div>`);
 
+  const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
-    <div class="slot-h">対話 <span style="opacity:.7">— 踏み込んだ問いは<b>一つだけ</b>。返答は、その者に何が刺さるかを語る</span></div>
+    <div class="slot-h">対話 <span style="opacity:.7">— 踏み込んだ問いは<b>一つだけ</b>。それ以上は代償が要る</span></div>
     <div class="row">
-      ${E.QUESTIONS.map((q, i) => ui.asked === i
+      ${E.QUESTIONS.map((q, i) => (ui.probed || guidedTurn())
+        ? `<span class="chip used">${esc(q.chip)}</span>`
+        : ui.asked === i
         ? `<span class="chip used">${esc(q.chip)}</span>`
         : ui.asked !== null
           ? `<span class="chip spent">${esc(q.chip)}</span>`
           : `<button class="chip" data-ask="${i}">${esc(q.chip)}</button>`).join('')}
+    </div>
+    <div class="row">
+      ${guidedTurn()
+        ? '<span class="probed">練習中 — 三つとも開示しています（探りは消費しません）</span>'
+        : ui.probed
+        ? '<span class="probed">◎ 残らず聞き出した — この交渉の獲得は 1 下がる</span>'
+        : probeLeft > 0
+          ? `<button class="probe" id="probe">さらに聞き出す<span class="small">（残り ${probeLeft} 回・この交渉の獲得 −1）</span></button>`
+          : `<span class="probed" style="opacity:.6">これ以上は聞き出せない（1局 ${E.PROBE_LIMIT} 回まで）</span>`}
     </div>
     ${said.join('')}
     ${(() => {
@@ -3116,6 +3132,8 @@ function viewStance(){
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
   app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
+  const pb0 = document.getElementById('probe');
+  if (pb0) pb0.onclick = () => { ui.probed = true; render(); };
   app.querySelectorAll('[data-own]').forEach(b => b.onclick = () => { ui.ownF = +b.dataset.own; render(); });
   app.querySelectorAll('[data-stance]').forEach(b => b.onclick = () => {
     ui.stance = b.dataset.stance;
@@ -3159,12 +3177,10 @@ function viewCards(){
       ${E.waryOf(st.currents, ui.charId) >= 0 ? '<div class="warn">警戒されているため、判定は一段下がります。</div>' : ''}
       <div class="row" style="margin-top:12px">
         ${guided
-          ? '<span class="probed">練習中 — 正解の開示に「探る」は消費しません</span>'
+          ? '<span class="probed">練習中 — 三つとも開示しています</span>'
           : ui.probed
-          ? '<span class="probed">◎ 探り済み — この交渉の獲得は 1 下がる</span>'
-          : left > 0
-            ? `<button class="probe" id="probe">この相手を探る（残り ${left} 回・獲得 −1）</button>`
-            : '<span class="probed" style="opacity:.6">探りは使い切った（1局 ' + E.PROBE_LIMIT + ' 回まで）</span>'}
+          ? '<span class="probed">◎ 残らず聞き出した — この交渉の獲得は 1 下がる</span>'
+          : `<span class="probed" style="opacity:.6">読み切れないときは、<b>戻る</b>と「さらに聞き出す」が使えます（残り ${left} 回）</span>`}
       </div>
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
@@ -3193,8 +3209,6 @@ function viewCards(){
     if (guided && motive !== c.correct[cat]) return;
     ui.picks[cat] = motive; render();
   });
-  const pb = document.getElementById('probe');
-  if (pb) pb.onclick = () => { ui.probed = true; render(); };
   document.getElementById('back').onclick = () => { ui.approach = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
     const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
