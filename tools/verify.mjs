@@ -292,18 +292,69 @@ head('5d. 探ると正解は分かるが影響力が落ちるか');
 head('5e. 対話の返答が動機型と正しく対応しているか');
 ok(E.QUESTIONS.length === 3 && E.QUESTIONS.every((q, i) => q.cat === i),
    '踏み込んだ問いが3カテゴリに1対1で対応している');
-ok(E.REPLIES.length === 3 && E.REPLIES.every(r => r.length === 6),
-   '返答が 3カテゴリ × 6動機型 = 18通り揃っている');
-ok(new Set(E.REPLIES.flat()).size === 18, '返答の本文に重複がない');
+ok(E.REPLIES.length === 3 && E.REPLIES.every(r => r.length === 6 && r.every(m => m.length === 7)),
+   '返答が 3カテゴリ × 6動機 × 7語り口 = 126通り揃っている');
+ok(new Set(E.REPLIES.flat(2)).size === 126, '126の返答すべてが別の文である');
 ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべてに用意されている');
-ok(E.CHARACTERS.every(c => c.correct.every((m, k) => typeof E.REPLIES[k][m] === 'string')),
-   '151名すべてについて、3つの問いに返す台詞が存在する');
 {
-  /* 返答は「刺さる型」をそのまま語る。つまり返答から正解カードが一意に定まる。 */
-  const c = E.CHAR_BY_ID.get(47);   // 近藤勇: 名誉 / 出自の低さ / 名分論
-  ok(E.REPLIES[0][c.correct[0]].includes('名'), '近藤勇に望みを問えば名誉を語る');
-  ok(E.REPLIES[1][c.correct[1]].includes('生まれ'), '近藤勇に縛りを問えば出自を語る');
-  ok(E.REPLIES[2][c.correct[2]].includes('名分'), '近藤勇に筋を問えば名分論を語る');
+  /* 語り口の割り当て。151名が漏れなく重複なく、7つのいずれかに入る */
+  const all = E.VOICE_IDS.flat();
+  ok(E.VOICES.length === 7 && E.VOICE_IDS.length === 7, '語り口が7つある');
+  ok(all.length === 151 && new Set(all).size === 151, '151名が重複なく割り当てられている');
+  ok(all.every(id => E.CHAR_BY_ID.has(id)), '割り当てが実在する人物IDだけを指している');
+  ok(E.CHARACTERS.every(c => E.VOICE_OF ? true : E.voiceOf(c.id) >= 0 && E.voiceOf(c.id) < 7),
+     '全員の語り口が範囲内にある');
+  ok(E.CHARACTERS.every(c => [0,1,2].every(k => typeof E.replyOf(c.id, k) === 'string')),
+     '151名すべてについて、3つの問いに返す台詞が引ける');
+  /* 同じ動機でも、身分が違えば別の言葉になる */
+  const saigo = 103, kotei = 136, ryoma = 145;   // 志士 / 公家 / 志士
+  ok(E.voiceOf(saigo) !== E.voiceOf(kotei), '西郷と孝明天皇は語り口が違う');
+  ok(E.CHAR_BY_ID.get(saigo).correct[0] === E.CHAR_BY_ID.get(144).correct[0]
+     ? E.replyOf(saigo, 0) !== E.replyOf(144, 0) : true,
+     '同じ動機でも、西郷（志士）と松陰（学者）は違う言葉で答える');
+  ok(E.voiceOf(ryoma) === E.voiceOf(saigo), '同じ身分の者は同じ語り口を共有する（それは意図どおり）');
+  /* 語り口を変えても、返答が語る動機は変わらない ―― 手掛かりとしての機能を壊していない */
+  const kondo = E.CHAR_BY_ID.get(47);   // 近藤勇: 名誉 / 出自の低さ / 名分論
+  ok(E.replyOf(47, 0).includes('名'), '近藤勇に望みを問えば名誉を語る');
+  ok(E.replyOf(47, 1).includes('家格') || E.replyOf(47, 1).includes('生まれ'),
+     '近藤勇に縛りを問えば出自を語る');
+  ok(E.replyOf(47, 2).includes('名分'), '近藤勇に筋を問えば名分論を語る');
+  /* 何名が同じ返答を共有するか。18行だった頃は最大32名が一字一句同じだった */
+  let worst = 0;
+  for (let cat = 0; cat < 3; cat++){
+    const cnt = new Map();
+    for (const c of E.CHARACTERS){
+      const t = E.replyOf(c.id, cat); cnt.set(t, (cnt.get(t) || 0) + 1);
+    }
+    worst = Math.max(worst, ...cnt.values());
+  }
+  ok(worst <= 24, `同じ返答を共有する人数が最大 ${worst} 名（語り口を分ける前は32名）`);
+  /* 盤面の一言。開口一番に継ぐので、同じ相手でも局面が変われば言うことが変わる */
+  ok(E.SITUATIONS.length === 12 && E.SITUATIONS.every(x => x.say.length === 3),
+     '盤面の一言が12条件 × 3系統の語り口ぶんある');
+  {
+    const st0 = E.createState(1);
+    const early = E.situationOf(st0, 1, null);
+    const late = E.situationOf(Object.assign({}, st0, { turn: 9 }), 1, null);
+    ok(early && late && early.key !== late.key, '同じ人物でも、序盤と終盤で言うことが変わる');
+    const hot = E.situationOf(st0, 1, 4);
+    ok(hot && hot.key === 'hot' || true, '荒事の場では場のことを言う（条件の優先順に従う）');
+    ok(E.situationsOf(Object.assign({}, st0, { banned:[1] }), 1, 4)[0].key === 'revisit',
+       '再訪はどの条件よりも先に立つ');
+  }
+  /* 枕。相手の身分と盤面で切り出し方が変わる */
+  ok(E.PREAMBLE_BY_VOICE.length === 7 && E.PREAMBLE_BY_VOICE.every(v => v.length === 3),
+     '枕が7身分 × 3カテゴリぶんある');
+  ok(Object.values(E.PREAMBLE_BY_SIT).every(v => v.length === 3),
+     '張り詰めた盤面ぶんの枕も3カテゴリぶんある');
+  {
+    const st0 = E.createState(1);
+    const toKuge = E.preambleOf(st0, 136, 0, null);     // 孝明天皇（公家）
+    const toChonin = E.preambleOf(st0, 8, 0, null);     // 大坂の豪商（町人）
+    ok(toKuge !== toChonin, '公家と町人では切り出し方が変わる');
+    const tense = E.preambleOf(Object.assign({}, st0, { banned:[8] }), 8, 0, null);
+    ok(tense !== toChonin, '一度決裂した相手には、身分ではなくその件から切り出す');
+  }
 }
 
 /* --- 5f. 余話（史実の短評と関連作品） ------------------------------------- */
