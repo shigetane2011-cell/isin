@@ -142,9 +142,10 @@ console.log('残した約束:', vowSeen + '件');
 if (!tieSeen) errs.push('縁（紹介・悪評）の表示が通しプレイで一度も出なかった');
 /* --- 2周目: 因縁の確認 ---------------------------------------------------
    決裂した相手が荒事の場で待つ経路は、先に失敗しないと踏めない。
-   seed 1 は第2ターンで決裂するので、そこから再訪の札まで確実に辿れる。 */
+   seed 6 は第1ターンで決裂するので、そこから再訪の札まで確実に辿れる。
+   札の文面を変えると論証の字数が変わり基点IDも動くので、この seed は固定資産である。 */
 await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
-await p.fill('#seed', '1');
+await p.fill('#seed', '6');
 if (await p.$('#start-normal')) await p.click('#start-normal'); else await p.click('#start');
 let revisitSeen = 0, revisitTaken = 0, reconciled = 0;
 for (let t = 0; t < 11; t++){
@@ -177,7 +178,7 @@ for (let t = 0; t < 11; t++){
   const nx = await p.$('#next'); if (!nx) break; await nx.click();
 }
 console.log('再訪の札:', revisitSeen + '回（挑んだ ' + revisitTaken + '回）');
-if (!revisitSeen) errs.push('seed 1 で決裂したのに、荒事の場に再訪の札が出なかった');
+if (!revisitSeen) errs.push('seed 6 で決裂したのに、荒事の場に再訪の札が出なかった');
 await p.screenshot({ path: shot('10-revisit.png'), fullPage: true });
 
 console.log('スクリーンショット:', sp);
