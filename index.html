@@ -1485,31 +1485,31 @@ const situationOf = (st, charId, place) => situationsOf(st, charId, place)[0] ||
    核（勢力×カテゴリ×動機の90枚）はそのままに、
    ［枕］＋［核］で組むことで、90枚が相手と場面の数だけ違う文になる。
    ------------------------------------------------------------------------ */
-/* 相手の身分ごと × カテゴリごと（7 × 3） */
+/* 相手の身分ごと（7通り）。三点を述べる前に、一度だけ口を開く言葉。 */
 const PREAMBLE_BY_VOICE = [
-  [ /* 志士・浪士に */ '腹を割って申す', '足許のことを申す', '筋の話をいたす' ],
-  [ /* 武家・幕臣に */ '御役目の筋で申し上げる', '御家中の内情を承知の上で申す', '道理として申し上げる' ],
-  [ /* 公家・宮中に */ '畏れながら申し上げる', '御所の御事情は察しております', '筋道として申し上げます' ],
-  [ /* 町人・商人に */ '商いの話としてお聞きください', '町のことは存じております', '算盤の合う話をいたします' ],
-  [ /* 女に         */ '不躾を承知でお願い申します', 'お立場は分かっているつもりです', '筋としてお聞きください' ],
-  [ /* 学者・僧に   */ '理を立てて申し上げる', '事実として申し上げる', '論として申し上げる' ],
-  [ /* 異人・通詞に */ '率直に申し上げます', '事情はご存じかと思います', '筋を立ててお話しします' ],
+  '腹を割って申す',                 /* 志士・浪士に */
+  '御役目の筋で申し上げる',         /* 武家・幕臣に */
+  '畏れながら申し上げる',           /* 公家・宮中に */
+  '商いの話としてお聞きください',   /* 町人・商人に */
+  '不躾を承知でお願い申します',     /* 女に */
+  '理を立てて申し上げる',           /* 学者・僧に */
+  '率直に申し上げます',             /* 異人・通詞に */
 ];
-/* 盤面が張り詰めているときは、身分よりそちらから入る（条件 × カテゴリ） */
+/* 盤面が張り詰めているときは、身分よりそちらから入る */
 const PREAMBLE_BY_SIT = {
-  revisit:   ['前のことは詫びる。その上で申す', '前のことは詫びる。今度は仕舞いまで聞け', '前のことは詫びる。筋だけ通させてくれ'],
-  grudge:    ['悪い噂は承知の上で申す', '噂は届いていよう。その上で申す', '噂はさておき、筋の話をいたす'],
-  vouch:     ['あの方の顔に免じて聞いてくれ', 'あの方の紹介ゆえ、隠さず申す', 'あの方の名にかけて筋を通す'],
-  wary:      ['旗色は隠さぬ。その上で申す', 'こちらの立場は承知しておろう', '立場は違えど、筋は通る話をいたす'],
-  premature: ['今すぐの話ではない。だが申しておく', '世が熟すまでの話として聞かれよ', '早い話と思われようが、筋は変わらぬ'],
-  hot:       ['手短に申す', '長くは話せぬ。要点だけ申す', '一言で申す'],
-  late:      ['もう時がない。単刀直入に申す', '猶予はない。事情だけ申す', '時がない。筋だけ申す'],
+  revisit:   '前のことは詫びる。その上で申す',
+  grudge:    '悪い噂は承知の上で申す',
+  vouch:     'あの方の顔に免じて聞いてくれ',
+  wary:      '旗色は隠さぬ。その上で申す',
+  premature: '今すぐの話ではない。だが申しておく',
+  hot:       '手短に申す',
+  late:      'もう時がない。単刀直入に申す',
 };
-/* いま、この相手に、このカテゴリで切り出すときの枕 */
-function preambleOf(st, charId, cat, place){
+/* いま、この相手に切り出すときの枕。論証全体の頭に一度だけ置く。 */
+function preambleOf(st, charId, place){
   for (const s of situationsOf(st, charId, place))
-    if (PREAMBLE_BY_SIT[s.key]) return PREAMBLE_BY_SIT[s.key][cat];
-  return PREAMBLE_BY_VOICE[voiceOf(charId)][cat];
+    if (PREAMBLE_BY_SIT[s.key]) return PREAMBLE_BY_SIT[s.key];
+  return PREAMBLE_BY_VOICE[voiceOf(charId)];
 }
 
 /* --- 余話（史実の短評と、関連作品） --------------------------------------
@@ -2229,13 +2229,12 @@ function cardOptions(st, charId, faction){
 function composeArgument(argueF, cards, approach, pre, grp){
   const n = APPROACHES[approach ?? 0].cards;
   if (n === 0) return '（言葉ではなく、品を差し出した）';
-  return [0,1,2].slice(0, n)
-    .map(i => (pre && pre[i] ? pre[i] + '。' : '') + CARDS[argueF][i][cards[i]][grp || 0]).join('。') + '。';
+  const body = [0,1,2].slice(0, n).map(i => CARDS[argueF][i][cards[i]][grp || 0]).join('。');
+  return (pre ? pre + '。' : '') + body + '。';
 }
 /* いまの盤面で、この相手に向けて組み上がる論証 */
 const argumentFor = (st, action) => composeArgument(action.argueF, action.cards, action.approach,
-  [0,1,2].map(i => preambleOf(st, action.charId, i, action.place ?? null)),
-  listenerGroup(action.charId));
+  preambleOf(st, action.charId, action.place ?? null), listenerGroup(action.charId));
 
 /* 提示された論証が何枚刺さるか。警戒による格下げまで含めた実効の点数。 */
 /* 働きかけごとに、そもそも何を当てるのかが違う。
@@ -3173,9 +3172,9 @@ function viewCards(){
           ? '<span class="probed">◎ 残らず聞き出した — この交渉の獲得は 1 下がる</span>'
           : `<span class="probed" style="opacity:.6">読み切れないときは、<b>戻る</b>と「さらに聞き出す」が使えます（残り ${left} 回）</span>`}
       </div>
+      <div class="pre">切り出し：「${esc(E.preambleOf(st, ui.charId, ui.place))} ──」</div>
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
-        <div class="pre">「${esc(E.preambleOf(st, ui.charId, i, ui.place))} ──</div>
         ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.75">〔　〕はその札が訴えかける先です。この人物が何を欲しているかを当ててください。</div>' : ''}
         ${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
@@ -3205,34 +3204,40 @@ function viewCards(){
     const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
                 cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed,
                 approach: ui.approach, place: ui.place };
-    if (E.duelPending(st, a)){ ui.duelAction = a; ui.screen = 'duel'; render(); return; }
+    /* 刃が出ても画面は変えない。結果の流れの中で応じ方を訊く。 */
+    if (E.duelPending(st, a)){ ui.duelAction = a; ui.report = null; ui.screen = 'result'; render(); return; }
     const r = E.resolve(st, a);
     st = r.next; ui.report = r.report; ui.screen = 'result'; render();
   };
 }
 
-/* --- 画面: 立ち合い ------------------------------------------------------- */
-function viewDuel(){
+/* --- 画面: 結果（刃が出た場合は、その応じ方から） --------------------------- */
+/* 立ち合いは別画面をやめた。交渉の結果を見にいく途中で刃が出る、という一続きにする。
+   組み上げた論証をそのまま上に残すので、何を言った結果こうなったのかが切れない。 */
+function viewDuelInline(){
   const a = ui.duelAction, c = E.CHAR_BY_ID.get(a.charId);
-  app.innerHTML = headerHTML() +
+  const text = E.argumentFor(st, a);
+  app.innerHTML = headerHTML() + meetingVisualHTML(c) +
     `<div class="panel duel">
       <div class="kind">立ち合い</div>
       <div class="title">${esc(c.name)}が刀に手をかけた</div>
-      <p>${ui.duelAction.stance === 'convert'
+      <div class="quote">「${esc(text)}」</div>
+      <p>${a.stance === 'convert'
         ? `言い分がどうであれ、${esc(c.name)}は柄に手をかけた。転向を迫るとは、そういうことだ。`
         : `見え透いた世辞と受け取られた。${esc(c.name)}の目つきが変わり、柄に手がかかる。`}間合いは、もう詰まっている。</p>
       <div class="row" style="display:block">${E.DUELS.map((d, i) =>
         `<button class="choice" data-duel="${i}">${esc(d.label)}</button>`).join('')}</div>
-      <div class="small" style="margin-top:10px;opacity:.7">この男に何が通じるか ―― 望んでいるものを思い出せ。</div>
+      <div class="small" style="margin-top:10px;opacity:.7">この者に何が通じるか ―― 望んでいるものを思い出せ。</div>
     </div>`;
   app.querySelectorAll('[data-duel]').forEach(b => b.onclick = () => {
     const r = E.resolve(st, Object.assign({}, a, { duel: +b.dataset.duel }));
-    st = r.next; ui.report = r.report; ui.duelAction = null; ui.screen = 'result'; render();
+    st = r.next; ui.report = r.report; ui.duelAction = null; render();
   });
 }
 
 /* --- 画面: 結果 ---------------------------------------------------------- */
 function viewResult(){
+  if (ui.duelAction && !ui.report) return viewDuelInline();
   const r = ui.report, c = E.CHAR_BY_ID.get(r.charId);
   const guidedResult = !!(ui.guidedTutorial && st.actions.length === 1);
   const marks = r.hits.slice(0, r.nCards).map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
@@ -3401,7 +3406,7 @@ function wireSaveBox(){
 
 function render(){
   ({ title:viewTitle, meeting:viewMeeting, stance:viewStance, cards:viewCards,
-     duel:viewDuel, result:viewResult, ending:viewEnding })[ui.screen]();
+     result:viewResult, ending:viewEnding })[ui.screen]();
   wireSaveBox();
   /* Enter / Space でも押せるようにする（role="button" を付けた要素すべて） */
   app.querySelectorAll('[role="button"]').forEach(el => el.onkeydown = e => {

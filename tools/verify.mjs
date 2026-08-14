@@ -403,17 +403,25 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
        '再訪はどの条件よりも先に立つ');
   }
   /* 枕。相手の身分と盤面で切り出し方が変わる */
-  ok(E.PREAMBLE_BY_VOICE.length === 7 && E.PREAMBLE_BY_VOICE.every(v => v.length === 3),
-     '枕が7身分 × 3カテゴリぶんある');
-  ok(Object.values(E.PREAMBLE_BY_SIT).every(v => v.length === 3),
-     '張り詰めた盤面ぶんの枕も3カテゴリぶんある');
+  ok(E.PREAMBLE_BY_VOICE.length === 7 && E.PREAMBLE_BY_VOICE.every(v => typeof v === 'string' && v.length > 3),
+     '枕が7身分ぶんある（口を開くのは一度だけ）');
+  ok(Object.values(E.PREAMBLE_BY_SIT).every(v => typeof v === 'string' && v.length > 3),
+     '張り詰めた盤面ぶんの枕もある');
   {
     const st0 = E.createState(1);
-    const toKuge = E.preambleOf(st0, 136, 0, null);     // 孝明天皇（公家）
-    const toChonin = E.preambleOf(st0, 8, 0, null);     // 大坂の豪商（町人）
+    const toKuge = E.preambleOf(st0, 136, null);     // 孝明天皇（公家）
+    const toChonin = E.preambleOf(st0, 8, null);     // 大坂の豪商（町人）
     ok(toKuge !== toChonin, '公家と町人では切り出し方が変わる');
-    const tense = E.preambleOf(Object.assign({}, st0, { banned:[8] }), 8, 0, null);
+    const tense = E.preambleOf(Object.assign({}, st0, { banned:[8] }), 8, null);
     ok(tense !== toChonin, '一度決裂した相手には、身分ではなくその件から切り出す');
+    /* 枕が三度繰り返される不具合が出たので、論証に一度しか現れないことを固定する */
+    const c = E.CHAR_BY_ID.get(8);
+    const a = { charId:8, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+                cards:c.correct.slice(), probed:false, approach:0, place:null };
+    const text = E.argumentFor(st0, a);
+    const pre = E.preambleOf(st0, 8, null);
+    ok(text.split(pre).length - 1 === 1, `論証の中で枕は一度だけ（実測 ${text.split(pre).length - 1}回）`);
+    ok(text.startsWith(pre), '枕は論証の頭に置かれる');
   }
 }
 
