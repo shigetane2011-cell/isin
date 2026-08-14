@@ -1799,6 +1799,9 @@ function viewTitle(){
 function viewMeeting(){
   if (st.finished && ui.interludePicked === null) { ui.screen = 'ending'; return viewEnding(); }
   if (E.pendingInterlude(st) || ui.interludePicked !== null) return viewInterlude();
+  /* どの遷移で来ても、いま行ける場に居ないなら行き先選択へ戻す。
+     連泊の禁止（placesOpen が直前の場を外す）を画面側で取りこぼさないための番人 */
+  if (ui.place !== null && !E.placesOpen(st).includes(ui.place)) ui.place = null;
   if (ui.place === null) return viewPlace();
   const m = E.meetingList(st, ui.place);
   const era = E.eraOf(st);
@@ -1908,7 +1911,7 @@ function viewInterlude(){
   });
   const nx = document.getElementById('ilnext');
   if (nx) nx.onclick = () => {
-    ui.interludePicked = null; ui.interludeData = null;
+    ui.interludePicked = null; ui.interludeData = null; ui.place = null;
     ui.screen = st.finished ? 'ending' : 'meeting'; render();
   };
 }
@@ -2158,6 +2161,7 @@ function viewResult(){
     + saveBoxHTML();
   document.getElementById('next').onclick = () => {
     if (guidedResult) ui.guidedTutorial = false;
+    ui.place = null;                       // ターンが変われば行き先から選び直す
     ui.screen = st.finished ? 'ending' : 'meeting'; render();
   };
 }

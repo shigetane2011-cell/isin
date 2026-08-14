@@ -439,6 +439,29 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   ok(early.length === 5 && late.length === 6, '江戸城中は中級期になってから開く');
 }
 {
+  /* 同じ場に連泊できないこと。resolve が居た場を残し、次のターンの候補から外れる */
+  const rnd = E.mulberry32(4649);
+  let stx = E.createState(20250814), prev = null, unrecorded = 0, repeat = 0, empty = 0;
+  while (!stx.finished){
+    if (E.pendingInterlude(stx)) stx = E.applyInterlude(stx, 0);
+    if (stx.finished) break;
+    const open = E.placesOpen(stx);
+    if (!open.length) { empty++; break; }
+    if (prev !== null && open.includes(prev)) repeat++;
+    const pl = open[Math.floor(rnd() * open.length)];
+    const id = E.meetingList(stx, pl).normal[0], ch = E.CHAR_BY_ID.get(id);
+    const a = { charId:id, stance:'support', ownF:ch.factions[0], argueF:ch.factions[0],
+                cards:ch.correct.slice(), probed:false, approach:0, place:pl };
+    if (E.duelPending(stx, a)) a.duel = 0;
+    stx = E.resolve(stx, a).next;
+    if (stx.lastPlace !== pl) unrecorded++;
+    prev = pl;
+  }
+  ok(unrecorded === 0, '居た場が毎ターン状態に記録される');
+  ok(repeat === 0, '直前に居た場は次のターンの行き先候補から外れる（10ターン通し）');
+  ok(empty === 0, '一つ外しても、行ける場は必ず残る');
+}
+{
   /* 場ごとに顔ぶれが偏るか */
   const share = pl => {
     const cnt = [0,0,0,0,0]; let tot = 0;
