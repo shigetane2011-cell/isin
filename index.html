@@ -9,7 +9,7 @@
 <meta name="color-scheme" content="light">
 <meta property="og:type" content="website">
 <meta property="og:title" content="維新の乱流 ― 幕末、日本の夜明けを設計せよ ―">
-<meta property="og:description" content="人物の欲望・立場・論理を読み、言葉で歴史を動かす幕末シミュレーション。同じseedと同じ選択なら盤面は必ず同じになる完全決定論エンジン。">
+<meta property="og:description" content="人物の欲望・立場・論理を読み、ときに刃をかわしながら歴史を動かす幕末シミュレーション。同じseedと同じ選択なら盤面は必ず同じになる完全決定論エンジン。">
 <meta property="og:url" content="https://shigetane2011-cell.github.io/isin/">
 <meta property="og:image" content="https://shigetane2011-cell.github.io/isin/assets/hero-bakumatsu.webp">
 <meta property="og:image:type" content="image/webp">
@@ -133,7 +133,10 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person .nick{font-size:.82rem;color:var(--sumi2);margin-top:2px}
 .person .desc{font-size:.86rem;margin-top:8px;padding-left:10px;border-left:2px solid var(--line);color:var(--sumi2)}
 .person.intro{border-left:4px solid var(--kin)}
-.person.place{border-left:4px solid var(--ai)}
+.person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
+.person.place::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
+.uibadge{color:var(--kin);font-weight:600}
 .warn{color:var(--shu);font-size:.78rem;margin-top:6px}
 button{font-family:inherit;font-size:.9rem;background:var(--washi2);border:1px solid var(--sumi2);color:var(--sumi);
   padding:8px 16px;border-radius:2px;cursor:pointer;letter-spacing:.08em}
@@ -1476,7 +1479,9 @@ function resolve(st, action){
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     delta: cur.map((v, i) => v - before[i]),
     verdict: succeeded ? (score === 3 ? '大成功' : '成功') : ['決裂','失敗','失敗','失敗'][score],
-    contactAdded: succeeded, bannedNow: score === 0,
+    /* 立ち合いで覆ることがあるので、表示は実際の状態変化から決める */
+    contactAdded: contacts.includes(action.charId) && !st.contacts.includes(action.charId),
+    bannedNow: banned.includes(action.charId) && !st.banned.includes(action.charId),
   }};
 }
 
@@ -1803,7 +1808,7 @@ function viewMeeting(){
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>面会可能な人物</h2>
-      ${guidedTurn() ? coachHTML('一', '人物を一人選ぶ', 'まずは各人物の<b>【情勢】</b>を読み、誰が何に困り、何を欲しているかを見比べます。練習なので、今回は気になる相手を自由に選んでください。') : ''}
+      ${guidedTurn() ? coachHTML('二', '人物を一人選ぶ', 'まずは各人物の<b>【情勢】</b>を読み、誰が何に困り、何を欲しているかを見比べます。練習なので、今回は気になる相手を自由に選んでください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
@@ -1826,25 +1831,29 @@ function viewMeeting(){
 
 /* --- 画面: 行き先 --------------------------------------------------------- */
 function viewPlace(){
-  const open = E.placesOpen(st);
+  const open = guidedTurn() ? [0] : E.placesOpen(st);   // 練習は祇園の茶屋に固定
     const locked = E.PLACES.map((p, i) => i).filter(i => !open.includes(i));
   const card = i => {
     const p = E.PLACES[i];
-    return `<div class="person place" data-place="${i}" role="button" tabindex="0">
+    const fa = fac(p.favor[0]).key, fb = fac(p.favor[p.favor.length - 1]).key;
+    return `<div class="person place" data-place="${i}" role="button" tabindex="0"
+      style="--pf-a:var(--${fa});--pf-b:var(--${fb})">
       <div><span class="nm">${esc(p.name)}</span><span class="tag">${esc(p.where)}</span>
         ${p.favor.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('')}
         ${p.hot ? '<span class="tag" style="color:var(--shu)">荒事</span>' : ''}</div>
       <div class="desc">${esc(p.desc)}</div>
       <div class="small" style="margin-top:6px">
         使える働きかけ：${p.allow.map(a => E.APPROACHES[a].name).join('・')}
-        ／ この場で深く刺さるのは <b>${esc(E.APPROACHES[p.boost].name)}</b></div>
+        ／ この場で深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[p.boost].name)}</span></div>
     </div>`;
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>どこへ行きますか</h2>
-      <div class="small" style="margin-bottom:8px">場によって集まる者が変わり、できる働きかけも変わります。</div>
+      ${guidedTurn()
+        ? coachHTML('一', 'まずは茶屋へ', '毎ターン、はじめに行き先を選びます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定します。')
+        : '<div class="small" style="margin-bottom:8px">場によって集まる者が変わり、できる働きかけも変わります。</div>'}
       ${open.map(card).join('')}
-      ${locked.map(i => `<div class="person" style="opacity:.4">
+      ${(guidedTurn() ? [] : locked).map(i => `<div class="person" style="opacity:.4">
         <div><span class="nm">${esc(E.PLACES[i].name)}</span><span class="tag">${esc(E.PLACES[i].where)}</span></div>
         <div class="small">${i === st.lastPlace
           ? '昨日も通った。続けて顔を出せば噂になる'
@@ -1918,17 +1927,19 @@ function viewStance(){
       const left = E.PROBE_LIMIT - st.probesUsed;
       body = `<p>どう働きかけますか？</p>
         <div class="row" style="display:block">${E.APPROACHES.map((a, i) => {
+          const noGuide = guidedTurn() && i !== 0;
           const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
           const noConvert = ui.stance === 'convert' && !E.canConvert(i);
           const noProbe = i === 2 && left <= 0;
-          const off = noPlace || noConvert || noProbe;
-          const why = noPlace ? `（${esc(E.PLACES[ui.place].name)}ではできない）`
+          const off = noGuide || noPlace || noConvert || noProbe;
+          const why = noGuide ? '（練習では論じるに絞ります）'
+                    : noPlace ? `（${esc(E.PLACES[ui.place].name)}ではできない）`
                     : noConvert ? '（転向は論じるか肚を割るでしか通らない）'
                     : noProbe ? '（探りを使い切っている）' : '';
           return `<button class="choice" data-approach="${i}" ${off ? 'disabled' : ''}>
             <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small">カード${a.cards}枚</span>`}
             ${ui.place !== null && E.PLACES[ui.place].boost === i && !off
-              ? '<span class="small" style="color:var(--yuhan)">　◎ この場に合う</span>' : ''}
+              ? '<span class="small uibadge">　◎ この場に合う</span>' : ''}
             <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`;
         }).join('')}</div>
         <div class="small" style="margin-top:8px;opacity:.7">相手に響く当たり方は、その者が何を望んでいるかで決まります。</div>`;
@@ -1976,8 +1987,8 @@ function viewStance(){
 
   const guide = guidedTurn()
     ? ui.ownF === null && c.factions.length > 1
-      ? coachHTML('二', '向き合う属性を決める', `${esc(c.name)}は複数の勢力に属します。練習で読み解く側面を一つ選んでください。`)
-      : coachHTML('二', 'まずは支持で仕組みを覚える', '支持は<b>3枚中2枚一致でも成功</b>します。練習では転向を封じ、次の画面で正解と根拠を見ながら3枚を組みます。')
+      ? coachHTML('三', '向き合う属性を決める', `${esc(c.name)}は複数の勢力に属します。練習で読み解く側面を一つ選んでください。`)
+      : coachHTML('三', 'まずは支持と「論じる」で仕組みを覚える', '支持は<b>3枚中2枚一致でも成功</b>します。練習では転向と、論じる以外の働きかけを封じ、次の画面で正解と根拠を見ながら3枚を組みます。')
     : '';
 
   app.innerHTML = headerHTML() + meetingVisualHTML(c) +
@@ -2104,8 +2115,8 @@ function viewResult(){
       <div class="quote">「${esc(r.text)}」</div>
       ${marks}
       <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
-        r.placeFits ? '　<span style="color:var(--yuhan)">◎ 場に合った（獲得+1）</span>' : ''}${
-        r.fits ? '　<span style="color:var(--yuhan)">◎ この者に響いた（獲得+1）</span>'
+        r.placeFits ? '　<span class="uibadge">◎ 場に合った（獲得+1）</span>' : ''}${
+        r.fits ? '　<span class="uibadge">◎ この者に響いた（獲得+1）</span>'
                : r.approach >= 2 ? '　<span style="color:var(--shu)">読み違え（一段下がった）</span>' : ''}</div>
       ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
         <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}

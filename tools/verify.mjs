@@ -503,6 +503,22 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   ok(rejected === 2, '不正な場の番号を弾く');
 }
 
+{
+  /* 交渉で決裂しても立ち合いに勝てば覆る。表示用のフラグが実際の状態と食い違わないこと */
+  const st2 = E.createState(1), c2 = E.CHAR_BY_ID.get(47);
+  const wrong2 = [0,1,2].map(k => [0,1,2,3,4,5].find(m => m !== c2.correct[k]));
+  const win = E.resolve(st2, { charId:47, stance:'convert', ownF:2, argueF:4, cards:wrong2,
+                               probed:false, approach:0, duel:E.DUEL_ANSWER[c2.correct[0]] });
+  ok(win.report.contactAdded === win.next.contacts.includes(47)
+     && win.report.bannedNow === win.next.banned.includes(47),
+     '決裂後に立ち合いへ勝ったとき、表示フラグが実際の状態と一致する');
+  ok(win.report.contactAdded && !win.report.bannedNow,
+     '「人脈に加わった」と「二度と現れない」が同時に出ない');
+  const lose = E.resolve(st2, { charId:47, stance:'convert', ownF:2, argueF:4, cards:wrong2,
+                                probed:false, approach:0, duel:(E.DUEL_ANSWER[c2.correct[0]] + 1) % 3 });
+  ok(!lose.report.contactAdded && lose.report.bannedNow, '敗れたときは出現停止だけが出る');
+}
+
 /* --- 5g. 幕間「政変」 ------------------------------------------------------ */
 head('5g. 第8ターンの幕間');
 {
