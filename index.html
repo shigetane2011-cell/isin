@@ -151,6 +151,8 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 /* 人物の絵。勢力の情景は横長の帯だが、本人の絵は縦長で中央に置く */
 .story-visual.portrait-visual .visual-images{max-width:340px;margin:0 auto}
 .story-visual.portrait-visual img{aspect-ratio:3/4;object-fit:cover}
+.say.worldview{border-left-color:var(--sumi2);opacity:.9}
+.detail.savefold{margin-top:14px}
 .card .mv{color:var(--sumi2);font-weight:600;margin-right:2px}
 .card.sel .mv,.card.ans .mv{color:inherit}
 .person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
@@ -2753,7 +2755,6 @@ function headerHTML(){
       <span>${st.finished
         ? `全 <b>${E.MAX_TURN}</b> ターン 終了`
         : `第 <b>${st.turn}</b> ターン / 残り <b>${E.MAX_TURN - st.turn + 1}</b>`}</span>
-      <span>seed <code class="seed">${st.seed}</code></span>
       <span>時代ランク <b>${E.ERAS[E.eraOf(st)]}</b></span>
       <span>探り 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
     </div></header>`;
@@ -2922,14 +2923,14 @@ function viewMeeting(){
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
         そこから3名が選ばれています。時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
       </details>
-    </div>` + saveBoxHTML();
+    </div>`;
   const rp = document.getElementById('replace');
   if (rp) rp.onclick = () => { ui.place = null; render(); };
   app.querySelectorAll('.person').forEach(el => el.onclick = () => {
     if (el.dataset.id === undefined) return;
     ui.charId = +el.dataset.id; ui.intro = el.classList.contains('intro');
     ui.stance = null; ui.ownF = null; ui.argueF = null;
-    ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null; ui.chatted = [];
+    ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null;
     ui.screen = 'stance'; render();
   });
 }
@@ -2963,7 +2964,7 @@ function viewPlace(){
         <div class="small">${i === st.lastPlace
           ? '昨日も通った。続けて顔を出せば噂になる'
           : `まだ登れる身分ではない（${E.ERAS[E.PLACES[i].unlockEra]}から）`}</div></div>`).join('')}
-    </div>` + saveBoxHTML();
+    </div>`;
   app.querySelectorAll('[data-place]').forEach(el => el.onclick = () => { ui.place = +el.dataset.place; render(); });
   app.querySelectorAll('[role="button"]').forEach(el => el.onkeydown = e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
@@ -3072,14 +3073,6 @@ function viewStance(){
       esc(E.replyOf(ui.charId, ui.asked))}
       <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[ui.asked].name)}</b>は
       <span class="uibadge">〔${esc(E.CATS[ui.asked].motives[c.correct[ui.asked]])}〕</span></div></div>`);
-  for (const k of ui.chatted)
-    said.push(k === 'impression'
-      ? `<div class="say"><span class="q">「拙者をどう見ておられる」</span><br>${
-          wb0 >= 0
-            ? esc(`〔${fac(wb0).name}〕の御方だと聞いておる。……何を申されても、そちらの利になるだけであろう。`)
-            : esc('まだ何者とも決めかねておる。だからこうして会うておるのだ。')}</div>`
-      : `<div class="say"><span class="q">「${esc(E.SMALLTALK[0].chip)}」</span><br>${
-          esc(E.SMALLTALK[0].lines[ui.ownF ?? c.factions[0]][E.TONE_OF_VOICE[E.voiceOf(ui.charId)]])}</div>`);
 
   const chips = `
     <div class="slot-h">対話 <span style="opacity:.7">— 踏み込んだ問いは<b>一つだけ</b>。返答は、その者に何が刺さるかを語る</span></div>
@@ -3089,10 +3082,6 @@ function viewStance(){
         : ui.asked !== null
           ? `<span class="chip spent">${esc(q.chip)}</span>`
           : `<button class="chip" data-ask="${i}">${esc(q.chip)}</button>`).join('')}
-    </div>
-    <div class="row">
-      ${ui.chatted.includes('era') ? '' : `<button class="chip talk" data-chat="era">${esc(E.SMALLTALK[0].chip)}</button>`}
-      ${ui.chatted.includes('impression') ? '' : '<button class="chip talk" data-chat="impression">拙者をどう見ておられる</button>'}
     </div>
     ${said.join('')}
     ${(() => {
@@ -3122,11 +3111,11 @@ function viewStance(){
       <div class="opening">「${esc(E.SAYS.get(ui.charId) || '')}」</div>
       ${(() => { const sit = E.situationOf(st, ui.charId, ui.place);
         return sit ? `<div class="opening sit">「── ${esc(sit.text)}」</div>` : ''; })()}
-      ${guide}<div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
+      ${guide}<div class="quote">${esc(c.desc)}</div>
+      <div class="say worldview">${esc(E.SMALLTALK[0].lines[ui.ownF ?? c.factions[0]][E.TONE_OF_VOICE[E.voiceOf(ui.charId)]])}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
   app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
-  app.querySelectorAll('[data-chat]').forEach(b => b.onclick = () => { ui.chatted.push(b.dataset.chat); render(); });
   app.querySelectorAll('[data-own]').forEach(b => b.onclick = () => { ui.ownF = +b.dataset.own; render(); });
   app.querySelectorAll('[data-stance]').forEach(b => b.onclick = () => {
     ui.stance = b.dataset.stance;
@@ -3303,7 +3292,7 @@ function viewResult(){
       <div class="small" style="margin-top:8px;opacity:.7">この論証は ${r.len} 字。次の面会者はこの数から導かれます。</div>
     </div>` + chartHTML() +
     `<div class="row"><button class="primary" id="next">${st.finished?'結末を見る':guidedResult?'第2ターンへ（通常進行）':'次のターンへ'}</button></div>`
-    + saveBoxHTML();
+    + `<details class="detail savefold"><summary>この盤面を保存・共有する</summary>${saveBoxHTML()}</details>`;
   document.getElementById('next').onclick = () => {
     if (guidedResult) ui.guidedTutorial = false;
     ui.place = null;                       // ターンが変われば行き先から選び直す
@@ -3387,7 +3376,7 @@ function epilogueHTML(ending){
 
 function saveBoxHTML(){
   return `<div class="panel"><h2>保存 / 共有</h2>
-    <div class="small">このコードを控えれば、同じ盤面をいつでも再現できます。</div>
+    <div class="small">このコードを控えれば、同じ盤面をいつでも再現できます（seed <code class="seed">${st.seed}</code>）。</div>
     <textarea readonly id="savebox">${esc(E.encodeSave(st))}</textarea>
     <div class="row"><button id="copy">コードをコピー</button><span id="copied" class="small"></span></div>
     <div class="small" style="opacity:.7">state hash: <code class="seed">${E.hashState(st)}</code></div>
