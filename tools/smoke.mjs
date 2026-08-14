@@ -34,7 +34,8 @@ else await p.click('#start');
 const visited = [];
 const pickPlace = async shotName => {
   await p.waitForSelector('[data-place]');
-  const names = await p.$$eval('[data-place] .nm', e => e.map(x => x.textContent));
+  const names = await p.$$eval('[data-place] .nm', e => e.map(x => x.textContent.trim()));
+  if (!names.length) errs.push('行き先の候補が読み取れない（.nm が無い）');
   const prev = visited[visited.length - 1];
   if (prev && names.includes(prev)) errs.push(`連泊できる: 前ターンの「${prev}」が行き先候補に残っている`);
   if (shotName) await p.screenshot({ path: shot(shotName), fullPage: true });
@@ -154,9 +155,8 @@ for (let t = 0; t < 11; t++){
                                 if (await p.$('.ending')) break; }
   if (await p.$('[data-place]')){
     /* 決裂した相手がいるなら荒事の場へ向かう */
-    const hot = await p.$('[data-place] .tag:text-is("荒事")');
-    await (hot ? (await hot.evaluateHandle(e => e.closest('[data-place]'))).asElement()
-               : await p.$('[data-place]')).click();
+    const hot = await p.$('[data-place][data-hot]');
+    await (hot || await p.$('[data-place]')).click();
   }
   await p.waitForSelector('.person[data-id]');
   const rv = await p.$('.person.revisit');

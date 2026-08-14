@@ -153,6 +153,15 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .story-visual.portrait-visual img{aspect-ratio:3/4;object-fit:cover}
 .say.worldview{border-left-color:var(--sumi2);opacity:.9}
 .detail.savefold{margin-top:14px}
+/* 行き先の選択列。別画面をやめて面会候補と同じ画面に載せる */
+.placebar{margin-bottom:10px}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.placechip{font-size:.85rem;padding:6px 11px;text-align:left;line-height:1.35}
+.placechip .nm{font-weight:600}
+.placechip .small{display:block;opacity:.85;font-size:.72rem;margin-top:1px}
+.placechip.on{background:var(--sumi);color:var(--washi2);border-color:var(--sumi)}
+.placechip.on .small span{color:var(--washi2)}
+.placebar .locked{margin-top:6px;opacity:.5}
 .card .mv{color:var(--sumi2);font-weight:600;margin-right:2px}
 .card.sel .mv,.card.ans .mv{color:inherit}
 .person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
@@ -2878,7 +2887,10 @@ function viewMeeting(){
   /* どの遷移で来ても、いま行ける場に居ないなら行き先選択へ戻す。
      連泊の禁止（placesOpen が直前の場を外す）を画面側で取りこぼさないための番人 */
   if (ui.place !== null && !E.placesOpen(st).includes(ui.place)) ui.place = null;
-  if (ui.place === null) return viewPlace();
+  /* 行き先と面会候補は同じ画面にまとめる。未定なら先頭の場を仮に選んでおく。 */
+  const openPlaces = guidedTurn() ? [0] : E.placesOpen(st);
+  if (ui.place === null || !openPlaces.includes(ui.place)) ui.place = openPlaces[0];
+  const lockedPlaces = guidedTurn() ? [] : E.PLACES.map((p, i) => i).filter(i => !openPlaces.includes(i));
   const m = E.meetingList(st, ui.place);
   const era = E.eraOf(st);
   const pl = E.PLACES[ui.place];
@@ -2908,13 +2920,27 @@ function viewMeeting(){
       ${again}${isRevisit ? '' : tie}${pre}${isRevisit ? '' : wary}${hot}</div>`;
   };
   app.innerHTML = headerHTML() + chartHTML() +
-    `<div class="panel"><h2>面会可能な人物</h2>
+    `<div class="panel"><h2>どこへ行き、誰に会うか</h2>
+      <div class="placebar">
+        <div class="small">行き先を選ぶと、下の面会候補もそのまま入れ替わります。</div>
+        <div class="chiprow">${openPlaces.map(i => {
+          const q = E.PLACES[i];
+          return `<button class="placechip ${i === ui.place ? 'on' : ''}" data-place="${i}"${
+            q.hot ? ' data-hot="1"' : ''}><span class="nm">${esc(q.name)}</span>
+            <span class="small">${q.favor.map(f => `<span class="${fac(f).cls}">${fac(f).name}</span>`).join('・')}${
+              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}</span></button>`;
+        }).join('')}</div>
+        ${lockedPlaces.length ? `<div class="small locked">${lockedPlaces.map(i =>
+          `${esc(E.PLACES[i].name)}（${i === st.lastPlace ? '昨日も通った'
+            : E.ERAS[E.PLACES[i].unlockEra] + 'から'}）`).join('　')}</div>` : ''}
+      </div>
       <div class="here" style="--pf-a:var(--${pfa});--pf-b:var(--${pfb})">
         <div><span class="lbl">現在地</span><span class="nm">${esc(pl.name)}</span><span class="tag">${esc(pl.where)}</span></div>
         <div class="desc">${esc(pl.desc)}</div>
-        <div class="row"><button id="replace">行き先を変更する<span class="small">（面会候補も変わります）</span></button></div>
+        <div class="small" style="margin-top:5px">使える働きかけ：${pl.allow.map(a => E.APPROACHES[a].name).join('・')}
+          ／ ここで深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[pl.boost].name)}</span></div>
       </div>
-      ${guidedTurn() ? coachHTML('二', '人物を一人選ぶ', 'まずは各人物の<b>【情勢】</b>を読み、誰が何に困り、何を欲しているかを見比べます。練習なので、今回は気になる相手を自由に選んでください。') : ''}
+      ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
@@ -2924,50 +2950,15 @@ function viewMeeting(){
         そこから3名が選ばれています。時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
       </details>
     </div>`;
-  const rp = document.getElementById('replace');
-  if (rp) rp.onclick = () => { ui.place = null; render(); };
+  app.querySelectorAll('[data-place]').forEach(el => el.onclick = () => {
+    ui.place = +el.dataset.place; render();
+  });
   app.querySelectorAll('.person').forEach(el => el.onclick = () => {
     if (el.dataset.id === undefined) return;
     ui.charId = +el.dataset.id; ui.intro = el.classList.contains('intro');
     ui.stance = null; ui.ownF = null; ui.argueF = null;
     ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null;
     ui.screen = 'stance'; render();
-  });
-}
-
-/* --- 画面: 行き先 --------------------------------------------------------- */
-function viewPlace(){
-  const open = guidedTurn() ? [0] : E.placesOpen(st);   // 練習は祇園の茶屋に固定
-    const locked = E.PLACES.map((p, i) => i).filter(i => !open.includes(i));
-  const card = i => {
-    const p = E.PLACES[i];
-    const fa = fac(p.favor[0]).key, fb = fac(p.favor[p.favor.length - 1]).key;
-    return `<div class="person place" data-place="${i}" role="button" tabindex="0"
-      style="--pf-a:var(--${fa});--pf-b:var(--${fb})">
-      <div><span class="nm">${esc(p.name)}</span><span class="tag">${esc(p.where)}</span>
-        ${p.favor.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('')}
-        ${p.hot ? '<span class="tag" style="color:var(--shu)">荒事</span>' : ''}</div>
-      <div class="desc">${esc(p.desc)}</div>
-      <div class="small" style="margin-top:6px">
-        使える働きかけ：${p.allow.map(a => E.APPROACHES[a].name).join('・')}
-        ／ この場で深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[p.boost].name)}</span></div>
-    </div>`;
-  };
-  app.innerHTML = headerHTML() + chartHTML() +
-    `<div class="panel"><h2>どこへ行きますか</h2>
-      ${guidedTurn()
-        ? coachHTML('一', 'まずは茶屋へ', '毎ターン、はじめに行き先を選びます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定します。')
-        : '<div class="small" style="margin-bottom:8px">場によって集まる者が変わり、できる働きかけも変わります。</div>'}
-      ${open.map(card).join('')}
-      ${(guidedTurn() ? [] : locked).map(i => `<div class="person" style="opacity:.4">
-        <div><span class="nm">${esc(E.PLACES[i].name)}</span><span class="tag">${esc(E.PLACES[i].where)}</span></div>
-        <div class="small">${i === st.lastPlace
-          ? '昨日も通った。続けて顔を出せば噂になる'
-          : `まだ登れる身分ではない（${E.ERAS[E.PLACES[i].unlockEra]}から）`}</div></div>`).join('')}
-    </div>`;
-  app.querySelectorAll('[data-place]').forEach(el => el.onclick = () => { ui.place = +el.dataset.place; render(); });
-  app.querySelectorAll('[role="button"]').forEach(el => el.onkeydown = e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
   });
 }
 
