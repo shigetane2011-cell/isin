@@ -108,8 +108,17 @@ button.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:12px
 .fate{border-left:3px solid var(--line);padding:8px 12px;margin:8px 0;font-size:.9rem}
 .fate.won{border-left-color:var(--yuhan)}
 .fate.lost{border-left-color:var(--sumi2);opacity:.85}
-.tut{border:1px dashed var(--ai);background:#fbfaf5;padding:12px 14px;margin:10px 0;font-size:.86rem}
-.tut b{color:var(--ai)}
+.tutorial-offer,.coach{border:1px solid rgba(177,123,36,.62);background:linear-gradient(105deg,rgba(177,123,36,.12),#fffdf7 72%);
+  padding:12px 14px;margin:12px 0;font-size:.86rem;box-shadow:inset 4px 0 0 rgba(177,123,36,.5)}
+.tutorial-offer .title,.coach .title{font-weight:700;letter-spacing:.1em;color:#7c551c}
+.coach .step{display:inline-block;margin-right:7px;padding:1px 7px;border:1px solid currentColor;border-radius:9px;
+  color:#7c551c;font-size:.7rem;font-weight:700;letter-spacing:.08em}
+.coach p{margin:5px 0 0}
+.card.guide-answer{border:2px solid var(--kin);background:linear-gradient(100deg,rgba(177,123,36,.13),#fffdf7 68%)}
+.card.guide-decoy{opacity:.48;cursor:not-allowed}
+.card.guide-decoy:hover{border-color:var(--line)}
+.guide-reason{margin-top:6px;padding-top:6px;border-top:1px dotted rgba(177,123,36,.55);color:var(--sumi2);font-size:.76rem;line-height:1.65}
+.guide-reason b{color:#7c551c}
 .person .nm{font-size:1.05rem;font-weight:600;letter-spacing:.06em}
 .person .tag{font-size:.72rem;border:1px solid currentColor;padding:1px 6px;margin-left:8px;vertical-align:2px;border-radius:2px}
 .person .nick{font-size:.82rem;color:var(--sumi2);margin-top:2px}
@@ -1255,13 +1264,40 @@ let st = null;
 let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
            picks:[null,null,null], probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null,
-           opts:null, report:null, intro:false };
+           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fac = i => E.FACTIONS[i];
 const bar = v => '█'.repeat(Math.floor(v/2)) + '░'.repeat(20 - Math.floor(v/2));
 const pad = v => String(v).padStart(2,'0');
 const FACTION_RGB = ['111,74,142','44,111,156','63,112,77','177,123,36','167,55,50'];
+const TUTORIAL_SEEN_KEY = 'isin:first-turn-tutorial:v1';
+
+function freshSeed(){
+  try {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return (a[0] % 999999999) + 1;
+  } catch { return 1868; }
+}
+function tutorialSeen(){
+  try { return localStorage.getItem(TUTORIAL_SEEN_KEY) === '1'; }
+  catch { return false; }
+}
+function markTutorialSeen(){
+  try { localStorage.setItem(TUTORIAL_SEEN_KEY, '1'); }
+  catch { /* 保存できない環境でもゲームは続ける */ }
+}
+function guidedTurn(){ return !!(ui.guidedTutorial && st && st.turn === 1); }
+function coachHTML(step, title, body){
+  return `<div class="coach"><div class="title"><span class="step">${esc(step)}</span>${esc(title)}</div><p>${body}</p></div>`;
+}
+function tutorialReasonHTML(c, i){
+  const motive = E.CATS[i].motives[c.correct[i]];
+  const reply = E.REPLIES[i][c.correct[i]];
+  return `<div class="guide-reason"><b>根拠</b>：「${esc(E.QUESTIONS[i].chip)}」と問えば、相手は「${esc(reply)}」と答える。
+    この返答が〈${esc(motive)}〉を示している。</div>`;
+}
 
 function toneStyle(factions){
   const fs = factions && factions.length ? factions : [];
@@ -1334,6 +1370,8 @@ function headerHTML(){
 
 /* --- 画面: タイトル ------------------------------------------------------ */
 function viewTitle(){
+  if (ui.seedDraft === null) ui.seedDraft = freshSeed();
+  const offerTutorial = !tutorialSeen();
   app.innerHTML = `<section class="title-hero" aria-label="幕末の城下と黒船を望み、それぞれの未来を見据える人々">
     <div class="hero-copy"><h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1></div>
   </section>
@@ -1359,9 +1397,16 @@ function viewTitle(){
     元の獲得が大きい大物ほど代償は相対的に軽いので、<b>探りは大物と、失敗できない転向に取っておくのが得</b>です。</p>
     <p class="small">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</p>
     <div class="row" style="align-items:center">
-      <label class="small">seed <input id="seed" type="number" value="1868" style="width:9em;font-family:monospace;padding:5px;border:1px solid var(--line)"></label>
-      <button class="primary" id="start">開始する</button>
+      <label class="small">seed <input id="seed" type="number" min="1" max="999999999" value="${ui.seedDraft}" style="width:9em;font-family:monospace;padding:5px;border:1px solid var(--line)"></label>
+      <button class="chip" id="reroll-seed">seedを振り直す</button>
+      ${offerTutorial ? '' : '<button class="primary" id="start">開始する</button>'}
     </div>
+    ${offerTutorial ? `<div class="tutorial-offer">
+      <div class="title">はじめての方へ ― 一手だけ読み方を学ぶ</div>
+      <p>最初の1ターンだけ、3枚の正解と「人物のどの返答が根拠になるか」を開示できます。
+      第2ターンからは通常ルールに戻ります。不要なら説明なしで始められます。</p>
+      <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
+    </div>` : ''}
     <hr>
     <div class="small">保存コードから再開：</div>
     <textarea id="code" placeholder="IR4:1868:47,0,2,2,053,0;...#1"></textarea>
@@ -1370,16 +1415,27 @@ function viewTitle(){
     <hr>
     <p class="small" style="opacity:.85">※ 本作は史実を題材にした<b>フィクション</b>です。人物の勢力分類・性格づけ・台詞・「刺さる動機」は、すべてゲーム上の解釈であり、史実の評価ではありません。実在の人物・団体への評価を意図するものではありません。</p>
   </div>`;
-  document.getElementById('start').onclick = () => {
+  const startGame = guided => {
     const v = parseInt(document.getElementById('seed').value, 10);
     st = E.createState(Number.isFinite(v) ? v : 1868);
+    ui.seedDraft = st.seed; ui.guidedTutorial = guided; markTutorialSeen();
     ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null;
     ui.screen = 'meeting'; render();
+  };
+  const start = document.getElementById('start');
+  if (start) start.onclick = () => startGame(false);
+  const startGuide = document.getElementById('start-guide');
+  if (startGuide) startGuide.onclick = () => startGame(true);
+  const startNormal = document.getElementById('start-normal');
+  if (startNormal) startNormal.onclick = () => startGame(false);
+  document.getElementById('reroll-seed').onclick = () => {
+    ui.seedDraft = freshSeed(); document.getElementById('seed').value = ui.seedDraft;
   };
   document.getElementById('load').onclick = () => {
     try {
       const { seed, actions, interludeChoice } = E.decodeSave(document.getElementById('code').value);
       st = E.replay(seed, actions, interludeChoice).state;
+      ui.seedDraft = seed; ui.guidedTutorial = false; markTutorialSeen();
       ui.interludePicked = null; ui.interludeData = null;
       ui.screen = st.finished ? 'ending' : 'meeting'; render();
     } catch (e){ document.getElementById('err').textContent = '読み込めません: ' + e.message; }
@@ -1408,6 +1464,7 @@ function viewMeeting(){
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>面会可能な人物</h2>
+      ${guidedTurn() ? coachHTML('一', '人物を一人選ぶ', 'まずは各人物の<b>【情勢】</b>を読み、誰が何に困り、何を欲しているかを見比べます。練習なので、今回は気になる相手を自由に選んでください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
@@ -1471,7 +1528,7 @@ function viewStance(){
         ${wb2 >= 0 ? `<div class="warn">この人物は、あなたが掲げる〔${fac(wb2).name}〕を警戒している。判定が一段下がる。</div>` : ''}
         <div class="row">
           <button class="primary" data-stance="support">支持する<span class="small">（${fac(ui.ownF).name}を伸ばす）</span></button>
-          <button data-stance="convert">論破して転向させる<span class="small">（別の思想に引き込む）</span></button>
+          <button data-stance="convert" ${guidedTurn() ? 'disabled' : ''}>論破して転向させる<span class="small">（別の思想に引き込む）</span></button>
         </div>
         <div class="small" style="margin-top:10px">
           <b>支持</b>は2枚一致でも通る。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
@@ -1523,9 +1580,15 @@ function viewStance(){
       </details>`;
     })()}`;
 
+  const guide = guidedTurn()
+    ? ui.ownF === null && c.factions.length > 1
+      ? coachHTML('二', '向き合う属性を決める', `${esc(c.name)}は複数の勢力に属します。練習で読み解く側面を一つ選んでください。`)
+      : coachHTML('二', 'まずは支持で仕組みを覚える', '支持は<b>3枚中2枚一致でも成功</b>します。練習では転向を封じ、次の画面で正解と根拠を見ながら3枚を組みます。')
+    : '';
+
   app.innerHTML = headerHTML() + meetingVisualHTML(c) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
-      <div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
+      ${guide}<div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
   app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
@@ -1546,6 +1609,7 @@ function viewStance(){
 function viewCards(){
   const c = E.CHAR_BY_ID.get(ui.charId);
   ui.opts = E.cardOptions(st, ui.charId, ui.argueF);
+  const guided = guidedTurn();
   const ready = ui.picks.every(p => p !== null);
   const left = E.PROBE_LIMIT - st.probesUsed;
   const text = ready ? E.composeArgument(ui.argueF, ui.picks) : '';
@@ -1553,22 +1617,15 @@ function viewCards(){
     `<div class="panel tone-panel" style="${toneStyle([ui.argueF])}"><h2>${esc(c.name)}を${ui.stance === 'support' ? '支持する' : `${fac(ui.argueF).name}へ転向させる`}</h2>
       <div class="quote">${esc(c.desc)}</div>
       <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは相手の型</b>で決まります。</div>
-      ${st.turn === 1 && !ui.tutorialDone ? `<div class="tut">
-        <b>はじめに ― 三枚の読み方</b><br>
-        各人物の【情勢】描写には、<b>「何を欲しているか」の手がかりが必ず入っています</b>。
-        たとえば「武士の身分への渇望が滲む」とあれば、利益提示は〈名誉・武名〉。
-        「今日の実入りが明日の命になる」とあれば〈金銭・利権〉です。<br>
-        残る<b>文脈理解</b>と<b>論理整合</b>は描写だけでは足りません。そこで
-        <b>対話で一つ訊く</b>か、<b>探る</b>（獲得−1）か、<b>賭ける</b>かを選びます。
-        3枚そろえば大成功、2枚なら成功、1枚は失敗、0枚は決裂です。
-        <div class="row"><button id="tutok">わかった</button></div>
-      </div>` : ''}
+      ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
       ${ui.asked !== null ? `<div class="say"><span class="q">「${esc(E.QUESTIONS[ui.asked].chip)}か」</span><br>${
         esc(E.REPLIES[ui.asked][c.correct[ui.asked]])}</div>` : ''}
       ${ui.stance === 'convert' ? '<div class="warn">転向は3枚すべて刺さらねば通りません。</div>' : ''}
       ${E.waryOf(st.currents, ui.charId) >= 0 ? '<div class="warn">警戒されているため、判定は一段下がります。</div>' : ''}
       <div class="row" style="margin-top:12px">
-        ${ui.probed
+        ${guided
+          ? '<span class="probed">練習中 — 正解の開示に「探る」は消費しません</span>'
+          : ui.probed
           ? '<span class="probed">◎ 探り済み — この交渉の獲得は 1 下がる</span>'
           : left > 0
             ? `<button class="probe" id="probe">この相手を探る（残り ${left} 回・獲得 −1）</button>`
@@ -1577,26 +1634,29 @@ function viewCards(){
       ${E.CATS.map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${ui.opts[i].map(o => {
-          const isAns = ui.probed && o.motive === c.correct[i];
-          return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="0" aria-pressed="${ui.picks[i]===o.motive}">${
-            isAns ? '<span class="mark">◎ これが刺さる</span> ' : ''}${esc(o.text)}</div>`;
+          const isCorrect = o.motive === c.correct[i];
+          const isAns = (ui.probed || guided) && isCorrect;
+          const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
+          return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${guided && !isCorrect ? '-1' : '0'}" aria-disabled="${guided && !isCorrect}" aria-pressed="${ui.picks[i]===o.motive}">${
+            isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}</span> ` : ''}${esc(o.text)}${
+            guided && isCorrect ? tutorialReasonHTML(c, i) : ''}</div>`;
         }).join('')}
       `).join('')}
       ${ready ? `<div class="slot-h">組み上がった論証（${Array.from(text).length} 字）</div>
         <div class="quote">「${esc(text)}」</div>` : ''}
 
       <div class="row">
-        <button class="primary" id="go" ${ready?'':'disabled'}>この論で臨む</button>
+        <button class="primary" id="go" ${ready?'':'disabled'}>${guided ? '正解の論で臨む' : 'この論で臨む'}</button>
         <button id="back">戻る</button>
       </div>
     </div>`;
   app.querySelectorAll('.card').forEach(el => el.onclick = () => {
-    ui.picks[+el.dataset.cat] = +el.dataset.m; render();
+    const cat = +el.dataset.cat, motive = +el.dataset.m;
+    if (guided && motive !== c.correct[cat]) return;
+    ui.picks[cat] = motive; render();
   });
   const pb = document.getElementById('probe');
   if (pb) pb.onclick = () => { ui.probed = true; render(); };
-  const tb = document.getElementById('tutok');
-  if (tb) tb.onclick = () => { ui.tutorialDone = true; render(); };
   document.getElementById('back').onclick = () => { ui.stance = null; ui.argueF = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
     const r = E.resolve(st, { charId: ui.charId, stance: ui.stance, ownF: ui.ownF,
@@ -1608,6 +1668,7 @@ function viewCards(){
 /* --- 画面: 結果 ---------------------------------------------------------- */
 function viewResult(){
   const r = ui.report, c = E.CHAR_BY_ID.get(r.charId);
+  const guidedResult = !!(ui.guidedTutorial && st.actions.length === 1);
   const marks = r.hits.map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
     h ? (r.probed ? '刺さった（探って得た）' : '刺さった')
       : `外れ（この人物に効くのは「${E.CATS[i].motives[c.correct[i]]}」）`}</div>`).join('');
@@ -1616,6 +1677,7 @@ function viewResult(){
   app.innerHTML = headerHTML() +
     `<div class="result ${r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
+      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から三枚の型を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「探る」を使うか、賭けてください。') : ''}
       ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
@@ -1633,9 +1695,12 @@ function viewResult(){
       }${(E.TIE_GRAPH.get(r.charId)?.size || 0) > 4 ? ' ほか' : ''} からの紹介が絶えた）</div>` : ''}
       <div class="small" style="margin-top:8px;opacity:.7">この論証は ${r.len} 字。次の面会者はこの数から導かれます。</div>
     </div>` + chartHTML() +
-    `<div class="row"><button class="primary" id="next">${st.finished?'結末を見る':'次のターンへ'}</button></div>`
+    `<div class="row"><button class="primary" id="next">${st.finished?'結末を見る':guidedResult?'第2ターンへ（通常進行）':'次のターンへ'}</button></div>`
     + saveBoxHTML();
-  document.getElementById('next').onclick = () => { ui.screen = st.finished ? 'ending' : 'meeting'; render(); };
+  document.getElementById('next').onclick = () => {
+    if (guidedResult) ui.guidedTutorial = false;
+    ui.screen = st.finished ? 'ending' : 'meeting'; render();
+  };
 }
 
 /* --- 画面: エンディング --------------------------------------------------- */
@@ -1655,7 +1720,9 @@ function viewEnding(){
       ${epilogueHTML(e)}
     </div>` + saveBoxHTML() +
     `<div class="row"><button class="primary" id="again">最初から</button></div>`;
-  document.getElementById('again').onclick = () => { st = null; ui.screen = 'title'; render(); };
+  document.getElementById('again').onclick = () => {
+    st = null; ui.screen = 'title'; ui.guidedTutorial = false; ui.seedDraft = freshSeed(); render();
+  };
 }
 
 const CREDIT = `<hr><div class="small" style="text-align:center;opacity:.7;padding-bottom:20px">
