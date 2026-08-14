@@ -330,8 +330,41 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
   }
   ok(worst <= 24, `同じ返答を共有する人数が最大 ${worst} 名（語り口を分ける前は32名）`);
   /* 盤面の一言。開口一番に継ぐので、同じ相手でも局面が変われば言うことが変わる */
-  ok(E.SITUATIONS.length === 12 && E.SITUATIONS.every(x => x.say.length === 3),
-     '盤面の一言が12条件 × 3系統の語り口ぶんある');
+  ok(E.SITUATIONS.length === 12 && E.SITUATIONS.every(x => x.say.length === 4),
+     '盤面の一言が12条件 × 4系統の調子ぶんある');
+  ok(E.TONES.length === 4 && E.TONE_OF_VOICE.length === 7
+     && E.TONE_OF_VOICE.every(t => t >= 0 && t < 4),
+     '語り口7つが、4系統の調子のいずれかに割り当てられている');
+  ok(E.VOUCH_SAYS.every(x => x.length === 4) && E.GRUDGE_SAYS.every(x => x.length === 4)
+     && E.REVISIT_SAYS.every(x => x.length === 4) && E.SMALLTALK[0].lines.every(x => x.length === 4),
+     '縁・再訪・世間話も4系統ぶん書き分けてある');
+  {
+    /* 性別を決めつける語の検査。
+       紹介者・決裂相手・再訪してくる者には女が入りうる（お龍・和宮・篤姫・芸妓・元女中）。
+       実際、お龍の紹介で「あの男が寄越したのなら」と言う不具合があった。 */
+    const MALE = /あの男|この男|その男|男が|野郎|奴が|奴の/;
+    const pools = { VOUCH_SAYS: E.VOUCH_SAYS, GRUDGE_SAYS: E.GRUDGE_SAYS,
+                    REVISIT_SAYS: E.REVISIT_SAYS,
+                    SITUATIONS: E.SITUATIONS.map(x => x.say),
+                    SMALLTALK: E.SMALLTALK[0].lines };
+    const hits = [];
+    for (const [name, pool] of Object.entries(pools))
+      for (const t of pool.flat(2)) if (MALE.test(t)) hits.push(`${name}:「${t.slice(0, 24)}」`);
+    ok(hits.length === 0, `誰にでも当たる台詞に、性別を決めつける語がない${
+      hits.length ? '（検出: ' + hits.join(' / ') + '）' : ''}`);
+    /* 相手を男と想定した呼びかけは、女がいない立場の札にしか使わない */
+    const women = E.VOICE_IDS[4];
+    ok(women.every(id => E.voiceOf(id) === 4), '女は語り口4（女）に割り当てられている');
+    ok(women.every(id => E.TONE_OF_VOICE[E.voiceOf(id)] === 3), '女の受け答えは丁寧の系統になる');
+    ok(women.every(id => E.listenerGroup(id) === 2), '女はすべて立場2（下と外）に入る');
+    let danger = 0;
+    for (let f = 0; f < 5; f++) for (let c = 0; c < 3; c++) for (let m = 0; m < 6; m++)
+      if (/貴殿|御仁/.test(E.CARDS[f][c][m][2])) danger++;
+    ok(danger === 0, '女が受け取る立場2の札に「貴殿」「御仁」を使っていない');
+    /* 立ち合いの文は男を想定した書き方なので、短気な者に女が混じっていないこと */
+    ok(women.every(id => !E.HOTHEADS.has(id)),
+       '短気な者に女はいない（立ち合いの文が男を想定しているため）');
+  }
   {
     const st0 = E.createState(1);
     const early = E.situationOf(st0, 1, null);
