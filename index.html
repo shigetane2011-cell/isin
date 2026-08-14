@@ -137,6 +137,12 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person.place::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
   background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
 .uibadge{color:var(--kin);font-weight:600}
+/* 縁。人脈の誰かが顔になっている相手と、決裂の噂が先に届いている相手 */
+.tie{margin-top:8px;padding:7px 11px;border-left:3px solid var(--kin);
+  background:rgba(160,120,40,.08);font-size:.85rem;border-radius:2px}
+.tie.bad{border-left-color:var(--shu);background:rgba(176,58,46,.06)}
+.tie .who{font-weight:600;letter-spacing:.04em}
+.tie .small{display:block;margin-top:4px;color:var(--sumi2)}
 /* 現在地の帯。行き先の札と同じ配色の筋を引き、いま居る場を面会画面にも残す */
 .here{position:relative;overflow:hidden;background:var(--washi);border:1px solid var(--line);
   border-left:4px solid var(--sumi2);border-radius:2px;padding:9px 12px 10px 13px;margin:0 0 12px}
@@ -1363,7 +1369,8 @@ function composeArgument(argueF, cards, approach){
 /* 働きかけごとに、そもそも何を当てるのかが違う。
    論じる=3枚 / 酌み交わす=利益と文脈の2枚 / 金品=当てるものなし / 肚を割る=利益の1枚。
    そのうえで、響く働きかけなら一段良く、外した働きかけなら一段悪くなる。 */
-function scoreOf(st, action){
+/* 判定の内訳。表示と判定が食い違わないよう、下げ幅の理由まで含めてここだけで出す。 */
+function scoreBreakdown(st, action){
   const ch = CHAR_BY_ID.get(action.charId);
   const ap = action.approach ?? 0, spec = APPROACHES[ap];
   let raw;
@@ -1374,9 +1381,50 @@ function scoreOf(st, action){
   /* 読み違えの罰は「相手を読んだ前提」の働きかけだけに課す。
      論じる・酌み交わすは誰にでも一応通じる（最適ではないだけ）。
      金品と肚を割るは相手を読み切った上での賭けなので、外せば裏目に出る。 */
-  if (ap >= 2 && approachOf(action.charId) !== ap) raw -= 1;
-  if (waryOf(st.currents, action.charId) >= 0 && raw >= 2) raw -= 1;  // 警戒は決裂までは落とさない
-  return clamp(raw, 0, spec.cap);
+  const misfit = ap >= 2 && approachOf(action.charId) !== ap;
+  if (misfit) raw -= 1;
+  const vouchedBy = vouchOf(st, action.charId), grudgedBy = grudgeOf(st, action.charId);
+  const waryBy = waryOf(st.currents, action.charId);
+  /* 人脈の誰かが顔になっていれば、旗色の警戒も決裂の悪評も通らない。
+     旗色は勝つほど鮮明になり、終盤ほど警戒される。人脈はそこを通るための手形になる。 */
+  const waryApplied = waryBy >= 0 && vouchedBy < 0 && raw >= 2;   // 警戒は決裂までは落とさない
+  if (waryApplied) raw -= 1;
+  const grudgeApplied = grudgedBy >= 0 && vouchedBy < 0 && raw >= 2;
+  if (grudgeApplied) raw -= 1;
+  return { score: clamp(raw, 0, spec.cap), misfit, vouchedBy, grudgedBy, waryBy, waryApplied, grudgeApplied };
+}
+const scoreOf = (st, action) => scoreBreakdown(st, action).score;
+
+/* 人脈の誰かと史実の縁で繋がっているか。＝あなたの名を通せる相手。
+   紹介枠に限った話ではない。縁のある者はどの枠に出ても、あなたを門前払いしない。 */
+function vouchOf(st, charId){
+  for (const c of st.contacts) if (TIE_GRAPH.get(c)?.has(charId)) return c;
+  return -1;
+}
+/* 決裂させた相手と縁で繋がっているか。＝悪評が先に届いている相手。 */
+function grudgeOf(st, charId){
+  for (const b of st.banned) if (TIE_GRAPH.get(b)?.has(charId)) return b;
+  return -1;
+}
+/* 縁の一言。TIES は間柄の種類までは持たないので、師弟でも同志でも仇でも通る言い回しに絞る */
+const VOUCH_SAYS = [
+  'どのの名を出されては、無下にもできますまい。',
+  'から話は聞いております。まあ、お掛けなさい。',
+  'の使いか。……ならば、聞くだけは聞こう。',
+  'どのが会えと言うなら、よほどの用向きなのだろう。',
+  'の見込んだ相手か。試させてもらう。',
+  'とは長い付き合いでな。あの男が寄越したのなら、断る法がない。',
+];
+const GRUDGE_SAYS = [
+  'を怒らせたそうだな。話はこちらにも届いている。',
+  'から、あなたの噂は聞いた。……よい噂ではない。',
+  'の一件がある。悪いが、こちらも身構えさせてもらう。',
+  'があなたを罵っていた。私は私で見るが、割り引いては聞く。',
+];
+function tieSay(st, charId, who, kind){
+  const list = kind === 'vouch' ? VOUCH_SAYS : GRUDGE_SAYS;
+  const rnd = streamOf(st.seed, st.turn, 700003 + charId * ROSTER + who);
+  return '「' + CHAR_BY_ID.get(who).name + list[Math.floor(rnd() * list.length)] + '」';
 }
 
 /* その人物が、こちらの旗色を見て警戒しているか */
@@ -1408,9 +1456,11 @@ function resolve(st, action){
   const text  = composeArgument(action.argueF, action.cards, approach);
   const len   = chars(text);
 
-  /* 警戒: こちらの旗色が鮮明すぎると、判定が一段下がる（決裂までは落とさない） */
-  const waryBy = waryOf(st.currents, action.charId);
-  const score  = scoreOf(st, action);
+  /* 警戒: こちらの旗色が鮮明すぎると、判定が一段下がる（決裂までは落とさない）。
+     ただし人脈の誰かが顔になっていれば通らない。内訳は scoreBreakdown が持つ。 */
+  const sb = scoreBreakdown(st, action);
+  const waryBy = sb.waryBy;
+  const score  = sb.score;
 
   /* 探れるのは残り回数がある場合のみ。リプレイでも同じ判定になるよう状態から決める。 */
   const probed = !!action.probed && st.probesUsed < PROBE_LIMIT;
@@ -1489,6 +1539,8 @@ function resolve(st, action){
     place: action.place ?? null, placeFits,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
+    vouchedBy: sb.vouchedBy, grudgedBy: sb.grudgedBy,
+    waryApplied: sb.waryApplied, grudgeApplied: sb.grudgeApplied,
     delta: cur.map((v, i) => v - before[i]),
     verdict: succeeded ? (score === 3 ? '大成功' : '成功') : ['決裂','失敗','失敗','失敗'][score],
     /* 立ち合いで覆ることがあるので、表示は実際の状態変化から決める */
@@ -1601,7 +1653,7 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
-  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -1795,6 +1847,30 @@ function viewTitle(){
   };
 }
 
+/* 縁の表示。面会の札でも、相手と向き合う画面でも同じものを出す。
+   said を渡すと、同じ画面で言い回しが重なったときに台詞を省いて短い形にする。 */
+function tieHTML(id, wb, said){
+  const line = (cls, who, say, note) => {
+    const dup = said && said.has(say);
+    if (said) said.add(say);
+    return `<div class="tie ${cls}"><span class="who">〔${esc(who)}〕</span>${dup ? '' : esc(say)}
+      <span class="small">※ ${note}</span></div>`;
+  };
+  const vb = E.vouchOf(st, id);
+  if (vb >= 0){
+    const v = E.CHAR_BY_ID.get(vb).name;
+    return line('', `${v}の紹介`, E.tieSay(st, id, vb, 'vouch'),
+      `${esc(v)}の顔が立つ。${wb >= 0 ? `〔${fac(wb).name}〕への警戒を受けずに済む` : '旗色を警戒されない'}`);
+  }
+  const gb = E.grudgeOf(st, id);
+  if (gb >= 0){
+    const g = E.CHAR_BY_ID.get(gb).name;
+    return line('bad', `${g}の縁者`, E.tieSay(st, id, gb, 'grudge'),
+      '決裂させた噂が先に届いている。判定が一段下がります');
+  }
+  return '';
+}
+
 /* --- 画面: 面会 ---------------------------------------------------------- */
 function viewMeeting(){
   if (st.finished && ui.interludePicked === null) { ui.screen = 'ending'; return viewEnding(); }
@@ -1807,6 +1883,7 @@ function viewMeeting(){
   const era = E.eraOf(st);
   const pl = E.PLACES[ui.place];
   const pfa = fac(pl.favor[0]).key, pfb = fac(pl.favor[pl.favor.length - 1]).key;
+  const saidTies = new Set();          // 同じ画面で縁の台詞が重ならないように
   const card = (id, isIntro) => {
     const c = E.CHAR_BY_ID.get(id), rk = E.rankOfId(id);
     const fl = c.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('');
@@ -1815,13 +1892,15 @@ function viewMeeting(){
     const hot = E.HOTHEADS.has(id)
       ? `<div class="warn">※ 気が短い。転向を仕掛ければ刃が出る。応じ方を誤れば手傷を負う</div>` : '';
     const wb = E.waryOf(st.currents, id);
-    const wary = wb >= 0
+    /* 縁は判定に効く。紹介の顔が立てば旗色の警戒も悪評も通らない */
+    const tie = tieHTML(id, wb, saidTies);
+    const wary = (wb >= 0 && E.vouchOf(st, id) < 0)
       ? `<div class="warn">※ あなたが掲げる〔${fac(wb).name}〕を警戒している。判定が一段下がります</div>` : '';
     return `<div class="person ${isIntro?'intro':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
       <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
-      <div class="desc">${isIntro ? '[人脈] ご紹介にあずかりました。<br>' : '[情勢] '}${esc(c.desc)}</div>
-      ${pre}${wary}${hot}</div>`;
+      <div class="desc">${isIntro ? '[人脈] ' : '[情勢] '}${esc(c.desc)}</div>
+      ${tie}${pre}${wary}${hot}</div>`;
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>面会可能な人物</h2>
@@ -1930,7 +2009,8 @@ function viewStance(){
     if (ui.stance === null){
       const wb2 = E.waryOf(st.currents, ui.charId);
       body = `<p>${esc(c.name)}〔${fac(ui.ownF).name}〕にどう臨みますか？</p>
-        ${wb2 >= 0 ? `<div class="warn">この人物は、あなたが掲げる〔${fac(wb2).name}〕を警戒している。判定が一段下がる。</div>` : ''}
+        ${wb2 >= 0 && E.vouchOf(st, ui.charId) < 0
+          ? `<div class="warn">この人物は、あなたが掲げる〔${fac(wb2).name}〕を警戒している。判定が一段下がる。</div>` : ''}
         <div class="row">
           <button class="primary" data-stance="support">支持する<span class="small">（${fac(ui.ownF).name}を伸ばす）</span></button>
           <button data-stance="convert" ${guidedTurn() ? 'disabled' : ''}>論破して転向させる<span class="small">（別の思想に引き込む）</span></button>
@@ -2014,6 +2094,7 @@ function viewStance(){
 
   app.innerHTML = headerHTML() + meetingVisualHTML(c) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
+      ${tieHTML(ui.charId, E.waryOf(st.currents, ui.charId))}
       <div class="opening">「${esc(E.SAYS.get(ui.charId) || '')}」</div>
       ${guide}<div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
@@ -2146,7 +2227,10 @@ function viewResult(){
           : `手傷を負った。〔${fac(r.argueF).name}〕−3、探りを1回失い、この者は二度と現れない。`}</div>
       </div>` : ''}
       ${r.probed && r.gain > 0 ? `<div class="warn">※ 探りを入れたため、獲得が ${r.gainBeforeProbe} から ${r.gain} に下がりました（探り残り ${r.probesLeft} 回）</div>` : ''}
-      ${r.waryBy >= 0 ? `<div class="warn">※ あなたの掲げる〔${fac(r.waryBy).name}〕への警戒により、${r.rawScore}枚一致が一段下げられました</div>` : ''}
+      ${r.waryApplied ? `<div class="warn">※ あなたの掲げる〔${fac(r.waryBy).name}〕への警戒により、${r.rawScore}枚一致が一段下げられました</div>` : ''}
+      ${r.vouchedBy >= 0 ? `<div class="small"><span class="uibadge">※ ${esc(E.CHAR_BY_ID.get(r.vouchedBy).name)}の紹介が効いた。</span>${
+        r.waryBy >= 0 ? `〔${fac(r.waryBy).name}〕への警戒を受けずに済んだ` : 'この相手は端からあなたを門前払いしなかった'}</div>` : ''}
+      ${r.grudgeApplied ? `<div class="warn">※ ${esc(E.CHAR_BY_ID.get(r.grudgedBy).name)}を決裂させた噂が先に届いており、判定が一段下げられました</div>` : ''}
       ${r.allOrNothing && r.score === 2 ? `<div class="warn">※ 転向は3枚すべて刺さらねば通りません。2枚では相手は動きませんでした</div>` : ''}
       ${r.premature ? `<div class="warn">※ 時期尚早のため、${E.RANKS[r.rank]}級ですが影響力は限定的です（ランク補正を無効化）</div>` : ''}
       ${r.penalty ? `<div class="warn">※ ${E.RANKS[r.rank]}級との交渉に失敗し時勢 -${r.penalty}</div>` : ''}

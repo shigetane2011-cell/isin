@@ -426,6 +426,59 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
   ok(rejected === 2, '不正な働きかけ番号を弾く');
 }
 
+/* --- 5f3b. 縁 -------------------------------------------------------------- */
+head('5f3b. 縁 ― 人脈の顔と、決裂の悪評');
+{
+  /* 縁を持つ組のうち、相手が警戒しうる（対立勢力を持つ）ものを一つ取る */
+  let pair = null;
+  for (const [a, set] of E.TIE_GRAPH){
+    for (const b of set){
+      const wf = E.OPPOSED[E.CHAR_BY_ID.get(b).factions[0]][0];
+      if (wf != null){ pair = { a, b, wf }; break; }
+    }
+    if (pair) break;
+  }
+  ok(pair !== null, '縁を持ち、かつ警戒されうる組が名簿にある');
+  const base = E.createState(1);
+  const cur = [0,0,0,0,0]; cur[pair.wf] = E.WARY_LINE;
+  const mk = o => Object.assign({}, base, o);
+  const plain   = mk({ currents: cur.slice() });
+  const vouched = mk({ currents: cur.slice(), contacts: [pair.a] });
+  const grudged = mk({ banned: [pair.a] });
+  const both    = mk({ contacts: [pair.a], banned: [pair.a] });
+  ok(E.vouchOf(vouched, pair.b) === pair.a, '人脈の縁者は「紹介あり」と判定される');
+  ok(E.vouchOf(plain, pair.b) === -1, '人脈が空なら紹介はない');
+  ok(E.grudgeOf(grudged, pair.b) === pair.a, '決裂させた相手の縁者は「悪評あり」と判定される');
+
+  const ch = E.CHAR_BY_ID.get(pair.b), f0 = ch.factions[0];
+  const act = { charId: pair.b, stance:'support', ownF:f0, argueF:f0,
+                cards: ch.correct.slice(), probed:false, approach:0, place:null };
+  ok(E.waryOf(cur, pair.b) >= 0, '旗色が鮮明なら警戒される');
+  ok(E.scoreOf(plain, act) === 2, '警戒されると3枚一致が一段下がる');
+  ok(E.scoreOf(vouched, act) === 3, '紹介の顔が立てば警戒を受けない');
+  ok(E.scoreBreakdown(vouched, act).waryApplied === false, '内訳も「警戒は効かなかった」と答える');
+  ok(E.scoreBreakdown(plain, act).waryApplied === true, '内訳は効いた下げだけを true にする');
+  ok(E.scoreOf(grudged, act) === 2, '悪評が先に届いていれば一段下がる');
+  ok(E.scoreOf(both, act) === 3, '紹介があれば悪評は打ち消される');
+  /* 縁は決裂までは落とさない（警戒と同じ扱い） */
+  const weak = Object.assign({}, act, { cards: [ch.correct[0], (ch.correct[1]+1)%6, (ch.correct[2]+1)%6] });
+  ok(E.scoreOf(grudged, weak) === 1, '1枚しか刺さっていないところから、悪評でさらに落ちはしない');
+
+  const say = E.tieSay(vouched, pair.b, pair.a, 'vouch');
+  ok(say === E.tieSay(vouched, pair.b, pair.a, 'vouch'), '縁の一言は決定論的');
+  ok(say.includes(E.CHAR_BY_ID.get(pair.a).name), '縁の一言に、縁者の名が入る');
+  ok(E.tieSay(grudged, pair.b, pair.a, 'grudge') !== say, '紹介と悪評で言うことが違う');
+  /* 表示と判定が食い違わないこと。scoreOf は内訳の score と常に一致する */
+  let agree = true;
+  for (let i = 0; i < 200; i++){
+    const id = (i % E.CHARACTERS.length) + 1, c = E.CHAR_BY_ID.get(id);
+    const a2 = { charId:id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+                 cards:[i%6,(i*2)%6,(i*3)%6], probed:false, approach:i%4, place:null };
+    if (E.scoreOf(vouched, a2) !== E.scoreBreakdown(vouched, a2).score) agree = false;
+  }
+  ok(agree, 'scoreOf と内訳の判定が常に一致する（200通り）');
+}
+
 /* --- 5f4. 場 --------------------------------------------------------------- */
 head('5f4. 行き先');
 ok(E.PLACES.length === 6 && E.PLACES.every(p => p.name && p.desc && p.allow.length && p.favor.length),

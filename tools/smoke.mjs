@@ -46,8 +46,16 @@ const pickPlace = async shotName => {
   return names;
 };
 console.log('行き先:', await pickPlace('01b-place.png'));
+/* 縁（人脈の顔・決裂の悪評）が実際に画面に出るか。人脈は2ターン目から溜まる */
+let tieSeen = 0, tieSample = '';
+const noteTies = async () => {
+  const n = await p.$$eval('.tie', e => e.length);
+  if (n && !tieSample) tieSample = await p.$eval('.tie .who', e => e.textContent);
+  tieSeen += n;
+};
 await p.waitForSelector('.person[data-id]');
 console.log('面会者:', await p.$$eval('.person .nm', els => els.map(e => e.textContent)));
+await noteTies();
 await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
 
 /* 1人目を選ぶ → 支持 → カード3枚 */
@@ -88,6 +96,7 @@ for (let i = 0; i < 12; i++) {
   }
   await pickPlace();
   await p.waitForSelector('.person[data-id]');
+  await noteTies();
   await p.click('.person[data-id]');
   if (await p.$('[data-own]')) await p.click('[data-own]');
   await p.click('[data-stance="support"]');
@@ -116,6 +125,8 @@ const restored = await p.$eval('.ending .title', e => e.textContent);
 console.log('復元後のエンディング:', restored);
 
 console.log('滞在した場:', visited.join(' → '));
+console.log('縁の表示:', tieSeen ? `${tieSeen}件（例: ${tieSample}）` : 'なし');
+if (!tieSeen) errs.push('縁（紹介・悪評）の表示が通しプレイで一度も出なかった');
 console.log('スクリーンショット:', sp);
 console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'JSエラーなし');
 await b.close();
