@@ -63,6 +63,18 @@ h1 .sub{display:block;font-size:.72rem;letter-spacing:.3em;color:var(--sumi2);ma
   box-shadow:0 1px 0 rgba(0,0,0,.05)}
 .panel h2{font-size:.9rem;margin:0 0 10px;letter-spacing:.18em;color:var(--sumi2);
   border-left:4px solid var(--kin);padding-left:8px}
+.panel.tone-panel{position:relative;border-color:rgba(var(--tone-a,59,52,44),.46);
+  background:linear-gradient(108deg,rgba(var(--tone-a,59,52,44),.11),rgba(var(--tone-b,59,52,44),.055) 54%,rgba(246,240,225,.94) 84%),var(--washi2);
+  box-shadow:inset 0 0 0 1px rgba(255,253,247,.72),0 2px 7px rgba(27,24,21,.09)}
+.panel.tone-panel>h2:first-child{margin:-14px -16px 12px;padding:9px 14px 8px 17px;border-left:0;
+  border-bottom:1px solid rgba(var(--tone-a,59,52,44),.28);color:var(--sumi);
+  background:linear-gradient(90deg,rgba(var(--tone-a,59,52,44),.23),rgba(var(--tone-b,59,52,44),.11) 64%,rgba(246,240,225,.24))}
+.panel.tone-panel>h2:first-child::before{content:"";display:inline-block;width:5px;height:1.05em;margin-right:9px;
+  vertical-align:-.14em;background:linear-gradient(180deg,rgb(var(--tone-a,59,52,44)),rgb(var(--tone-b,59,52,44)));
+  box-shadow:0 0 0 1px rgba(27,24,21,.15)}
+.panel.tone-panel .quote{border-left-color:rgb(var(--tone-a,59,52,44));
+  background:linear-gradient(90deg,rgba(var(--tone-a,59,52,44),.09),rgba(var(--tone-b,59,52,44),.035) 72%,transparent);
+  padding:7px 10px}
 pre.chart{font-family:"SFMono-Regular",Consolas,"Noto Sans Mono CJK JP",monospace;
   font-size:.82rem;line-height:1.55;margin:0;white-space:pre;overflow-x:auto;color:var(--sumi)}
 pre.chart .u{color:var(--shu);font-weight:700}
@@ -124,28 +136,38 @@ button.primary:hover:not(:disabled){background:#162a3c}
 .card.ans{border-color:var(--kin);background:#fffdf5}
 .card .mark{color:var(--kin);font-weight:600;font-size:.8rem}
 .slot-h{font-size:.8rem;letter-spacing:.16em;color:var(--sumi2);margin-top:16px;border-bottom:1px solid var(--line);padding-bottom:3px}
-.result{border:2px solid var(--sumi);padding:14px 16px;margin:14px 0;
-  background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.14),var(--washi2) 58%)}
+.result{border:2px solid rgb(var(--tone-a,59,52,44));padding:14px 16px;margin:14px 0;
+  background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.16),rgba(var(--tone-b,59,52,44),.07) 52%,var(--washi2) 82%);
+  box-shadow:inset 5px 0 0 rgba(var(--tone-a,59,52,44),.2),0 2px 7px rgba(27,24,21,.09)}
 .result.failed{background:linear-gradient(105deg,rgba(27,24,21,.16),var(--washi2) 62%);border-color:var(--sumi2)}
-.result .verdict{font-size:1.2rem;letter-spacing:.2em;font-weight:600}
+.result .verdict{display:inline-block;font-size:1.2rem;letter-spacing:.2em;font-weight:600;padding:2px 10px;
+  background:rgba(var(--tone-a,59,52,44),.1);border-bottom:2px solid rgba(var(--tone-a,59,52,44),.5)}
 .v3{color:var(--kin)}.v2{color:var(--ai)}.v1{color:var(--sumi2)}.v0{color:#000;background:var(--sumi);color:var(--washi);padding:2px 10px}
 .delta{font-family:monospace;font-size:.9rem;margin-top:8px}
 .quote{border-left:3px solid var(--kin);padding-left:12px;margin:10px 0;font-size:.92rem;color:var(--sumi2)}
 .ending h3{border-bottom:1px solid var(--line);padding-bottom:4px;font-size:.9rem;letter-spacing:.2em;margin:18px 0 6px}
 .ending .title{font-size:1.5rem;letter-spacing:.14em;text-align:center;margin:6px 0}
 .ending .kind{text-align:center;font-size:.78rem;letter-spacing:.3em;color:var(--kin)}
-.story-visual{position:relative;overflow:hidden;aspect-ratio:5/2;margin:12px 0 16px;border:1px solid var(--line);
-  background:var(--washi);box-shadow:0 2px 8px rgba(27,24,21,.14)}
-.story-visual .visual-images{position:absolute;inset:0;display:flex}
+.ending.tone-panel .title{margin:6px -6px 8px;padding:5px 10px;
+  background:linear-gradient(90deg,transparent,rgba(var(--tone-a,59,52,44),.16) 24%,rgba(var(--tone-b,59,52,44),.12) 76%,transparent)}
+.story-visual{position:relative;overflow:hidden;aspect-ratio:5/2;margin:12px 0 16px;border:5px solid transparent;
+  background:linear-gradient(var(--washi),var(--washi)) padding-box,
+    linear-gradient(90deg,rgb(var(--tone-a,59,52,44)),rgb(var(--tone-b,59,52,44))) border-box;
+  box-shadow:0 0 0 1px rgba(27,24,21,.62),0 0 0 4px rgba(154,132,96,.22),0 5px 14px rgba(27,24,21,.18)}
+.story-visual .visual-images{position:absolute;inset:3px;display:flex}
 .story-visual .visual-images img{display:block;width:100%;height:100%;object-fit:cover;min-width:0}
 .story-visual .visual-images.split img{width:50%}
 .story-visual::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.36),rgba(var(--tone-a,59,52,44),.12) 43%,
     rgba(var(--tone-b,59,52,44),.27));mix-blend-mode:multiply}
 .story-visual.neutral::after{background:rgba(59,52,44,.10)}
-.story-visual .visual-key{position:absolute;z-index:1;left:10px;bottom:9px;display:flex;flex-wrap:wrap;gap:6px}
-.story-visual .visual-key span{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;background:rgba(246,240,225,.88);
-  border:1px solid currentColor;border-radius:10px;font-size:.7rem;font-weight:700;box-shadow:0 1px 4px rgba(27,24,21,.12)}
+.story-visual::before{content:"";position:absolute;z-index:2;inset:3px;border:1px solid rgba(255,253,247,.5);
+  box-shadow:inset 0 0 0 1px rgba(27,24,21,.18);pointer-events:none}
+.story-visual .visual-key{position:absolute;z-index:3;left:12px;bottom:11px;display:flex;flex-wrap:wrap;gap:6px}
+.story-visual .visual-key span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;
+  background:rgba(var(--key-rgb,59,52,44),.9);color:#fff;border:1px solid rgba(255,253,247,.72);
+  border-radius:2px;font-size:.7rem;font-weight:700;text-shadow:0 1px 1px rgba(27,24,21,.45);
+  box-shadow:0 1px 0 rgba(255,253,247,.36) inset,0 2px 5px rgba(27,24,21,.28)}
 .faction-visual{margin-top:0}
 .small{font-size:.76rem;color:var(--sumi2)}
 code.seed{font-family:monospace;background:#fff;border:1px solid var(--line);padding:1px 6px}
@@ -158,7 +180,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .title-hero h1{font-size:1.7rem;letter-spacing:.14em}
   .title-hero h1 .sub{font-size:.66rem;letter-spacing:.2em}
   .story-visual{aspect-ratio:16/7}
-  .story-visual .visual-key{left:6px;bottom:6px}
+  .story-visual .visual-key{left:9px;bottom:8px}
 }
 </style>
 </head>
@@ -1252,7 +1274,7 @@ function storyVisualHTML(srcs, factions, alt, extraClass, eager){
   const fs = factions || [];
   const imgs = srcs.map(src => `<img src="${src}" alt="" loading="${eager?'eager':'lazy'}" decoding="async">`).join('');
   const keys = fs.length ? `<div class="visual-key">${fs.map(f =>
-    `<span class="${fac(f).cls}"><i aria-hidden="true"></i>${fac(f).name}</span>`).join('')}</div>` : '';
+    `<span class="${fac(f).cls}" style="--key-rgb:${FACTION_RGB[f]}"><i aria-hidden="true"></i>${fac(f).name}</span>`).join('')}</div>` : '';
   return `<figure class="story-visual ${extraClass || ''} ${fs.length?'':'neutral'}" style="${toneStyle(fs)}" role="img" aria-label="${esc(alt)}">
     <div class="visual-images ${srcs.length > 1 ? 'split' : ''}">${imgs}</div>${keys}
   </figure>`;
@@ -1410,7 +1432,7 @@ function viewInterlude(){
         esc(iv.opts[picked].res)}</div>
        <div class="row"><button class="primary" id="ilnext">続ける</button></div>`;
   app.innerHTML = headerHTML() +
-    `<div class="panel interlude" style="${toneStyle(iv.key.split('+').map(Number))}">
+    `<div class="panel interlude tone-panel" style="${toneStyle(iv.key.split('+').map(Number))}">
       <div class="kind">幕間 ― 第${E.INTERLUDE_TURN}ターン</div>
       <div class="title">『${esc(iv.title)}』</div>
       <p>${esc(iv.scene)}</p>
@@ -1430,6 +1452,7 @@ function viewInterlude(){
 /* --- 画面: 立場の決定 ----------------------------------------------------- */
 function viewStance(){
   const c = E.CHAR_BY_ID.get(ui.charId);
+  const activeFs = ui.ownF === null ? c.factions.slice() : [ui.ownF];
   let body = '';
   if (ui.ownF === null && c.factions.length > 1){
     body = `<p>${esc(c.name)}は複数の顔を持ちます。<b>どの属性に向き合いますか？</b></p>
@@ -1496,7 +1519,7 @@ function viewStance(){
     })()}`;
 
   app.innerHTML = headerHTML() + meetingVisualHTML(c) +
-    `<div class="panel"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
+    `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       <div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
@@ -1522,7 +1545,7 @@ function viewCards(){
   const left = E.PROBE_LIMIT - st.probesUsed;
   const text = ready ? E.composeArgument(ui.argueF, ui.picks) : '';
   app.innerHTML = headerHTML() +
-    `<div class="panel"><h2>${esc(c.name)}を${ui.stance === 'support' ? '支持する' : `${fac(ui.argueF).name}へ転向させる`}</h2>
+    `<div class="panel tone-panel" style="${toneStyle([ui.argueF])}"><h2>${esc(c.name)}を${ui.stance === 'support' ? '支持する' : `${fac(ui.argueF).name}へ転向させる`}</h2>
       <div class="quote">${esc(c.desc)}</div>
       <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは相手の型</b>で決まります。</div>
       ${st.turn === 1 && !ui.tutorialDone ? `<div class="tut">
@@ -1613,9 +1636,10 @@ function viewResult(){
 /* --- 画面: エンディング --------------------------------------------------- */
 function viewEnding(){
   const e = E.evaluateEnding(st);
+  const endingFs = E.winningFactions(e);
   const heads = ['国内政治','国際関係','あなたのその後'];
   app.innerHTML = headerHTML() + chartHTML() +
-    `<div class="panel ending">
+    `<div class="panel ending tone-panel" style="${toneStyle(endingFs)}">
       <div class="kind">${e.kind==='solo'?'単独覇権エンド':e.kind==='combo'?'複合革命エンド':'混沌エンド'}</div>
       <div class="title">『${esc(e.t)}』</div>
       <div class="kind" style="color:var(--sumi2)">${esc(e.s)}</div>
