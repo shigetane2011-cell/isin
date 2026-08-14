@@ -28,9 +28,13 @@ head('1a. 混入していない文字');
   /* 生成の過程で、日本語のつもりの箇所にキリル文字などが紛れ込んだことが何度かある。
      読めば分かる類いだが、151名分の台詞を毎回目視するのは無理なので機械で見る。 */
   const stray = /[\u0400-\u04FF\u0370-\u03FF\u0600-\u06FF\u0590-\u05FF]+/g;
+  const readIf = rel => { try { return readFileSync(new URL('../' + rel, import.meta.url), 'utf8'); }
+                          catch { return ''; } };
   for (const [name, text] of [['index.html', html],
-      ['README.md', readFileSync(new URL('../README.md', import.meta.url), 'utf8')],
-      ['docs/spec.md', readFileSync(new URL('../docs/spec.md', import.meta.url), 'utf8')]]){
+      ['README.md', readIf('README.md')],
+      ['docs/spec.md', readIf('docs/spec.md')],
+      ['LICENSE-CONTENT', readIf('LICENSE-CONTENT')],
+      ['assets/portraits/README.md', readIf('assets/portraits/README.md')]]){
     const hit = text.match(stray);
     ok(!hit, `${name} にキリル文字・ギリシャ文字などが混入していない${
       hit ? '（検出: ' + [...new Set(hit)].join(' ') + '）' : ''}`);
@@ -462,6 +466,17 @@ head('5e2. 同梱画像が、エンジンの出しうる名前と一致してい
     ok([...listed.keys()].every(id => E.CHAR_BY_ID.has(id)), '人物絵の名簿が実在する人物IDだけを指している');
     ok([...listed].every(([id, p]) => E.portraitOf(id) === p.src), '人物絵のパスが名簿どおり');
     ok(E.portraitOf(-1) === null, '絵のない人物には null が返り、勢力の情景で代わる');
+    /* 実在の人物を描く以上、出典のない肖像を足せないようにしておく */
+    const src = existsSync(at('assets/portraits/README.md'))
+      ? readFileSync(at('assets/portraits/README.md'), 'utf8') : '';
+    const noShort = [...E.PORTRAITS.values()].filter(v => !v.short || v.short.length < 4);
+    const noBasis = [...E.PORTRAITS.values()].filter(v => !v.basis || v.basis.length < 10);
+    const noDoc = [...E.PORTRAITS.values()].filter(v => !src.includes(v.src.split('/').pop()));
+    ok(noShort.length === 0, '肖像すべてに、画面に出す短い出典表示がある');
+    ok(noBasis.length === 0, '肖像すべてに、参照した史料の詳細がある');
+    ok(noDoc.length === 0, `肖像すべてが assets/portraits/README.md の出典表に載っている${
+      noDoc.length ? '（未記載: ' + noDoc.map(v => v.src).join(' ') + '）' : ''}`);
+    ok(html.includes('portrait-source'), '出典表示が画面に出る');
     console.log(`     （人物絵 ${listed.size}/151枚。面会で絵が出る割合の目安: 伝説16枚=15% / 上級以上61枚=45% / 中級以上121枚=77%）`);
   }
 
