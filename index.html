@@ -2086,6 +2086,71 @@ function duelPending(st, action){
    実測では上位2勢力は第5ターンには固まっているので、幕間はそのまま結末の予兆になる。
    選択肢は正解のない価値観の問いで、盤面をわずかに動かし、後日談の語り口を変える。
    ------------------------------------------------------------------------ */
+/* 第5ターンの政変（前編）。第8ターン（後編）より前に起きた出来事から採る。
+   後編と同じく、その時点の上位2勢力の組合せで何が起きるかが決まる。
+   増減は後編より小さめ。ここでの選択は、後編の場面文からも参照される。 */
+const INTERLUDES_EARLY = {
+'0+1':{title:'和親条約の調印',scene:'下田と箱館を開くという一札に、判を押すかどうかの評定が続いている。開けば異国の船は薪水を得て去る。拒めば、次に来るのは砲艦だという。',
+ opts:[
+  {label:'開く。ただし二港だけと明記させる',res:'限定つきの開港で話はついた。異国は不満を残したが、砲は撃たれずに済んだ。',d:[1,2,0,0,-3],tag:'二港だけ開いた',after:'あの二港から始まった細い道が、後の交易の骨格になった。'},
+  {label:'拒む。先例を作れば際限がなくなる',res:'使節は空しく去った。しかし翌年、もっと大きな艦隊が同じ湾に現れる。',d:[1,-3,1,0,1],tag:'開かずに拒んだ',after:'拒み通したあの一年は、備えを整える時間ではなく、ただの猶予に終わった。'},
+  {label:'朝廷に諮ってから決めると引き延ばす',res:'評定は京へ送られ、答えが返るまで三月かかった。その間に情勢のほうが動いていた。',d:[3,0,-3,0,0],tag:'京へ諮った',after:'幕府が独りで決めなかったこと自体が、朝廷を政の場に引き戻す最初の一歩になった。'},
+ ]},
+'0+2':{title:'将軍継嗣',scene:'病弱な将軍の跡目に、幼い紀州か、英明と評判の一橋か。大奥は紀州を推し、雄藩の諸侯は一橋を推している。',
+ opts:[
+  {label:'紀州を推す。血筋の順を乱せば家中が割れる',res:'順は守られた。大奥と譜代は安堵し、一橋を推した者たちは中央から遠ざけられる。',d:[1,0,2,-3,0],tag:'血筋の順を守った',after:'順を守ったことで家中は割れずに済んだが、才ある者は外に溜まっていった。'},
+  {label:'一橋を推す。この難局に幼君では立ち行かぬ',res:'推挙は通らなかったが、一橋の名は天下に知れ渡った。推した諸侯は罰せられる。',d:[0,1,-3,2,0],tag:'一橋を推した',after:'あのとき退けられた顔ぶれが、そのまま次の時代の中心になった。'},
+  {label:'どちらにも与せず、後見の枠組みだけを整える',res:'誰が立っても回る仕組みが残った。人望は集まらなかったが、政は止まらなかった。',d:[1,0,1,1,-3],tag:'仕組みだけ整えた',after:'誰が立っても回る形を先に作っておいたことが、後の混乱を一度だけ救った。'},
+ ]},
+'0+3':{title:'安政の大獄',scene:'大老が反対派の一掃にかかっている。名簿には、あなたが会った者の名も混じっている。',
+ opts:[
+  {label:'名簿から数名を消させる',res:'手を回して幾人かを逃がした。恩は残ったが、大老の目にも留まった。',d:[0,0,-3,2,1],tag:'名簿から消させた',after:'あのとき逃がした者たちが、後にあなたの名を出して人を集めた。'},
+  {label:'見て見ぬふりをする。いま逆らえば共に沈む',res:'捕縛は粛々と進んだ。あなたは残ったが、獄に繋がれた者の縁者はそれを覚えている。',d:[1,0,3,-3,-1],tag:'見過ごした',after:'見過ごしたことを責める者はいなかった。ただ、誰も相談には来なくなった。'},
+  {label:'朝廷に働きかけ、弾圧そのものを止めさせる',res:'勅諚が下り、大獄は途中で緩んだ。幕府の面目は潰れ、朝廷の重みが増す。',d:[1,0,-3,1,1],tag:'朝廷に止めさせた',after:'獄を止めたのが幕府ではなく朝廷だったという一事が、以後の力関係を決めた。'},
+ ]},
+'0+4':{title:'桜田門外',scene:'雪の朝、大老の行列が襲われた。首謀者たちは義挙と呼び、幕閣は逆賊と呼んでいる。どちらの言葉で呼ぶかを、いま問われている。',
+ opts:[
+  {label:'義挙と呼ぶ。斃れた者の志は正しかった',res:'その一言は瞬く間に広まった。志士たちはあなたを味方と見なし、幕閣は敵と見なす。',d:[0,-1,-3,1,3],tag:'義挙と呼んだ',after:'あの朝を義挙と呼んだ者たちの言葉が、そのまま次の十年の合言葉になった。'},
+  {label:'逆賊と呼ぶ。政を刃で変えれば際限がない',res:'幕閣は頷いたが、若い者たちの目から光が消えた。以後、彼らは何も打ち明けない。',d:[1,1,2,-1,-3],tag:'逆賊と呼んだ',after:'刃で政を変える先例を認めなかったことは正しかった。それでも誰にも感謝されなかった。'},
+  {label:'どちらとも呼ばず、幕政の非を先に正す',res:'評定の場を弾圧の是非に引き戻した。名指しを避けたぶん、双方から不信を買う。',d:[2,-3,0,1,0],tag:'名指しを避けた',after:'名指しを避けた者は、どちらの側の記録にも残らなかった。'},
+ ]},
+'1+2':{title:'開港場の選定',scene:'条約に定めた開港場を神奈川とするか、間の宿場である横浜に振り替えるか。街道筋を避ければ攘夷の刃も避けられるが、異国は約定違反だと言う。',
+ opts:[
+  {label:'約定どおり神奈川を開く',res:'街道沿いに異人が住み始めた。摩擦は絶えないが、こちらの信義は保たれた。',d:[0,3,0,0,-3],tag:'約定を守った',after:'信義を守った代償は、街道沿いで幾度も流れた血だった。'},
+  {label:'横浜へ振り替える。刃の届かぬ場所に置く',res:'異国は抗議したが、結局は移った。人死には減り、代わりに「あの国は約定を守らぬ」という評が残る。',d:[-3,1,2,0,0],tag:'横浜へ移した',after:'刃の届かぬ場所に置いた港が、いつのまにかこの国で一番大きな港になった。'},
+  {label:'開港そのものを延期させる',res:'交渉は数年先送りされた。攘夷派は喝采したが、列強の要求は年ごとに重くなる。',d:[1,-3,1,0,1],tag:'開港を延ばした',after:'延ばした年数だけ、次に呑まされた条件は重くなっていた。'},
+ ]},
+'1+3':{title:'薩英戦争の後始末',scene:'薩摩と英国の砲火が収まった。賠償を払うか、払わぬか。そして敵だった相手から、何を学ぶか。',
+ opts:[
+  {label:'賠償を払い、そのまま留学生を送る',res:'敵に頭を下げ、同じ口で技術を請うた。恥と罵る者もいたが、若者が海を渡った。',d:[0,1,0,2,-3],tag:'払って学んだ',after:'敵から学ぶと決めたあの判断が、十年後の海軍と工場をまるごと用意した。'},
+  {label:'払わぬ。負けてはおらぬと押し通す',res:'交渉は物別れに終わった。面目は立ったが、港はもう一度砲火にさらされる危険を抱える。',d:[0,-3,0,1,2],tag:'払わずに押し通した',after:'押し通した面目は、次に来た艦隊の前ではもう通用しなかった。'},
+  {label:'幕府に肩代わりさせる',res:'支払いは江戸へ回された。薩摩は無傷で、幕府の金蔵だけが痩せる。',d:[0,1,-3,2,0],tag:'幕府に払わせた',after:'肩代わりさせた金額よりも、それを許した幕府の弱みのほうが後に響いた。'},
+ ]},
+'1+4':{title:'生麦の一件',scene:'行列を横切った異人が斬られた。列強は賠償と犯人の引き渡しを求め、攘夷派は英雄と讃えている。',
+ opts:[
+  {label:'賠償を払い、非を認める',res:'金は動き、艦隊は引いた。攘夷派はあなたを腰抜けと呼ぶ。',d:[1,1,1,0,-3],tag:'賠償を払った',after:'払った金の額は忘れられたが、非を認めた国だという評だけが長く残った。'},
+  {label:'引き渡しを拒む。斬られる側にも非がある',res:'使者は強硬に帰った。数か月後、湾に艦隊が並ぶことになる。',d:[0,-3,0,1,2],tag:'引き渡しを拒んだ',after:'拒んだ数か月のあいだに、こちらの備えは何ひとつ増えていなかった。'},
+  {label:'賠償は払い、犯人は匿う',res:'金で片をつけ、人は逃がした。双方に一分ずつ譲った形だが、どちらからも信用されない。',d:[-3,1,0,1,1],tag:'金で片をつけた',after:'双方に半分ずつ譲ったあの処理を、後になって双方が裏切りと呼んだ。'},
+ ]},
+'2+3':{title:'長州征討の軍議',scene:'朝敵とされた長州へ、諸藩の兵を出すかどうかの軍議が開かれている。出せば幕命は立つ。出さねば、幕府の号令が届かぬことが天下に知れる。',
+ opts:[
+  {label:'兵を出す。幕命に従わぬ先例は作れぬ',res:'諸藩の兵が動いた。長州は屈したが、動員の費えは各藩の骨身を削った。',d:[0,0,3,-3,-1],tag:'兵を出した',after:'動員の費えは、勝った側の藩をも十年苦しめた。'},
+  {label:'出兵を渋り、周旋で収めさせる',res:'戦わずに話がついた。幕府の面目は損なわれ、周旋した藩の名が上がる。',d:[1,0,-3,2,0],tag:'周旋で収めた',after:'戦わずに収めた者の名が上がり、号令をかけた者の名は下がった。'},
+  {label:'形だけ兵を出し、実は動かさぬ',res:'陣は敷かれたが矢は飛ばなかった。幕命は守られた形になり、長州も残る。',d:[0,-3,1,1,1],tag:'形だけ出した',after:'動かさなかった軍が、幕府に号令の力がないことを一番はっきり示していた。'},
+ ]},
+'2+4':{title:'池田屋',scene:'洛中の旅籠に、火をかけて京を焼く企てが集まっているという。踏み込むか、泳がせて全容を掴むか。',
+ opts:[
+  {label:'踏み込む。火をかけられてからでは遅い',res:'刃が交わり、企ては潰えた。京は焼けずに済んだが、斃れた者の同志が復讐を誓う。',d:[0,0,3,0,-3],tag:'踏み込んだ',after:'京を焼かせなかったあの夜は、同時に、以後の報復の起点にもなった。'},
+  {label:'泳がせて、背後の糸を掴む',res:'数日後、企ての全容と後ろ盾の名簿が手に入った。その間に一軒の商家が焼けた。',d:[1,-3,2,0,0],tag:'泳がせた',after:'掴んだ名簿は使われないまま、いつのまにか誰かの手に渡っていた。'},
+  {label:'密かに知らせ、散らせる',res:'旅籠はもぬけの殻だった。血は流れず、誰も捕まらず、企ては別の場所で続く。',d:[0,0,-3,1,2],tag:'逃がした',after:'血を流さずに散らせたことを、後に双方が別々の意味で恩に着た。'},
+ ]},
+'3+4':{title:'薩長の密議',scene:'犬猿の仲だった二藩が、密かに手を結ぼうとしている。仲立ちを引き受けるか、幕府に知らせるか。',
+ opts:[
+  {label:'仲立ちを引き受ける',res:'夜通しの談判の末、盟約が成った。天下の重心が、この夜を境に動き始める。',d:[0,0,-3,1,2],tag:'盟約を仲立ちした',after:'あの夜の盟約が、幕府に対抗しうる力を初めて一つにまとめた。'},
+  {label:'幕府に知らせる',res:'密議は露見し、双方は距離を取った。幕府はあなたを重用するが、志士たちは名を覚えた。',d:[1,0,3,-3,-1],tag:'幕府に知らせた',after:'知らせた見返りに得た地位は、幕府が倒れた日にそのまま消えた。'},
+  {label:'何も見なかったことにする',res:'盟約は成ったが、あなたの名はどこにも出てこない。恩も恨みも生まれなかった。',d:[0,1,-3,1,1],tag:'見なかったことにした',after:'恩も恨みも作らなかったことが、この時代を生き延びる最良の道だったのかもしれない。'},
+ ]},
+};
 const INTERLUDES = {
 '0+1':{title:'条約勅許',scene:'禁裏の門前に攘夷派の公卿が座り込んでいる。条約に勅許を出すか否か、帝の裁可は今夜に迫った。勅許が出れば開国は正統になり、出なければ幕府は不義の側に立たされる。',
  opts:[{label:'勅許を勝ち取るべく、公卿を一人ずつ切り崩す',res:'夜を徹して説いて回った。朝、門前の座り込みは半分に減っていた。開国は「朝廷が認めたもの」になる。',d:[0,3,0,0,-2],tag:'勅許を勝ち取った',after:'勅許を得た条約は、政権が変わった後も覆らなかった。港には異国船の灯が残り続けている。'},
@@ -2136,11 +2201,13 @@ const MAX_TURN = 10, GOAL = 30, CAP = 40, COMBO_MIN = 10;
    回数を切らないと、探り続けるだけで勝ててしまい賭けが消える。 */
 const PROBE_LIMIT = 4;
 /* 幕間「政変」が起きるターン。この時点の上位2勢力の組合せで事件が決まる。 */
-const INTERLUDE_TURN = 8;
+const INTERLUDE_TURNS = [5, 8];
+const INTERLUDE_SETS = [INTERLUDES_EARLY, INTERLUDES];
+const INTERLUDE_TURN = INTERLUDE_TURNS[INTERLUDE_TURNS.length - 1];   // 表示・互換のため
 
 function createState(seed){
   return { seed: seed >>> 0, turn: 1, currents:[0,0,0,0,0],
-           contacts:[], banned:[], promises:[], lastLen:0, probesUsed:0, interlude:null, lastPlace:null,
+           contacts:[], banned:[], promises:[], interludes:[], lastLen:0, probesUsed:0, interlude:null, lastPlace:null,
            actions:[], finished:false };
 }
 const totalOf = st => st.currents.reduce((a,b)=>a+b,0);
@@ -2494,7 +2561,7 @@ function resolve(st, action){
     /* 立ち合いに敗れると、深追いする余裕を失う（探りを1回失う） */
     probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
       + (approach === 2 ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
-    interlude: st.interlude,
+    interlude: st.interlude, interludes: st.interludes || [],
     actions: st.actions.concat([action]), finished: false,
   };
   next.finished = next.turn > MAX_TURN || cur.some(v => v >= CAP);
@@ -2526,10 +2593,16 @@ function topPairKey(currents){
   return [o[0], o[1]].sort((x,y) => x - y).join('+');
 }
 /* 第8ターンの開始時に一度だけ。未消化なら幕間データを返す */
+/* 第5ターンと第8ターンの開始時に一度ずつ。未消化ならその回の幕間データを返す */
 function pendingInterlude(st){
-  if (st.finished || st.turn !== INTERLUDE_TURN || st.interlude) return null;
+  if (st.finished) return null;
+  const n = INTERLUDE_TURNS.indexOf(st.turn);
+  if (n < 0) return null;
+  const done = st.interludes || [];
+  if (done.some(x => x.n === n)) return null;
   const key = topPairKey(st.currents);
-  return Object.assign({ key }, INTERLUDES[key]);
+  return Object.assign({ key, n, turn: st.turn, last: n === INTERLUDE_TURNS.length - 1,
+                         prev: done.length ? done[done.length - 1] : null }, INTERLUDE_SETS[n][key]);
 }
 function applyInterlude(st, choice){
   const iv = pendingInterlude(st);
@@ -2537,9 +2610,11 @@ function applyInterlude(st, choice){
   if (!Number.isInteger(choice) || !iv.opts[choice]) throw new Error('幕間の選択番号が不正です');
   const o = iv.opts[choice];
   const cur = st.currents.map((v, i) => clamp(v + o.d[i], 0, CAP));
+  const rec = { n: iv.n, key: iv.key, choice, tag: o.tag, title: iv.title, after: o.after };
   return Object.assign({}, st, {
     currents: cur,
-    interlude: { key: iv.key, choice, tag: o.tag, title: iv.title, after: o.after },
+    interludes: (st.interludes || []).concat([rec]),
+    interlude: rec,                       /* 直近のもの。盤面の一言などが参照する */
     /* 幕間の増減で上限に達したら、その時点で終局とする（交渉と同じ扱い） */
     finished: st.finished || cur.some(v => v >= CAP),
   });
@@ -2564,13 +2639,16 @@ function evaluateEnding(st){
 }
 
 /* --- リプレイ / セーブ ---------------------------------------------------- */
-function replay(seed, actions, interludeChoice){
+function replay(seed, actions, interludeChoices){
   let st = createState(seed);
+  const picks = Array.isArray(interludeChoices) ? interludeChoices
+              : interludeChoices == null ? [] : [null, interludeChoices];
   const reports = [];
   for (const a of actions){
     if (st.finished) break;
-    /* 幕間は第8ターンの交渉より前に解決する */
-    if (interludeChoice != null && pendingInterlude(st)) st = applyInterlude(st, interludeChoice);
+    /* 幕間は、そのターンの交渉より前に解決する */
+    const iv = pendingInterlude(st);
+    if (iv && picks[iv.n] != null) st = applyInterlude(st, picks[iv.n]);
     if (st.finished) break;
     const r = resolve(st, a);
     st = r.next; reports.push(r.report);
@@ -2582,7 +2660,12 @@ function encodeSave(st){
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
                a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
               + (a.duel != null ? ',' + a.duel : ''))
-    .join(';') + (st.interlude ? '#' + st.interlude.choice : '');
+    .join(';') + (st.interludes && st.interludes.length
+      ? '#' + INTERLUDE_TURNS.map((t, n) => {
+          const r = (st.interludes || []).find(x => x.n === n);
+          return r ? r.choice : '-';
+        }).join('.').replace(/(\.-)+$/, '')
+      : '');
 }
 function decodeSave(code){
   const s = String(code).trim();
@@ -2596,8 +2679,13 @@ function decodeSave(code){
   const raw = parts.slice(1).join(':');
   const hash = raw.indexOf('#');
   const choiceText = hash >= 0 ? raw.slice(hash + 1) : '';
-  if (hash >= 0 && !/^[0-2]$/.test(choiceText)) throw new Error('幕間の選択番号が不正です');
-  const interludeChoice = hash >= 0 ? +choiceText : null;
+  if (hash >= 0 && !/^[0-2-](\.[0-2-])*$/.test(choiceText)) throw new Error('幕間の選択番号が不正です');
+  /* '#a.b' が二度の幕間。'#a'（点なし）は幕間が一度だけだった頃のコードで、
+     その一度は第8ターンのものだったので、後半の枠に入れる。 */
+  const interludeChoice = hash < 0 ? null
+    : choiceText.includes('.')
+      ? choiceText.split('.').map(x => x === '-' || x === '' ? null : +x)
+      : [null, +choiceText];
   const body = hash >= 0 ? raw.slice(0, hash) : raw;
   const actions = !body ? [] : body.split(';').filter(Boolean).map(chunk => {
     const [c, s2, o, f, k, h, apr, plc, dl] = chunk.split(',');
@@ -2614,7 +2702,7 @@ function decodeSave(code){
 }
 function hashState(st){
   const s = JSON.stringify([st.seed, st.turn, st.currents, st.contacts, st.banned,
-                            st.promises, st.lastLen, st.probesUsed, st.interlude, st.lastPlace, st.finished]);
+                            st.promises, st.lastLen, st.probesUsed, st.interludes, st.lastPlace, st.finished]);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, '0');
@@ -2623,7 +2711,7 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, VOICES, VOICE_IDS, voiceOf, replyOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
-  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -2972,8 +3060,10 @@ function viewInterlude(){
        <div class="row"><button class="primary" id="ilnext">続ける</button></div>`;
   app.innerHTML = headerHTML() +
     `<div class="panel interlude tone-panel" style="${toneStyle(iv.key.split('+').map(Number))}">
-      <div class="kind">幕間 ― 第${E.INTERLUDE_TURN}ターン</div>
+      <div class="kind">幕間 ― 第${iv.turn}ターン（${iv.last ? '後編' : '前編'}）</div>
       <div class="title">『${esc(iv.title)}』</div>
+      ${iv.prev ? `<div class="say" style="border-left-color:var(--sumi2)">
+        あの『${esc(iv.prev.title)}』で、あなたは<b>${esc(iv.prev.tag)}</b>。その余波は、まだ収まっていない。</div>` : ''}
       <p>${esc(iv.scene)}</p>
       ${body}
     </div>` + (picked === null ? '' : chartHTML());

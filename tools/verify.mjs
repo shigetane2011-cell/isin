@@ -80,11 +80,12 @@ const pick = arr => arr[Math.floor(trnd() * arr.length)];
 function autoPlay(seed, rnd) {
   let st = E.createState(seed);
   const actions = [];
-  let interludeChoice = null;
+  const interludeChoice = [];
   while (!st.finished) {
-    if (E.pendingInterlude(st)) {
-      interludeChoice = Math.floor(rnd() * 3);
-      st = E.applyInterlude(st, interludeChoice);
+    const iv = E.pendingInterlude(st);
+    if (iv) {
+      interludeChoice[iv.n] = Math.floor(rnd() * 3);
+      st = E.applyInterlude(st, interludeChoice[iv.n]);
     }
     const m = E.meetingList(st);
     const slots = m.intro ? [...m.normal, m.intro] : m.normal;
@@ -985,21 +986,77 @@ head('5g. 第8ターンの幕間');
   ok(new Set(pairs.map(k => E.INTERLUDES[k].title)).size === 10, '幕間の題が10通りとも異なる');
 
   /* 発火位置 */
-  let fired = 0, games = 0, before8 = 0;
+  let games = 0, both = 0, offTurn = 0, twice = 0;
   for (let seed = 1; seed <= 200; seed++) {
     let st = E.createState(seed); games++;
-    let seen = false;
+    const at = [];
     while (!st.finished) {
       const iv = E.pendingInterlude(st);
-      if (iv) { if (st.turn !== E.INTERLUDE_TURN) before8++; seen = true; st = E.applyInterlude(st, seed % 3); }
+      if (iv) {
+        if (!E.INTERLUDE_TURNS.includes(st.turn)) offTurn++;
+        if (at.includes(iv.n)) twice++;
+        at.push(iv.n);
+        st = E.applyInterlude(st, seed % 3);
+      }
       const m = E.meetingList(st), c = E.CHAR_BY_ID.get(m.normal[0]);
       st = E.resolve(st, { charId: c.id, stance: 'support', ownF: c.factions[0],
                            argueF: c.factions[0], cards: c.correct.slice(), probed: false }).next;
     }
-    if (seen) fired++;
+    if (at.length === E.INTERLUDE_TURNS.length) both++;
   }
-  ok(fired === games, `全${games}局で幕間がちょうど1回起きる`);
-  ok(before8 === 0, `幕間が第${E.INTERLUDE_TURN}ターン以外で起きない`);
+  ok(E.INTERLUDE_TURNS.length === 2, `幕間は1局に${E.INTERLUDE_TURNS.length}回（第${E.INTERLUDE_TURNS.join('・第')}ターン）`);
+  ok(both === games, `全${games}局で幕間が${E.INTERLUDE_TURNS.length}回とも起きる（実測 ${both}局）`);
+  ok(offTurn === 0, `幕間が第${E.INTERLUDE_TURNS.join('・第')}ターン以外で起きない`);
+  ok(twice === 0, '同じ回の幕間が二度起きない');
+  {
+    /* 保存コード。二度ぶんは '#a.b'、点なしの '#a' は幕間が一度だけだった頃のもので、
+       その一度は第8ターンのものだったから後半の枠に入れる。 */
+    let st = E.createState(4242);
+    const picks = [];
+    while (!st.finished){
+      const iv = E.pendingInterlude(st);
+      if (iv){ picks[iv.n] = iv.n % 3; st = E.applyInterlude(st, picks[iv.n]); }
+      if (st.finished) break;
+      const m = E.meetingList(st), c = E.CHAR_BY_ID.get(m.normal[0]);
+      st = E.resolve(st, { charId:c.id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+                           cards:c.correct.slice(), probed:false }).next;
+    }
+    const code = E.encodeSave(st);
+    ok(/#\d\.\d$/.test(code), `二度ぶんの幕間が '#a.b' で書かれる（${code.slice(code.indexOf('#'))}）`);
+    const d = E.decodeSave(code);
+    ok(Array.isArray(d.interludeChoice) && d.interludeChoice.length === 2, '読み戻すと2つに分かれる');
+    ok(E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) === E.hashState(st),
+       '二度の幕間を含む盤面が保存コードの往復で一致する');
+    const legacy = E.decodeSave(code.replace(/#\d\./, '#'));
+    ok(legacy.interludeChoice[0] === null && legacy.interludeChoice[1] != null,
+       '点なしの旧コードは、その一度を後半の幕間として読む');
+    ok(E.decodeSave('IR4:1:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
+    let rejected = 0;
+    for (const bad of ['IR4:1:#9', 'IR4:1:#0.9', 'IR4:1:#a.b'])
+      { try { E.decodeSave(bad); } catch { rejected++; } }
+    ok(rejected === 3, '不正な幕間の選択番号を弾く');
+  }
+  {
+    /* 幕間の本文はすべて日本語。生成の過程で英単語が紛れ込んだ実績がある。 */
+    const texts = E.INTERLUDE_SETS.flatMap(set => Object.values(set)
+      .flatMap(v => [v.title, v.scene, ...v.opts.flatMap(o => [o.label, o.res, o.tag, o.after])]));
+    const latin = texts.filter(t => /[A-Za-z]{3,}/.test(t));
+    ok(latin.length === 0, `幕間の本文に英単語が混じっていない${
+      latin.length ? '（検出: ' + latin.map(t => t.slice(0, 30)).join(' / ') + '）' : ''}`);
+    ok(texts.every(t => typeof t === 'string' && t.length > 0), '幕間の本文に空文字がない');
+  }
+  ok(E.INTERLUDE_SETS.length === 2
+     && E.INTERLUDE_SETS.every(set => Object.keys(set).length === 10),
+     '前編・後編それぞれに10通りの組合せが揃っている');
+  {
+    const keys = Object.keys(E.INTERLUDES_EARLY);
+    ok(keys.every(k => Object.keys(E.INTERLUDES).includes(k)), '前編と後編で組合せの鍵が一致する');
+    ok(Object.values(E.INTERLUDES_EARLY).every(v => v.opts.length === 3
+         && v.opts.every(o => o.d.length === 5 && o.tag && o.after && o.res && o.label)),
+       '前編の各件が3択で、増減・見出し・余韻をすべて持つ');
+    const allTitles = [...Object.values(E.INTERLUDES_EARLY), ...Object.values(E.INTERLUDES)].map(v => v.title);
+    ok(new Set(allTitles).size === allTitles.length, '前編と後編で事件名が重複しない');
+  }
 }
 {
   /* 保存・復元と旧版互換 */
