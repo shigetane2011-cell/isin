@@ -23,7 +23,7 @@
 :root{
   --washi:#ece2cf; --washi2:#f6f0e1; --sumi:#1b1815; --sumi2:#3b342c;
   --shu:#b0272d; --ai:#22384e; --kin:#a8853a; --line:#c9bca1;
-  --kobu:#7a5aa0; --kaikoku:#1f7a8c; --sabaku:#8c5a2b; --yuhan:#2f7a45; --kosen:#b0272d;
+  --kobu:#6f4a8e; --kaikoku:#2c6f9c; --sabaku:#3f704d; --yuhan:#b17b24; --kosen:#a73732;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -62,13 +62,19 @@ h1 .sub{display:block;font-size:.72rem;letter-spacing:.3em;color:var(--sumi2);ma
 .panel{background:var(--washi2);border:1px solid var(--line);border-radius:2px;padding:14px 16px;margin:14px 0;
   box-shadow:0 1px 0 rgba(0,0,0,.05)}
 .panel h2{font-size:.9rem;margin:0 0 10px;letter-spacing:.18em;color:var(--sumi2);
-  border-left:4px solid var(--shu);padding-left:8px}
+  border-left:4px solid var(--kin);padding-left:8px}
 pre.chart{font-family:"SFMono-Regular",Consolas,"Noto Sans Mono CJK JP",monospace;
   font-size:.82rem;line-height:1.55;margin:0;white-space:pre;overflow-x:auto;color:var(--sumi)}
 pre.chart .u{color:var(--shu);font-weight:700}
 .f-kobu{color:var(--kobu)}.f-kaikoku{color:var(--kaikoku)}.f-sabaku{color:var(--sabaku)}
 .f-yuhan{color:var(--yuhan)}.f-kosen{color:var(--kosen)}
-.person{border:1px solid var(--line);background:var(--washi2);padding:12px 14px;margin:10px 0;border-radius:2px;
+.faction-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:12px 0 4px;font-size:.78rem}
+.faction-legend span{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.faction-legend i,.visual-key i{display:inline-block;width:.8em;height:.8em;border-radius:50%;background:currentColor;
+  box-shadow:0 0 0 1px rgba(27,24,21,.24)}
+.person{border:1px solid var(--line);border-left:5px solid rgba(var(--tone-a,59,52,44),.72);
+  background:linear-gradient(100deg,rgba(var(--tone-a,59,52,44),.11),rgba(var(--tone-b,59,52,44),.04) 48%,var(--washi2) 82%);
+  padding:12px 14px;margin:10px 0;border-radius:2px;
   cursor:pointer;transition:.12s;position:relative}
 .person:hover{border-color:var(--sumi);transform:translateX(2px)}
 .person:focus-visible,.card:focus-visible{outline:3px solid var(--ai);outline-offset:2px}
@@ -78,7 +84,8 @@ pre.chart .u{color:var(--shu);font-weight:700}
 .yowa summary{color:var(--kin);opacity:.85}
 a.spot{color:var(--ai);text-decoration:none;border-bottom:1px dotted var(--ai)}
 a.spot:hover{background:var(--ai);color:var(--washi2);border-bottom-color:transparent}
-.interlude{border:2px solid var(--sumi);background:#fffdf7}
+.interlude{border:2px solid var(--sumi);
+  background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.12),#fffdf7 48%,rgba(var(--tone-b,59,52,44),.10))}
 .interlude .title{font-size:1.4rem;letter-spacing:.14em;text-align:center;margin:6px 0 14px}
 button.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 16px;font-size:.92rem}
 .fate{border-left:3px solid var(--line);padding:8px 12px;margin:8px 0;font-size:.9rem}
@@ -96,13 +103,13 @@ button{font-family:inherit;font-size:.9rem;background:var(--washi2);border:1px s
   padding:8px 16px;border-radius:2px;cursor:pointer;letter-spacing:.08em}
 button:hover:not(:disabled){background:var(--sumi);color:var(--washi2)}
 button:disabled{opacity:.4;cursor:default}
-button.primary{background:var(--shu);border-color:var(--shu);color:#fff}
-button.primary:hover:not(:disabled){background:#8e1f24}
+button.primary{background:var(--ai);border-color:var(--ai);color:#fff}
+button.primary:hover:not(:disabled){background:#162a3c}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .card{border:1px solid var(--line);background:var(--washi2);padding:10px 12px;margin:7px 0;cursor:pointer;
   font-size:.88rem;border-radius:2px;transition:.1s}
 .card:hover{border-color:var(--sumi2)}
-.card.sel{border-color:var(--shu);border-left:5px solid var(--shu);background:#fff}
+.card.sel{border-color:var(--ai);border-left:5px solid var(--ai);background:#fff}
 .chip{font-size:.8rem;padding:5px 14px;border-radius:14px;border-color:var(--ai);color:var(--ai)}
 .chip:hover{background:var(--ai);color:var(--washi2)}
 .chip.talk{border-color:var(--line);color:var(--sumi2)}
@@ -117,14 +124,29 @@ button.primary:hover:not(:disabled){background:#8e1f24}
 .card.ans{border-color:var(--kin);background:#fffdf5}
 .card .mark{color:var(--kin);font-weight:600;font-size:.8rem}
 .slot-h{font-size:.8rem;letter-spacing:.16em;color:var(--sumi2);margin-top:16px;border-bottom:1px solid var(--line);padding-bottom:3px}
-.result{border:2px solid var(--sumi);padding:14px 16px;margin:14px 0;background:var(--washi2)}
+.result{border:2px solid var(--sumi);padding:14px 16px;margin:14px 0;
+  background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.14),var(--washi2) 58%)}
+.result.failed{background:linear-gradient(105deg,rgba(27,24,21,.16),var(--washi2) 62%);border-color:var(--sumi2)}
 .result .verdict{font-size:1.2rem;letter-spacing:.2em;font-weight:600}
-.v3{color:var(--shu)}.v2{color:var(--yuhan)}.v1{color:var(--sumi2)}.v0{color:#000;background:var(--sumi);color:var(--washi);padding:2px 10px}
+.v3{color:var(--kin)}.v2{color:var(--ai)}.v1{color:var(--sumi2)}.v0{color:#000;background:var(--sumi);color:var(--washi);padding:2px 10px}
 .delta{font-family:monospace;font-size:.9rem;margin-top:8px}
 .quote{border-left:3px solid var(--kin);padding-left:12px;margin:10px 0;font-size:.92rem;color:var(--sumi2)}
 .ending h3{border-bottom:1px solid var(--line);padding-bottom:4px;font-size:.9rem;letter-spacing:.2em;margin:18px 0 6px}
 .ending .title{font-size:1.5rem;letter-spacing:.14em;text-align:center;margin:6px 0}
-.ending .kind{text-align:center;font-size:.78rem;letter-spacing:.3em;color:var(--shu)}
+.ending .kind{text-align:center;font-size:.78rem;letter-spacing:.3em;color:var(--kin)}
+.story-visual{position:relative;overflow:hidden;aspect-ratio:5/2;margin:12px 0 16px;border:1px solid var(--line);
+  background:var(--washi);box-shadow:0 2px 8px rgba(27,24,21,.14)}
+.story-visual .visual-images{position:absolute;inset:0;display:flex}
+.story-visual .visual-images img{display:block;width:100%;height:100%;object-fit:cover;min-width:0}
+.story-visual .visual-images.split img{width:50%}
+.story-visual::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.36),rgba(var(--tone-a,59,52,44),.12) 43%,
+    rgba(var(--tone-b,59,52,44),.27));mix-blend-mode:multiply}
+.story-visual.neutral::after{background:rgba(59,52,44,.10)}
+.story-visual .visual-key{position:absolute;z-index:1;left:10px;bottom:9px;display:flex;flex-wrap:wrap;gap:6px}
+.story-visual .visual-key span{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;background:rgba(246,240,225,.88);
+  border:1px solid currentColor;border-radius:10px;font-size:.7rem;font-weight:700;box-shadow:0 1px 4px rgba(27,24,21,.12)}
+.faction-visual{margin-top:0}
 .small{font-size:.76rem;color:var(--sumi2)}
 code.seed{font-family:monospace;background:#fff;border:1px solid var(--line);padding:1px 6px}
 textarea{width:100%;font-family:monospace;font-size:.72rem;height:70px;border:1px solid var(--line);padding:6px;background:#fff}
@@ -135,6 +157,8 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .title-hero .hero-copy{top:18px;left:10px;right:10px}
   .title-hero h1{font-size:1.7rem;letter-spacing:.14em}
   .title-hero h1 .sub{font-size:.66rem;letter-spacing:.2em}
+  .story-visual{aspect-ratio:16/7}
+  .story-visual .visual-key{left:6px;bottom:6px}
 }
 </style>
 </head>
@@ -1210,6 +1234,42 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const fac = i => E.FACTIONS[i];
 const bar = v => '█'.repeat(Math.floor(v/2)) + '░'.repeat(20 - Math.floor(v/2));
 const pad = v => String(v).padStart(2,'0');
+const FACTION_RGB = ['111,74,142','44,111,156','63,112,77','177,123,36','167,55,50'];
+
+function toneStyle(factions){
+  const fs = factions && factions.length ? factions : [];
+  const a = fs.length ? FACTION_RGB[fs[0]] : '59,52,44';
+  const b = fs.length > 1 ? FACTION_RGB[fs[1]] : a;
+  return `--tone-a:${a};--tone-b:${b}`;
+}
+function factionLegendHTML(factions){
+  const fs = factions || [0,1,2,3,4];
+  return `<div class="faction-legend">${fs.map(f =>
+    `<span class="${fac(f).cls}"><i aria-hidden="true"></i>${fac(f).name} <small>${fac(f).full}</small></span>`
+  ).join('')}</div>`;
+}
+function storyVisualHTML(srcs, factions, alt, extraClass, eager){
+  const fs = factions || [];
+  const imgs = srcs.map(src => `<img src="${src}" alt="" loading="${eager?'eager':'lazy'}" decoding="async">`).join('');
+  const keys = fs.length ? `<div class="visual-key">${fs.map(f =>
+    `<span class="${fac(f).cls}"><i aria-hidden="true"></i>${fac(f).name}</span>`).join('')}</div>` : '';
+  return `<figure class="story-visual ${extraClass || ''} ${fs.length?'':'neutral'}" style="${toneStyle(fs)}" role="img" aria-label="${esc(alt)}">
+    <div class="visual-images ${srcs.length > 1 ? 'split' : ''}">${imgs}</div>${keys}
+  </figure>`;
+}
+function meetingVisualHTML(c){
+  const fs = ui.ownF === null ? c.factions.slice() : [ui.ownF];
+  const srcs = fs.map(f => `assets/factions/${fac(f).key}.webp`);
+  return storyVisualHTML(srcs, fs, `${c.name}が属する${fs.map(f => fac(f).full).join('と')}の情景`, 'faction-visual', false);
+}
+function endingVisualHTML(e){
+  const fs = E.winningFactions(e);
+  let file = 'chaos';
+  if (e.kind === 'solo') file = `solo-${fac(e.faction).key}`;
+  else if (e.kind === 'combo') file = `combo-${e.pair.slice().sort((a,b)=>a-b).join('-')}`;
+  const label = fs.length ? fs.map(f => fac(f).full).join('と') : '色を失った歴史';
+  return storyVisualHTML([`assets/endings/${file}.webp`], fs, `${e.t}――${label}が形づくった日本`, 'ending-visual', true);
+}
 
 function chartHTML(){
   const t = E.totalOf(st), era = E.ERAS[E.eraOfTotal(t)];
@@ -1252,6 +1312,7 @@ function viewTitle(){
   </section>
   <div class="panel">
     <p>本作は、<b>10ターン以内に理想の日本を創り上げる</b>シミュレーションです。到達できる未来は次の3系統・全16通り。</p>
+    ${factionLegendHTML()}
     <ul style="padding-left:1.2em;margin:8px 0">
       <li><b>単独覇権</b>：いずれか1つの時勢が<b>30以上</b> — 5通り</li>
       <li><b>複合革命</b>：上位2つの時勢の<b>合計が30以上、かつ2番目が10以上</b> — 10通り（組み合わせごとに別の未来）</li>
@@ -1312,7 +1373,7 @@ function viewMeeting(){
     const wb = E.waryOf(st.currents, id);
     const wary = wb >= 0
       ? `<div class="warn">※ あなたが掲げる〔${fac(wb).name}〕を警戒している。判定が一段下がります</div>` : '';
-    return `<div class="person ${isIntro?'intro':''}" data-id="${id}" role="button" tabindex="0">
+    return `<div class="person ${isIntro?'intro':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
       <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
       <div class="desc">${isIntro ? '[人脈] ご紹介にあずかりました。<br>' : '[情勢] '}${esc(c.desc)}</div>
@@ -1349,7 +1410,7 @@ function viewInterlude(){
         esc(iv.opts[picked].res)}</div>
        <div class="row"><button class="primary" id="ilnext">続ける</button></div>`;
   app.innerHTML = headerHTML() +
-    `<div class="panel interlude">
+    `<div class="panel interlude" style="${toneStyle(iv.key.split('+').map(Number))}">
       <div class="kind">幕間 ― 第${E.INTERLUDE_TURN}ターン</div>
       <div class="title">『${esc(iv.title)}』</div>
       <p>${esc(iv.scene)}</p>
@@ -1434,7 +1495,7 @@ function viewStance(){
       </details>`;
     })()}`;
 
-  app.innerHTML = headerHTML() +
+  app.innerHTML = headerHTML() + meetingVisualHTML(c) +
     `<div class="panel"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       <div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
@@ -1525,8 +1586,9 @@ function viewResult(){
   const d = r.delta.map((v,i) => v ? `<span class="${fac(i).cls}">[${fac(i).name}] ${v>0?'+':''}${v}</span>` : null)
     .filter(Boolean).join('　') || '変動なし';
   app.innerHTML = headerHTML() +
-    `<div class="result">
+    `<div class="result ${r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
+      ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
       <div class="quote">「${esc(r.text)}」</div>
@@ -1557,6 +1619,7 @@ function viewEnding(){
       <div class="kind">${e.kind==='solo'?'単独覇権エンド':e.kind==='combo'?'複合革命エンド':'混沌エンド'}</div>
       <div class="title">『${esc(e.t)}』</div>
       <div class="kind" style="color:var(--sumi2)">${esc(e.s)}</div>
+      ${endingVisualHTML(e)}
       ${e.p.map((para,i) => `<h3>${heads[i]}</h3><p>${esc(para)}</p>`).join('')}
       ${st.interlude ? `<h3>あの夜の選択</h3><p>『${esc(st.interlude.title)}』において、あなたは<b>${
         esc(st.interlude.tag)}</b>。<br>${esc(st.interlude.after || '')}</p>` : ''}
