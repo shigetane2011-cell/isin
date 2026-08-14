@@ -64,10 +64,18 @@ ok(portraitURLs.every(url => existsSync(url) && statSync(url).size > 30_000),
 ok(portraitFiles.every(([id, file]) =>
    html.includes(`[${id},`) && html.includes(`assets/portraits/${file}`)),
    '8名のIDと肖像ファイルが画面定義に結び付いている');
-ok(html.includes('characterVisualHTML(c)') && html.includes('portraitThumbHTML(id)'),
-   '候補一覧と個別面会の両方に肖像を表示する');
+ok(html.includes('characterVisualHTML(c)') && html.includes('portraitThumbHTML(id)')
+   && html.includes('interludeFigureHTML(iv)'),
+   '候補一覧・個別面会・幕間に肖像を表示する');
 ok(html.includes('本人と確定した写真はなく') && html.includes('キヨッソーネ肖像'),
    '西郷隆盛を実在写真と誤認させない注記がある');
+
+head('1d. 勝ち筋と旅程が画面に見えるか');
+ok(html.includes('class="route-guide"') && html.includes('通常ルート｜二つを育てる')
+   && html.includes('高難度ルート｜一つに寄せ切る'),
+   '複合と単独の二つの勝ち筋を、時勢チャートに常時表示する');
+ok(html.includes('遠路・通常候補 −1') && html.includes('class="travel-note'),
+   '行き先の札と現在地の両方に旅疲れを表示する');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
@@ -894,6 +902,23 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   ok(empty === 0, '一つ外しても、行ける場は必ず残る');
 }
 {
+  /* 距離は別の体力ゲージにせず、遠路を直行した日の通常面会枠だけで表す */
+  const first = E.createState(1868);
+  ok(!E.travelFatigue(null, 2) && E.meetingList(first, 2).normal.length === 3,
+     '初日は長崎を選んでも旅疲れにならず、通常候補は3名');
+  ok(E.travelFatigue(0, 2) && E.travelFatigue(2, 1),
+     '京・長崎・江戸の異なる都市圏を直行すると旅疲れになる');
+  ok(!E.travelFatigue(0, 3), '京の中で場を替えても旅疲れにならない');
+  ok(!E.travelFatigue(0, 5) && !E.travelFatigue(5, 2),
+     '都市から街道、街道から都市への移動では旅疲れにならない');
+  const fromKyoto = Object.assign({}, first, { lastPlace:0 });
+  const fromRoad = Object.assign({}, first, { lastPlace:5 });
+  ok(E.normalMeetingCount(fromKyoto, 2) === 2 && E.meetingList(fromKyoto, 2).normal.length === 2,
+     '京から長崎へ直行した日は通常候補が3名から2名に減る');
+  ok(E.normalMeetingCount(fromRoad, 2) === 3 && E.meetingList(fromRoad, 2).normal.length === 3,
+     '街道を一晩挟んで長崎へ入れば通常候補は3名のまま');
+}
+{
   /* 場ごとに顔ぶれが偏るか */
   const share = pl => {
     const cnt = [0,0,0,0,0]; let tot = 0;
@@ -975,7 +1000,7 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
 }
 
 /* --- 5g. 幕間「政変」 ------------------------------------------------------ */
-head('5g. 第8ターンの幕間');
+head('5g. 第5・第8ターンの幕間');
 {
   const pairs = [];
   for (let a = 0; a < 5; a++) for (let b = a + 1; b < 5; b++) pairs.push(`${a}+${b}`);
@@ -984,6 +1009,13 @@ head('5g. 第8ターンの幕間');
   ok(pairs.every(k => E.INTERLUDES[k].opts.every(o => o.d.length === 5 && o.res && o.tag)),
      'すべての選択肢に増減・結果文・後日談用のタグがある');
   ok(new Set(pairs.map(k => E.INTERLUDES[k].title)).size === 10, '幕間の題が10通りとも異なる');
+  ok(pairs.every(k => Array.isArray(E.INTERLUDE_FIGURES[k]) && E.INTERLUDE_FIGURES[k].length === 2),
+     '10通りの流れすべてに、前編・後編の主要人物が一人ずついる');
+  const figures = Object.values(E.INTERLUDE_FIGURES).flat();
+  ok(figures.every(id => E.CHAR_BY_ID.has(id) && E.PORTRAITS.has(id) && E.SAYS.has(id)),
+     '幕間の主要人物は全員、名簿・肖像・固有の開口一番を持つ');
+  ok(new Set(figures).size === E.PORTRAITS.size,
+     '肖像を持つ主要人物8名が、少なくとも一つの幕間で顔になる');
 
   /* 発火位置 */
   let games = 0, both = 0, offTurn = 0, twice = 0;
@@ -1158,11 +1190,23 @@ ok(mk([16,0,0,0,15]).t === '攘夷の詔', '公武16+抗戦15 → 攘夷の詔�
   ok(got.length === 10 && new Set(got).size === 10, '2勢力の組合せ10通りが、それぞれ別のエンディングになる');
   ok(!got.includes('野合の衆'), '『野合の衆』に落ちる組合せが残っていない（保険としてコードには残す）');
 }
-ok(mk([9,8,5,4,3]).t === '歴史の藻屑', '合計は多いが上位2つが30未満 → 歴史の藻屑');
+ok(mk([9,8,5,4,3]).t === '歴史の藻屑', '合計は多いが上位2つが28未満 → 歴史の藻屑');
+ok(mk([18,0,10,0,0]).t === '立憲君主幕府', '18+10 → 合計28・二番目10で複合革命が成立');
+ok(mk([17,0,10,0,0]).t === '歴史の藻屑', '17+10 → 合計27では複合革命にならない');
+ok(mk([20,0,8,0,0]).t === '歴史の藻屑', '20+8 → 合計28でも二番目が10未満なら成立しない');
 ok(mk([20,0,10,0,0]).t === '立憲君主幕府', '20+10 → 二番目が下限ちょうどで複合革命が成立');
 ok(mk([25,0,5,0,0]).t === '歴史の藻屑', '25+5 → 合計30でも二番目が薄いので複合革命にならない');
 ok(mk([29,1,0,0,0]).t === '歴史の藻屑', '29+1 → 連立の実体がなく歴史の藻屑');
 ok(mk([31,0,32,0,0]).t === '徳川の再臨', '複数が30超 → 最大値の単独覇権が優先');
+{
+  const r = E.routeForecast([12,0,9,0,0]);
+  ok(String(r.combo.pair) === '0,2' && r.combo.title === '立憲君主幕府',
+     '盤面の案内は、現在の上位2勢力に対応する固有エンドを示す');
+  ok(r.combo.need === 7 && r.solo.need === 18,
+     '盤面の「あと」は二番目10・合計28と単独30から正しく逆算する');
+  ok(E.routeForecast([18,0,10,0,0]).combo.need === 0,
+     '複合革命の条件を満たすと、盤面の残り必要点も0になる');
+}
 
 /* --- 7. データ整合性 ----------------------------------------------------- */
 head('7. データ整合性');

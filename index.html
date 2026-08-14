@@ -83,6 +83,16 @@ h1 .sub{display:block;font-size:.72rem;letter-spacing:.3em;color:var(--sumi2);ma
 pre.chart{font-family:"SFMono-Regular",Consolas,"Noto Sans Mono CJK JP",monospace;
   font-size:.82rem;line-height:1.55;margin:0;white-space:pre;overflow-x:auto;color:var(--sumi)}
 pre.chart .u{color:var(--shu);font-weight:700}
+.route-guide{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.route-card{position:relative;overflow:hidden;padding:9px 11px;border:1px solid var(--line);border-left:4px solid var(--sumi2);
+  background:#fff;font-size:.79rem;line-height:1.55}
+.route-card.combo{border-left-color:rgb(var(--route-a));
+  background:linear-gradient(102deg,rgba(var(--route-a),.11),rgba(var(--route-b),.07) 62%,#fff)}
+.route-card .kind{font-size:.68rem;letter-spacing:.1em;color:var(--sumi2)}
+.route-card .name{font-weight:700;letter-spacing:.04em}
+.route-card .need{float:right;font-weight:700;color:var(--shu)}
+.route-card.reached .need{color:var(--sabaku)}
+.route-card .rule{display:block;color:var(--sumi2);font-size:.72rem;margin-top:2px}
 .f-kobu{color:var(--kobu)}.f-kaikoku{color:var(--kaikoku)}.f-sabaku{color:var(--sabaku)}
 .f-yuhan{color:var(--yuhan)}.f-kosen{color:var(--kosen)}
 .faction-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:12px 0 4px;font-size:.78rem}
@@ -110,6 +120,17 @@ a.spot:hover{background:var(--ai);color:var(--washi2);border-bottom-color:transp
 .interlude{border:2px solid var(--sumi);
   background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.12),#fffdf7 48%,rgba(var(--tone-b,59,52,44),.10))}
 .interlude .title{font-size:1.4rem;letter-spacing:.14em;text-align:center;margin:6px 0 14px}
+.interlude-figure{display:flex;gap:13px;align-items:center;margin:10px 0 13px;padding:9px 12px;
+  border:1px solid rgba(var(--tone-a,59,52,44),.42);border-left:5px solid rgb(var(--tone-a,59,52,44));
+  background:linear-gradient(100deg,rgba(var(--tone-a,59,52,44),.13),rgba(var(--tone-b,59,52,44),.07) 64%,rgba(255,253,247,.9))}
+.interlude-figure .portrait{flex:0 0 66px;height:82px;padding:3px;
+  background:linear-gradient(180deg,rgb(var(--tone-a,59,52,44)),rgb(var(--tone-b,59,52,44)));
+  box-shadow:0 0 0 1px rgba(27,24,21,.45)}
+.interlude-figure .portrait img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 18%;
+  border:1px solid rgba(255,253,247,.72)}
+.interlude-figure .who{font-weight:700;letter-spacing:.08em}
+.interlude-figure .role{font-size:.68rem;color:var(--sumi2);letter-spacing:.12em;margin-bottom:3px}
+.interlude-figure .line{font-size:.86rem;line-height:1.65;margin-top:3px}
 button.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 16px;font-size:.92rem}
 button .small{color:inherit;opacity:.85}
 button:disabled{opacity:.45}
@@ -159,8 +180,10 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .placechip{font-size:.85rem;padding:6px 11px;text-align:left;line-height:1.35}
 .placechip .nm{font-weight:600}
 .placechip .small{display:block;opacity:.85;font-size:.72rem;margin-top:1px}
+.placechip .travel{display:block;color:var(--shu);font-size:.68rem;font-weight:700;margin-top:2px}
 .placechip.on{background:var(--sumi);color:var(--washi2);border-color:var(--sumi)}
 .placechip.on .small span{color:var(--washi2)}
+.placechip.on .travel{color:#ffd9cc}
 .placebar .locked{margin-top:6px;opacity:.5}
 .card .mv{color:var(--sumi2);font-weight:600;margin-right:2px}
 .card.sel .mv,.card.ans .mv{color:inherit}
@@ -191,6 +214,9 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .here .tag{font-size:.72rem;border:1px solid currentColor;padding:1px 6px;margin-left:8px;
   vertical-align:2px;border-radius:2px;color:var(--sumi2)}
 .here .desc{font-size:.82rem;color:var(--sumi2);margin-top:5px}
+.travel-note{margin-top:8px;padding:7px 10px;border-left:3px solid var(--shu);background:rgba(176,58,46,.07);
+  color:var(--sumi);font-size:.78rem;line-height:1.6}
+.travel-note.safe{border-left-color:var(--sabaku);background:rgba(63,112,77,.07)}
 .here .row{margin-top:8px}
 .here button{padding:6px 12px;font-size:.84rem}
 .warn{color:var(--shu);font-size:.78rem;margin-top:6px}
@@ -295,6 +321,8 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .portrait-stage .portrait-backdrop{left:44%}
   .portrait-stage .visual-key{right:9px;bottom:8px}
   .portrait-source{right:9px;top:8px;max-width:44%;font-size:.59rem}
+  .route-guide{grid-template-columns:1fr}
+  .interlude-figure{align-items:flex-start}
 }
 </style>
 </head>
@@ -1679,6 +1707,16 @@ const placeAllows = (pl, ap) => PLACES[pl].allow.includes(ap);
 /* その時代に行ける場だけを返す */
 const placesOpen = st => PLACES.map((p, i) => i)
   .filter(i => (PLACES[i].unlockEra ?? 0) <= eraOf(st) && i !== st.lastPlace);
+/* 京・江戸・長崎を一息に移ると、その日は旅だけで半ば潰れる。
+   新しい体力ゲージは持たず、面会の選択肢が1名減ることで距離を表す。
+   街道は中継地なので、街道を挟めば旅疲れは起きない。 */
+const CITY_AREAS = new Set(['京','江戸','長崎']);
+function travelFatigue(lastPlace, nextPlace){
+  if (lastPlace == null || nextPlace == null) return false;
+  const from = PLACES[lastPlace]?.where, to = PLACES[nextPlace]?.where;
+  return from !== to && CITY_AREAS.has(from) && CITY_AREAS.has(to);
+}
+const normalMeetingCount = (st, place) => travelFatigue(st.lastPlace, place) ? 2 : 3;
 
 /* --- 働きかけ -------------------------------------------------------------
    同じ「3枚当てる」を10ターン繰り返すと単調になる。そこで、相手への
@@ -2082,7 +2120,7 @@ function duelPending(st, action){
 }
 
 /* --- 幕間「政変」 ---------------------------------------------------------
-   第8ターンの開始時に一度だけ起きる。その時点の上位2勢力の組合せで事件が決まる。
+   第5・第8ターンの開始時に起きる。その時点の上位2勢力の組合せで事件が決まる。
    実測では上位2勢力は第5ターンには固まっているので、幕間はそのまま結末の予兆になる。
    選択肢は正解のない価値観の問いで、盤面をわずかに動かし、後日談の語り口を変える。
    ------------------------------------------------------------------------ */
@@ -2195,7 +2233,7 @@ const INTERLUDES = {
 };
 
 /* --- 状態 ---------------------------------------------------------------- */
-const MAX_TURN = 10, GOAL = 30, CAP = 40, COMBO_MIN = 10;
+const MAX_TURN = 10, GOAL = 30, COMBO_GOAL = 28, CAP = 40, COMBO_MIN = 10;
 /* 相手を「探る」と3つの正解がすべて分かるが、手の内を明かした分だけ影響力が落ち、
    その交渉の獲得が1下がる。使えるのは1局に PROBE_LIMIT 回まで。
    回数を切らないと、探り続けるだけで勝ててしまい賭けが消える。 */
@@ -2204,6 +2242,13 @@ const PROBE_LIMIT = 4;
 const INTERLUDE_TURNS = [5, 8];
 const INTERLUDE_SETS = [INTERLUDES_EARLY, INTERLUDES];
 const INTERLUDE_TURN = INTERLUDE_TURNS[INTERLUDE_TURNS.length - 1];   // 表示・互換のため
+/* 幕間を「事件の説明」だけで終わらせず、その流れを象徴する人物の顔を置く。
+   前編・後編で一人ずつ。全員、史料を参照した肖像を持つ主要人物に限る。 */
+const INTERLUDE_FIGURES = {
+  '0+1':[33,95],  '0+2':[33,140], '0+3':[33,103], '0+4':[33,144],
+  '1+2':[95,140], '1+3':[145,103],'1+4':[95,144], '2+3':[140,103],
+  '2+4':[47,144], '3+4':[142,144],
+};
 
 function createState(seed){
   return { seed: seed >>> 0, turn: 1, currents:[0,0,0,0,0],
@@ -2224,8 +2269,8 @@ function baseId(st){
   return v === 0 ? ROSTER : v;
 }
 
-/* 面会リスト: 通常枠3名 ＋ 紹介枠0..1名 */
-/* 場の指定がある場合、3枠のうち2枠までをその場に集まる勢力へ寄せる。
+/* 面会リスト: 通常枠3名（遠路を直行した日は2名）＋ 紹介枠0..1名 */
+/* 場の指定がある場合、通常枠のうち2枠までをその場に集まる勢力へ寄せる。
    基点IDの算出はそのままで、前方送りの条件に「場に合うか」を足すだけ。 */
 function meetingList(st, place){
   const era = eraOf(st), maxId = MAX_ID_BY_ERA[era];
@@ -2242,7 +2287,7 @@ function meetingList(st, place){
     if (slot === 1 && pl.hot) return HOTHEADS.has(id);
     return true;
   };
-  [b, b + 37, b + 73].forEach((raw, slot) => {
+  [b, b + 37, b + 73].slice(0, normalMeetingCount(st, place)).forEach((raw, slot) => {
     const r = raw > ROSTER ? raw - ROSTER : raw;
     let id = rankOfId(r) > era ? (r % 30) + 1 : r;   // ランク補正（強制変換）
     let guard = 0;
@@ -2592,7 +2637,6 @@ function topPairKey(currents){
   const o = [0,1,2,3,4].sort((a,b) => currents[b] - currents[a] || a - b);
   return [o[0], o[1]].sort((x,y) => x - y).join('+');
 }
-/* 第8ターンの開始時に一度だけ。未消化なら幕間データを返す */
 /* 第5ターンと第8ターンの開始時に一度ずつ。未消化ならその回の幕間データを返す */
 function pendingInterlude(st){
   if (st.finished) return null;
@@ -2602,6 +2646,7 @@ function pendingInterlude(st){
   if (done.some(x => x.n === n)) return null;
   const key = topPairKey(st.currents);
   return Object.assign({ key, n, turn: st.turn, last: n === INTERLUDE_TURNS.length - 1,
+                         figureId: INTERLUDE_FIGURES[key][n],
                          prev: done.length ? done[done.length - 1] : null }, INTERLUDE_SETS[n][key]);
 }
 function applyInterlude(st, choice){
@@ -2621,6 +2666,25 @@ function applyInterlude(st, choice){
 }
 
 /* --- エンディング判定 ---------------------------------------------------- */
+/* いま最短で届く複合ルートと、先頭勢力の単独ルート。
+   UIだけでなく検査からも同じ計算を使い、目標の説明と判定を食い違わせない。 */
+function routeForecast(currents){
+  const order = [0,1,2,3,4].sort((a,b) => currents[b] - currents[a] || a - b);
+  const [a, b] = order;
+  const pair = [a,b].sort((x,y) => x - y);
+  const key = pair.join('+');
+  const floorA = Math.max(currents[a], COMBO_MIN);
+  const floorB = Math.max(currents[b], COMBO_MIN);
+  const comboNeed = Math.max(0, COMBO_MIN - currents[a])
+    + Math.max(0, COMBO_MIN - currents[b])
+    + Math.max(0, COMBO_GOAL - floorA - floorB);
+  return {
+    combo:{ pair, total:currents[a] + currents[b], need:comboNeed, goal:COMBO_GOAL,
+            min:COMBO_MIN, title:(ENDINGS.combo[key] || ENDINGS.combo.etc).t },
+    solo:{ faction:a, total:currents[a], need:Math.max(0, GOAL - currents[a]),
+           goal:GOAL, title:ENDINGS.solo[a].t },
+  };
+}
 function evaluateEnding(st){
   const cur = st.currents, max = Math.max(...cur);
   if (max >= GOAL){
@@ -2631,7 +2695,7 @@ function evaluateEnding(st){
   const [a, b] = order;
   /* 「複合革命」を名乗るには、二番目の勢力も実体を伴っている必要がある。
      29+1 のような偏った内訳は連立ではなく、単に一勢力が届かなかっただけとみなす。 */
-  if (cur[a] + cur[b] >= GOAL && cur[b] >= COMBO_MIN){
+  if (cur[a] + cur[b] >= COMBO_GOAL && cur[b] >= COMBO_MIN){
     const key = [a,b].sort((x,y) => x - y).join('+');
     return Object.assign({ kind:'combo', pair:[a,b] }, ENDINGS.combo[key] || ENDINGS.combo['etc']);
   }
@@ -2711,9 +2775,9 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, VOICES, VOICE_IDS, voiceOf, replyOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
-  PLACES, placeAllows, placesOpen, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
-  meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, evaluateEnding, replay,
+  meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
 if (typeof globalThis !== 'undefined') globalThis.ENGINE = ENGINE;
 /* ==ENGINE END== */
@@ -2805,6 +2869,19 @@ function characterVisualHTML(c){
     <div class="portrait-source" title="${esc(portrait.basis)}">創作彩色｜${esc(portrait.short)}</div>${keys}
   </figure>`;
 }
+function interludeFigureHTML(iv){
+  const c = E.CHAR_BY_ID.get(iv.figureId), portrait = E.PORTRAITS.get(iv.figureId);
+  if (!c || !portrait) return '';
+  const fs = iv.key.split('+').map(Number);
+  const tags = c.factions.map(f => `<span class="${fac(f).cls}">${fac(f).name}</span>`).join('・');
+  return `<div class="interlude-figure" style="${toneStyle(fs)}">
+    <span class="portrait" aria-hidden="true"><img src="${portrait.src}" alt="" loading="eager" decoding="async"></span>
+    <div><div class="role">この流れを象徴する人物</div>
+      <div><span class="who">${esc(c.name)}</span> <span class="small">${tags}｜${esc(c.nick)}</span></div>
+      <div class="line">「${esc(E.SAYS.get(c.id))}」</div>
+    </div>
+  </div>`;
+}
 function portraitThumbHTML(id){
   const portrait = E.PORTRAITS.get(id);
   return portrait ? `<span class="person-thumb" aria-hidden="true"><img src="${portrait.src}" alt="" loading="lazy" decoding="async"></span>` : '';
@@ -2820,10 +2897,12 @@ function endingVisualHTML(e){
 
 function chartHTML(){
   const t = E.totalOf(st), era = E.ERAS[E.eraOfTotal(t)];
+  const route = E.routeForecast(st.currents);
+  const pair = route.combo.pair;
+  const comboReached = route.combo.need === 0, soloReached = route.solo.need === 0;
   let s = `<span class="u">🔥 [時代のうねり(合計)]: ${pad(t)} Pt / (現在: ${era})</span>\n`;
   E.FACTIONS.forEach((f,i) => {
-    s += `<span class="${f.cls}">[${f.name}] ${pad(st.currents[i])}: ${bar(st.currents[i])}</span>`
-       + (i===0 ? '  (目標30 / 上限40)' : '') + '\n';
+    s += `<span class="${f.cls}">[${f.name}] ${pad(st.currents[i])}: ${bar(st.currents[i])}</span>\n`;
   });
   const foes = E.FACTIONS.map((f, i) => st.currents[i] >= E.WARY_LINE
     ? `<span class="${f.cls}">${f.name}</span>を掲げるため <span class="warn" style="display:inline">${
@@ -2832,6 +2911,23 @@ function chartHTML(){
     ? st.contacts.map(id => `<span class="pill">${esc(E.CHAR_BY_ID.get(id).name)}</span>`).join('')
     : '<span class="small">なし</span>';
   return `<div class="panel"><h2>時勢チャート</h2><pre class="chart">${s.trimEnd()}</pre>
+    <div class="route-guide" aria-label="エンディングへの進み具合">
+      <div class="route-card combo ${comboReached ? 'reached' : ''}" style="--route-a:${FACTION_RGB[pair[0]]};--route-b:${FACTION_RGB[pair[1]]}">
+        <span class="need">${comboReached ? '到達圏' : `あと${route.combo.need}`}</span>
+        <div class="kind">通常ルート｜二つを育てる</div>
+        <div class="name">『${esc(route.combo.title)}』</div>
+        <span class="${fac(pair[0]).cls}">${fac(pair[0]).name} ${st.currents[pair[0]]}</span> ＋
+        <span class="${fac(pair[1]).cls}">${fac(pair[1]).name} ${st.currents[pair[1]]}</span>
+        <span class="rule">合計 ${route.combo.total} / ${E.COMBO_GOAL}、両方10以上</span>
+      </div>
+      <div class="route-card ${soloReached ? 'reached' : ''}">
+        <span class="need">${soloReached ? '到達圏' : `あと${route.solo.need}`}</span>
+        <div class="kind">高難度ルート｜一つに寄せ切る</div>
+        <div class="name">『${esc(route.solo.title)}』</div>
+        <span class="${fac(route.solo.faction).cls}">${fac(route.solo.faction).name} ${route.solo.total}</span>
+        <span class="rule">単独 ${route.solo.total} / ${E.GOAL}（30到達時はこちらが優先）</span>
+      </div>
+    </div>
     ${foes.length ? `<div class="small" style="margin-top:8px;color:var(--shu)">${foes.join('<br>')}</div>` : ''}
     <div style="margin-top:10px"><span class="small">【獲得した人脈】</span><br>${list}</div>
     ${st.promises.length ? `<div style="margin-top:6px"><span class="small">【残した約束】</span> ${
@@ -2865,17 +2961,19 @@ function viewTitle(){
     <p>本作は、<b>10ターン以内に理想の日本を創り上げる</b>シミュレーションです。到達できる未来は次の3系統・全16通り。</p>
     ${factionLegendHTML()}
     <ul style="padding-left:1.2em;margin:8px 0">
-      <li><b>単独覇権</b>：いずれか1つの時勢が<b>30以上</b> — 5通り</li>
-      <li><b>複合革命</b>：上位2つの時勢の<b>合計が30以上、かつ2番目が10以上</b> — 10通り（組み合わせごとに別の未来）</li>
+      <li><b>複合革命（通常）</b>：上位2つの時勢の<b>合計が28以上、かつ両方10以上</b> — 10通り（組み合わせごとに別の未来）</li>
+      <li><b>単独覇権（高難度）</b>：いずれか1つの時勢が<b>30以上</b> — 5通り。到達すれば複合より優先</li>
       <li><b>混沌</b>：いずれも満たさなければ『歴史の藻屑』</li>
     </ul>
     <ol style="padding-left:1.2em">
+      <li><b>場と旅程</b>：場によって会える人物と働きかけが変わります。京・江戸・長崎を直行すると、その日は旅疲れで通常の面会候補が1名減ります。夜の街道を挟めば減りません。</li>
       <li><b>時代のうねり</b>：どの勢力を伸ばしても『時代の熱量（合計値）』は高まり、より高位の人物が登場します。</li>
       <li><b>人脈と時期尚早</b>：『人脈』を使えばまだ時代に出てこない大物を呼べますが、時代が追いついていない場合、説得の効果は制限されます。</li>
       <li><b>対話と転向</b>：相手を支持するか、論破して『転向』させるか。言葉で歴史を設計してください。</li>
     </ol>
     <hr>
     <p class="small">説得は<b>論証カード</b>で行います。「利益提示・文脈理解・論理整合」の3枚を選び、その人物に本当に刺さる組み合わせを当ててください。手がかりは各人物の【情勢】描写です。</p>
+    <p class="small"><b>最初の一局は、相性のよい二勢力を10以上ずつ育てる複合革命がおすすめです。</b>盤面には、いま最も近い複合と単独の結末を常に表示します。</p>
     <p class="small"><b>支持</b>は一段下でも通ります（さらに一段下なら「手応え」で時勢が1だけ動く）。<b>転向</b>は攻撃なので<b>満点でしか通りません</b> ― 一段でも下がれば、札が刺さっていても届きません。<br>
     そして<b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>（いずれかの時勢が12以上で、対立勢力の人物は判定が一段下がる）。寄せ切るか、抑えて回るかが最大の判断です。</p>
     <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答はその者に何が刺さるかを語るので、どのカードを選ぶべきかが読めます。世間話は何度でもできます。</p>
@@ -2979,6 +3077,14 @@ function viewMeeting(){
   const m = E.meetingList(st, ui.place);
   const era = E.eraOf(st);
   const pl = E.PLACES[ui.place];
+  const fatigue = E.travelFatigue(st.lastPlace, ui.place);
+  const from = st.lastPlace == null ? null : E.PLACES[st.lastPlace];
+  const travelNote = fatigue
+    ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移ったため旅疲れ。通常の面会候補が3名から2名になります。</div>`
+    : pl.where === '街道'
+      ? `<div class="travel-note safe"><b>街道を中継：</b>今夜もここで面会できます。次に京・江戸・長崎へ入るときは旅疲れを受けません。</div>`
+      : from?.where === '街道'
+        ? `<div class="travel-note safe"><b>街道経由：</b>道中を一晩かけたため、旅疲れなく${esc(pl.where)}へ入りました。</div>` : '';
   const pfa = fac(pl.favor[0]).key, pfb = fac(pl.favor[pl.favor.length - 1]).key;
   const saidTies = new Set();          // 同じ画面で縁の台詞が重ならないように
   const card = (id, isIntro, isRevisit) => {
@@ -3006,13 +3112,15 @@ function viewMeeting(){
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>どこへ行き、誰に会うか</h2>
       <div class="placebar">
-        <div class="small">行き先を選ぶと、下の面会候補もそのまま入れ替わります。</div>
+        <div class="small">行き先を選ぶと、下の面会候補もそのまま入れ替わります。都市間の直行は候補−1、街道を挟めば減りません。</div>
         <div class="chiprow">${openPlaces.map(i => {
           const q = E.PLACES[i];
+          const tired = E.travelFatigue(st.lastPlace, i);
           return `<button class="placechip ${i === ui.place ? 'on' : ''}" data-place="${i}"${
             q.hot ? ' data-hot="1"' : ''}><span class="nm">${esc(q.name)}</span>
             <span class="small">${q.favor.map(f => `<span class="${fac(f).cls}">${fac(f).name}</span>`).join('・')}${
-              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}</span></button>`;
+              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}</span>${
+              tired ? '<span class="travel">遠路・通常候補 −1</span>' : ''}</button>`;
         }).join('')}</div>
         ${lockedPlaces.length ? `<div class="small locked">${lockedPlaces.map(i =>
           `${esc(E.PLACES[i].name)}（${i === st.lastPlace ? '昨日も通った'
@@ -3023,6 +3131,7 @@ function viewMeeting(){
         <div class="desc">${esc(pl.desc)}</div>
         <div class="small" style="margin-top:5px">使える働きかけ：${pl.allow.map(a => E.APPROACHES[a].name).join('・')}
           ／ ここで深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[pl.boost].name)}</span></div>
+        ${travelNote}
       </div>
       ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
@@ -3031,7 +3140,7 @@ function viewMeeting(){
       <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
-        そこから3名が選ばれています。時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
+        そこから${m.normal.length}名が選ばれています。${fatigue ? '遠路を直行した旅疲れで、通常枠が1名減っています。' : ''}時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
       </details>
     </div>`;
   app.querySelectorAll('[data-place]').forEach(el => el.onclick = () => {
@@ -3064,6 +3173,7 @@ function viewInterlude(){
       <div class="title">『${esc(iv.title)}』</div>
       ${iv.prev ? `<div class="say" style="border-left-color:var(--sumi2)">
         あの『${esc(iv.prev.title)}』で、あなたは<b>${esc(iv.prev.tag)}</b>。その余波は、まだ収まっていない。</div>` : ''}
+      ${interludeFigureHTML(iv)}
       <p>${esc(iv.scene)}</p>
       ${body}
     </div>` + (picked === null ? '' : chartHTML());
