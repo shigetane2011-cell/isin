@@ -27,7 +27,9 @@ p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text(
 await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
 
 await p.screenshot({ path: shot('01-title.png') });
-await p.click('#start');
+/* 初回は「ガイド付き／通常どおり」の2択、2回目以降は #start が出る */
+if (await p.$('#start-normal')) await p.click('#start-normal');
+else await p.click('#start');
 await p.waitForSelector('.person');
 console.log('面会者:', await p.$$eval('.person .nm', els => els.map(e => e.textContent)));
 await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
@@ -42,9 +44,14 @@ await p.screenshot({ path: shot('03-cards.png'), fullPage: true });
 for (const cat of [0, 1, 2]) await p.click(`.card[data-cat="${cat}"]`);
 console.log('組み上がった論証:', (await p.$$eval('.quote', els => els[els.length - 1].textContent)).slice(0, 40) + '…');
 await p.click('#go');
+if (await p.$('.duel')) {
+  console.log('立ち合い:', await p.$eval('.duel .title', e => e.textContent));
+  await p.screenshot({ path: shot('04-duel.png'), fullPage: true });
+  await p.click('[data-duel="0"]');
+}
 await p.waitForSelector('.result');
 console.log('判定:', await p.$eval('.verdict', e => e.textContent));
-await p.screenshot({ path: shot('04-result.png'), fullPage: true });
+await p.screenshot({ path: shot('04b-result.png'), fullPage: true });
 
 /* 残りのターンを機械的に消化してエンディングまで */
 for (let i = 0; i < 12; i++) {
@@ -67,6 +74,7 @@ for (let i = 0; i < 12; i++) {
   if (await p.$('#tutok')) await p.click('#tutok');
   for (const cat of [0, 1, 2]) await p.click(`.card[data-cat="${cat}"]`);
   await p.click('#go');
+  if (await p.$('.duel')) await p.click('[data-duel="0"]');
   await p.waitForSelector('.result');
 }
 await p.waitForSelector('.ending');

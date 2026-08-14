@@ -101,6 +101,12 @@ pre.chart .u{color:var(--shu);font-weight:700}
 .yowa summary{color:var(--kin);opacity:.85}
 a.spot{color:var(--ai);text-decoration:none;border-bottom:1px dotted var(--ai)}
 a.spot:hover{background:var(--ai);color:var(--washi2);border-bottom-color:transparent}
+.opening{font-size:1.02rem;margin:2px 0 10px;color:var(--sumi);letter-spacing:.02em}
+.duel{border:2px solid var(--shu);
+  background:linear-gradient(105deg,rgba(var(--tone-a,176,39,45),.10),#fffaf8 48%,rgba(var(--tone-b,176,39,45),.08))}
+.duel .title{font-size:1.3rem;letter-spacing:.1em;text-align:center;margin:6px 0 14px;color:var(--shu)}
+.duelresult{border:2px solid var(--shu);padding:10px 14px;margin:10px 0;background:#fff}
+.duelresult.won{border-color:var(--yuhan)}
 .interlude{border:2px solid var(--sumi);
   background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.12),#fffdf7 48%,rgba(var(--tone-b,59,52,44),.10))}
 .interlude .title{font-size:1.4rem;letter-spacing:.14em;text-align:center;margin:6px 0 14px}
@@ -844,6 +850,166 @@ N(151,'孝明天皇の子。父の急逝により十四歳で践祚し、王政�
 
 
 
+
+/* --- 開口一番 -------------------------------------------------------------
+   面会した瞬間に相手が発する一言。人物ごとに固有で、その場の空気を作る。
+   型の手がかりを兼ねることもあるが、それだけを頼りに当てられるほど直截ではない。
+   ------------------------------------------------------------------------ */
+const S = (id, line) => [id, line];
+const SAYS = new Map([
+S(1,'……どなたか存じませぬが、位のある方でしょうか。'),
+S(2,'あら、お珍しい。今日はどちらのお話をお持ちで？'),
+S(3,'よくぞ参られた。まずは一服なされよ。'),
+S(4,'お待ちを。ご身分をお伺いしてからでないと通せませぬ。'),
+S(5,'烏帽子は借り物でしてな。……笑わば笑え。'),
+S(6,'ほう、この物騒な世に歌の話をしに来られたわけでもあるまい。'),
+S(7,'アメリカでは、こういうとき握手をするんです。……いや、失礼を。'),
+S(8,'手短に願いますわ。銭にならん話は、聞くだけ損ですさかい。'),
+S(9,'腑を開けば人はみな同じでしてな。国も同じでしょうよ。'),
+S(10,'また訳せと？ ……どちらの嘘を訳せばよろしい。'),
+S(11,'異人の頭を刈って何が悪い。銭は銭でしょうが。'),
+S(12,'ジス・イズ・ア・ペン。……いま覚えたところです。'),
+S(13,'難しい話はわからん。強いほうにつく、それだけだ。'),
+S(14,'御用の筋か。手短に申せ。'),
+S(15,'帳面が合わんのです。志の話は、その後にしていただきたい。'),
+S(16,'火事の話ならいくらでも。政の話なら他所へどうぞ。'),
+S(17,'夜な夜な人が斬られておる。あんたも斬る側か。'),
+S(18,'奥のことは話せませぬ。……値によりますがね。'),
+S(19,'あら、あの人の知り合い？ なら茶くらい出すわ。'),
+S(20,'ほう。何をどこまで知っておられる。'),
+S(21,'足軽でも銃を持てば侍と同じだ。そうでしょう。'),
+S(22,'上士の方ではないな。ならば座られよ。'),
+S(23,'この釉薬は海を渡るんです。見てくだされ。'),
+S(24,'藩邸の門をくぐる用件を、まずお聞かせ願いたい。'),
+S(25,'ふむ、面白い。で、あんたはどちら側の人間だ。'),
+S(26,'米が高い。話はそれからだ。'),
+S(27,'いい話をお持ちなら買いますよ。瓦版にしますんで。'),
+S(28,'帰る家はもうない。だから聞くだけは聞こう。'),
+S(29,'……金か。志か。どちらでもないなら、行け。'),
+S(30,'古の御代には、こんな穢れはなかったのです。'),
+S(31,'会津の兵が、また何人か戻らなかった。……用件を伺おう。'),
+S(32,'また粛清だ。誠の旗が、血で汚れていく。'),
+S(33,'ほう、こんな洛北の草庵まで。ご苦労なことだ。'),
+S(34,'宮中のことは、宮中の理で動く。ご承知か。'),
+S(35,'前例のない話であれば、お引き取り願いたい。'),
+S(36,'摂家の者に何用かな。急かされるのは好まぬ。'),
+S(37,'……孫のことでお越しか。ならば言葉を選ばれよ。'),
+S(38,'夷狄が我が物顔で歩いておる。腹が立たぬのか。'),
+S(39,'英国を見てきた。攘夷など、できるはずがない。'),
+S(40,'算盤の合う話でしたら、いくらでも伺いましょう。'),
+S(41,'天は人の上に人を造らず。……で、ご用件は。'),
+S(42,'日本語で結構です。そのほうが早い。'),
+S(43,'仕組みの話をしましょう。人の話は苦手でしてな。'),
+S(44,'論語と算盤、どちらの話です。'),
+S(45,'兵の話でなければ、手短に願いたい。'),
+S(46,'これを見てくだされ。手を打つと歩くのです。'),
+S(47,'……拙者は多摩の百姓の出だ。それを承知で来られたか。'),
+S(48,'隊の話か、それとも余計な話か。'),
+S(49,'剣の話なら乗る。策の話なら他を当たれ。'),
+S(50,'誠の旗の下におるが、心まで縛られてはおらぬ。'),
+S(51,'…………。'),
+S(52,'仏国の公使からの書状がまだ片づかぬ。手短に。'),
+S(53,'幕府が滅んでも、造った物は残る。そう思わぬか。'),
+S(54,'老中の身は忙しい。……座られよ、茶くらいは出す。'),
+S(55,'追われる身でな。長居はできぬ。手短に頼む。'),
+S(56,'薩摩と長州を結ぶ。それしか頭にない。'),
+S(57,'土佐の手柄になる話なら、いくらでも伺おう。'),
+S(58,'才を認めぬ者と話す気はない。あなたはどうだ。'),
+S(59,'酒はどうだ。飲めぬ者の話は、どうも入ってこん。'),
+S(60,'まあ聞け。わしが先に話す。それから聞こう。'),
+S(61,'議論は要らぬ。兵がどれだけ集まるかを言え。'),
+S(62,'内がまとまらねば外も動かせぬ。そこからだ。'),
+S(63,'先生に言われれば斬る。あんたは誰の使いだ。'),
+S(64,'郷士の分際で、と思われたか。それでも聞こう。'),
+S(65,'酒だ。持ってこい。話はそれからよ。'),
+S(66,'神代より続く筋がある。それを外れる話は聞かぬ。'),
+S(67,'……忠義のためだ。それ以外に理由が要るか。'),
+S(68,'斬った者の顔は、いまも覚えておる。'),
+S(69,'獄を出てもな、志だけは曲げておらぬ。'),
+S(70,'進むしかあるまい。退くという語は知らぬ。'),
+S(71,'勅使としてまかり越した。控えられよ。'),
+S(72,'……声を落とされよ。壁に耳がござる。'),
+S(73,'岩倉殿の使いか。ならば話は早い。'),
+S(74,'職を追われた身でな。それでも来られたか。'),
+S(75,'ペリー提督と渡り合った男でしてな。……で、ご用は。'),
+S(76,'訳した書は五十を超えた。学の話でしたら喜んで。'),
+S(77,'まず定義から始めましょう。話はそれからです。'),
+S(78,'医の話か、外交の話か。どちらでも構いませんが。'),
+S(79,'……失礼、咳が。近藤先生のご用向きですか。'),
+S(80,'この腹の傷を見るか。舐められるのは我慢ならん。'),
+S(81,'試衛館の頃からの付き合いでしてな。まあ、お掛けなさい。'),
+S(82,'見廻組の頭を務めておる。上意であれば、迷いはない。'),
+S(83,'図面を広げてよいか。話が早い。'),
+S(84,'曲がったことは嫌いでな。それを承知で話されよ。'),
+S(85,'松陰先生の名を出すなら、覚悟してからにされよ。'),
+S(86,'まず金の話から。志は、その後で結構です。'),
+S(87,'藩は捨てた。もう帰る場所はない。'),
+S(88,'参政を斬った男だ。それでも話すか。'),
+S(89,'誰の下にもつかぬ。それだけは先に言うておく。'),
+S(90,'あの雪の朝のことを聞きに来たか。'),
+S(91,'国父である。……用向きを申せ。'),
+S(92,'都を追われた身だ。だが志は落ちておらぬ。'),
+S(93,'将軍である。……そう固くならずともよい。'),
+S(94,'刀は置いてきた。あなたも置かれるがよい。'),
+S(95,'幕府はもう長くねえよ。……ま、座んな。'),
+S(96,'Welcome. ……ああ、日本語のほうがよろしいか。'),
+S(97,'率直に申し上げる。貴国には時間がない。'),
+S(98,'フランスは幕府を支持しております。それは変わりません。'),
+S(99,'艦を預かる身でしてな。海の話なら尽きませぬ。'),
+S(100,'長岡は小さい藩だ。だが、踏まれるつもりはない。'),
+S(101,'兄上と同じ道を行く。それだけのことだ。'),
+S(102,'広く意見を集めておる。あなたの考えも聞かせてもらおう。'),
+S(103,'まあ、掛けやんせ。……話は、それからでよか。'),
+S(104,'要点だけ申されよ。時間は有限だ。'),
+S(105,'薩摩の家老を務めております。何なりと。'),
+S(106,'法がなければ国は立たぬ。まずそこからです。'),
+S(107,'面白い話か。つまらぬ話なら、寝ておる。'),
+S(108,'松陰先生の遺志を継ぐ者だ。生半可な話は困る。'),
+S(109,'肥後から出てまいった。同志の話であれば、喜んで。'),
+S(110,'宮である。……堅苦しいのは好まぬ、話されよ。'),
+S(111,'摂家筆頭の者に、何を申される。'),
+S(112,'幕府と朝廷、どちらの使いかを先に伺いたい。'),
+S(113,'宮家の血を引く身で、旗を揚げた。それが答えだ。'),
+S(114,'この身はもう出家した。それでも話を聞きに来たか。'),
+S(115,'七卿の一人でしてな。都の話は、少々こたえる。'),
+S(116,'まず言うておく。この国でわしより物を知る者はおらぬ。'),
+S(117,'ロシアとの交渉から戻ったばかりでな。……で、ご用件は。'),
+S(118,'条約に判を押した男だ。恨み言なら聞き飽きた。'),
+S(119,'勅許は、ついに得られなんだ。……その話であろう。'),
+S(120,'砲は嘘をつかぬ。人と違うてな。'),
+S(121,'陸軍の編制の途中でしてな。手短に願いたい。'),
+S(122,'龍岡に城を築いておる。星の形をした、妙な城だ。'),
+S(123,'ほう。妖怪に会いに来る物好きがおるとはな。'),
+S(124,'また交渉か。……座られよ、茶を出そう。'),
+S(125,'ペリーと渡り合うた儒者でしてな。理で参られよ。'),
+S(126,'宇和島は小さいが、技術は買うておる。何の話かな。'),
+S(127,'奇兵隊の軍監を務めておる。兵の数の話をしよう。'),
+S(128,'足軽の子でしてな。それでもよろしければ。'),
+S(129,'西郷先生のご用向きか。ならば伺おう。'),
+S(130,'薩英の砲火を浴びた身だ。力の話をしようではないか。'),
+S(131,'おいは学がなか。……難しか言葉は使わんでたもんせ。'),
+S(132,'一首詠んでからでもよいか。……いや、冗談だ。'),
+S(133,'父東湖の名を出されるのは、正直こたえる。'),
+S(134,'老いぼれだが、千人を預かる身でな。'),
+S(135,'寺田屋に集うておる。あんたも来るか。'),
+S(136,'……面を上げよ。夷狄の話であれば、聞かぬ。'),
+S(137,'わたくしは、京に帰りたいだけでございました。'),
+S(138,'I am Commodore Perry. ……通詞を通されよ。'),
+S(139,'条約の話であれば、いくらでも時間を取りましょう。'),
+S(140,'……ふむ。あなたは、わたしに何を期待しておられる。'),
+S(141,'この家を潰させはしませぬ。それだけは申しておきます。'),
+S(142,'桂という名は捨てた。いまは木戸だ。'),
+S(143,'集成館を見て行かれよ。話はそれからだ。'),
+S(144,'諸君、狂いたまえ。……で、あなたは狂えるか。'),
+S(145,'おんしゃあ、面白い顔をしちょる。何しに来たがか。'),
+S(146,'越前の隠居でしてな。……まあ、掛けられよ。'),
+S(147,'まず前提を確かめよう。話が噛み合わぬのは困る。'),
+S(148,'大老である。……申されよ、聞くだけは聞く。'),
+S(149,'…………そうせい。いや、まだ何も聞いておらぬな。'),
+S(150,'烈公と呼ばれておる。生ぬるい話は、腹が立つ。'),
+S(151,'……よい。近う寄れ。'),
+]);
+
 /* --- 後日談 ---------------------------------------------------------------
    築いた人脈が、選んだ未来の中でどうなったか。
    [勝ち組の後日談, 負け組の後日談] の2通り。勝敗は「その人物の勢力が
@@ -933,6 +1099,33 @@ function fateOf(charId, winners){
   const won = ch.factions.some(f => winners.includes(f));
   const pair = FATES.get(charId) || FATE_TEMPLATE[ch.factions[0]];
   return { won, text: pair[won ? 0 : 1] };
+}
+
+
+/* --- 立ち合い -------------------------------------------------------------
+   短気な人物に転向を仕掛けて通らなかったとき、相手は刀に手をかける。
+   新しい判定系は足していない。応じ方の正解は、その人物の「利益の型」で決まる。
+   すでに対話や探りで型を掴んでいれば切り抜けられる ―― 既存の読みがそのまま効く。
+   分岐が増えないのはこのため。文章も3通り×勝敗の6つで、人物ごとには持たない。
+   ------------------------------------------------------------------------ */
+const HOTHEADS = new Set([13,14,21,28,29,47,48,49,51,63,65,67,68,70,79,80,82,87,88,89,90,113,131,133,135]);
+const DUELS = [
+  { label:'抜き合わせる', win:'刃を交えたのは三合だった。相手が先に引いた。「……できるな」と、低く笑う。',
+    lose:'踏み込みが遅れた。肩を裂かれ、血が袖を伝う。相手は刀を振って血を払い、去った。' },
+  { label:'言葉で収める', win:'柄にかけた手が、ゆっくりと離れた。「……その言い分は、聞く値打ちがある」',
+    lose:'言葉は届かなかった。「口ばかりだ」と吐き捨てられ、鞘で肩を打たれて倒れた。' },
+  { label:'退く', win:'一歩下がって間合いを切った。相手は追わず、鼻を鳴らして刀を納めた。',
+    lose:'背を向けた瞬間に踏み込まれた。逃げる者を、この男は許さなかった。' },
+];
+/* 利益の型 → 通じる応じ方。名誉と武は力に、大義と学は言葉に、金と保身は間合いに応じる。 */
+const DUEL_ANSWER = [0, 2, 2, 1, 0, 1];
+/* 立ち合いが起きる条件: 短気な相手に、説得が通らなかったとき。
+   支持でも起きる ―― 見え透いた世辞は、この手の男をかえって怒らせる。 */
+function duelPending(st, action){
+  if (!HOTHEADS.has(action.charId)) return false;
+  /* 転向は「攻撃」。この手の男に仕掛ければ、通ろうと通るまいと刃が出る。
+     支持なら、見え透いた世辞と受け取られたときだけ怒らせる。 */
+  return action.stance === 'convert' || scoreOf(st, action) < 2;
 }
 
 /* --- 幕間「政変」 ---------------------------------------------------------
@@ -1071,6 +1264,13 @@ function composeArgument(argueF, cards){
   return [0,1,2].map(i => CARDS[argueF][i][cards[i]]).join('。') + '。';
 }
 
+/* 提示された論証が何枚刺さるか。警戒による格下げまで含めた実効の点数。 */
+function scoreOf(st, action){
+  const ch = CHAR_BY_ID.get(action.charId);
+  const raw = [0,1,2].filter(i => action.cards[i] === ch.correct[i]).length;
+  return (waryOf(st.currents, action.charId) >= 0 && raw >= 2) ? raw - 1 : raw;
+}
+
 /* その人物が、こちらの旗色を見て警戒しているか */
 function waryOf(currents, charId){
   const ch = CHAR_BY_ID.get(charId);
@@ -1135,9 +1335,28 @@ function resolve(st, action){
   if (succeeded && !contacts.includes(action.charId)) contacts.push(action.charId);
   if (score === 0 && !banned.includes(action.charId)) banned.push(action.charId);
 
+  /* 立ち合い。action.duel が無い場合（幕間より前の保存コード）は起きなかったものとして扱う。 */
+  let duel = null;
+  if (action.duel != null && duelPending(st, action)){
+    const answer = DUEL_ANSWER[ch.correct[0]];
+    const survived = action.duel === answer;
+    duel = { choice: action.duel, survived,
+             text: survived ? DUELS[action.duel].win : DUELS[action.duel].lose };
+    if (survived){
+      if (!contacts.includes(action.charId)) contacts.push(action.charId);
+      const bi = banned.indexOf(action.charId); if (bi >= 0) banned.splice(bi, 1);
+    } else {
+      cur[action.argueF] = clamp(cur[action.argueF] - 3, 0, CAP);
+      if (!banned.includes(action.charId)) banned.push(action.charId);
+      const ci = contacts.indexOf(action.charId); if (ci >= 0) contacts.splice(ci, 1);
+    }
+  }
+
   const next = {
     seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned,
-    lastLen: len, probesUsed: st.probesUsed + (probed ? 1 : 0),
+    lastLen: len,
+    /* 立ち合いに敗れると、深追いする余裕を失う（探りを1回失う） */
+    probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
     interlude: st.interlude,
     actions: st.actions.concat([action]), finished: false,
   };
@@ -1145,7 +1364,7 @@ function resolve(st, action){
 
   return { next, report: {
     charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
-    gain, gainBeforeProbe, penalty, text, len, probed,
+    gain, gainBeforeProbe, penalty, text, len, probed, duel,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     delta: cur.map((v, i) => v - before[i]),
@@ -1215,7 +1434,7 @@ function replay(seed, actions, interludeChoice){
 function encodeSave(st){
   return 'IR4:' + st.seed + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
-               a.probed ? 1 : 0].join(','))
+               a.probed ? 1 : 0].join(',') + (a.duel != null ? ',' + a.duel : ''))
     .join(';') + (st.interlude ? '#' + st.interlude.choice : '');
 }
 function decodeSave(code){
@@ -1234,9 +1453,11 @@ function decodeSave(code){
   const interludeChoice = hash >= 0 ? +choiceText : null;
   const body = hash >= 0 ? raw.slice(0, hash) : raw;
   const actions = !body ? [] : body.split(';').filter(Boolean).map(chunk => {
-    const [c, s2, o, f, k, h] = chunk.split(',');
+    const [c, s2, o, f, k, h, dl] = chunk.split(',');
+    if (dl !== undefined && !/^[0-2]$/.test(dl)) throw new Error('立ち合いの応じ方が不正です');
     return { charId:+c, stance: +s2 === 0 ? 'support' : 'convert',
-             ownF:+o, argueF:+f, cards: Array.from(k).map(Number), probed: +(h || 0) === 1 };
+             ownF:+o, argueF:+f, cards: Array.from(k).map(Number), probed: +(h || 0) === 1,
+             duel: dl === undefined ? null : +dl };
   });
   return { seed, actions, interludeChoice };
 }
@@ -1249,7 +1470,7 @@ function hashState(st){
 }
 
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
-  TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, NOTES, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -1264,7 +1485,7 @@ const E = ENGINE;
 let st = null;
 let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
            picks:[null,null,null], probed:false, asked:null, chatted:[],
-           tutorialDone:false, interludePicked:null, interludeData:null,
+           tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
            opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1454,6 +1675,8 @@ function viewMeeting(){
     const fl = c.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('');
     const pre = rk > era
       ? `<div class="warn">※ 時期尚早：世論が熟しておらず、動かしても影響は限定的です（初級相当に制限）</div>` : '';
+    const hot = E.HOTHEADS.has(id)
+      ? `<div class="warn">※ 気が短い。転向を仕掛ければ刃が出る。応じ方を誤れば手傷を負う</div>` : '';
     const wb = E.waryOf(st.currents, id);
     const wary = wb >= 0
       ? `<div class="warn">※ あなたが掲げる〔${fac(wb).name}〕を警戒している。判定が一段下がります</div>` : '';
@@ -1461,7 +1684,7 @@ function viewMeeting(){
       <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
       <div class="desc">${isIntro ? '[人脈] ご紹介にあずかりました。<br>' : '[情勢] '}${esc(c.desc)}</div>
-      ${pre}${wary}</div>`;
+      ${pre}${wary}${hot}</div>`;
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>面会可能な人物</h2>
@@ -1531,6 +1754,7 @@ function viewStance(){
           <button class="primary" data-stance="support">支持する<span class="small">（${fac(ui.ownF).name}を伸ばす）</span></button>
           <button data-stance="convert" ${guidedTurn() ? 'disabled' : ''}>論破して転向させる<span class="small">（別の思想に引き込む）</span></button>
         </div>
+        ${E.HOTHEADS.has(ui.charId) ? '<div class="warn">この者は気が短い。<b>転向を仕掛ければ必ず刃が出る</b>。支持でも、通らなければ怒らせる。</div>' : ''}
         <div class="small" style="margin-top:10px">
           <b>支持</b>は2枚一致でも通る。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
           <b>転向</b>は攻撃。<b>3枚すべて刺さらねば通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
@@ -1589,6 +1813,7 @@ function viewStance(){
 
   app.innerHTML = headerHTML() + meetingVisualHTML(c) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
+      <div class="opening">「${esc(E.SAYS.get(ui.charId) || '')}」</div>
       ${guide}<div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
@@ -1660,10 +1885,32 @@ function viewCards(){
   if (pb) pb.onclick = () => { ui.probed = true; render(); };
   document.getElementById('back').onclick = () => { ui.stance = null; ui.argueF = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
-    const r = E.resolve(st, { charId: ui.charId, stance: ui.stance, ownF: ui.ownF,
-                              argueF: ui.argueF, cards: ui.picks.slice(), probed: ui.probed });
+    const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF,
+                argueF: ui.argueF, cards: ui.picks.slice(), probed: ui.probed };
+    if (E.duelPending(st, a)){ ui.duelAction = a; ui.screen = 'duel'; render(); return; }
+    const r = E.resolve(st, a);
     st = r.next; ui.report = r.report; ui.screen = 'result'; render();
   };
+}
+
+/* --- 画面: 立ち合い ------------------------------------------------------- */
+function viewDuel(){
+  const a = ui.duelAction, c = E.CHAR_BY_ID.get(a.charId);
+  app.innerHTML = headerHTML() +
+    `<div class="panel duel">
+      <div class="kind">立ち合い</div>
+      <div class="title">${esc(c.name)}が刀に手をかけた</div>
+      <p>${ui.duelAction.stance === 'convert'
+        ? `言い分がどうであれ、${esc(c.name)}は柄に手をかけた。転向を迫るとは、そういうことだ。`
+        : `見え透いた世辞と受け取られた。${esc(c.name)}の目つきが変わり、柄に手がかかる。`}間合いは、もう詰まっている。</p>
+      <div class="row" style="display:block">${E.DUELS.map((d, i) =>
+        `<button class="choice" data-duel="${i}">${esc(d.label)}</button>`).join('')}</div>
+      <div class="small" style="margin-top:10px;opacity:.7">この男に何が通じるか ―― 望んでいるものを思い出せ。</div>
+    </div>`;
+  app.querySelectorAll('[data-duel]').forEach(b => b.onclick = () => {
+    const r = E.resolve(st, Object.assign({}, a, { duel: +b.dataset.duel }));
+    st = r.next; ui.report = r.report; ui.duelAction = null; ui.screen = 'result'; render();
+  });
 }
 
 /* --- 画面: 結果 ---------------------------------------------------------- */
@@ -1684,6 +1931,12 @@ function viewResult(){
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
       <div class="quote">「${esc(r.text)}」</div>
       ${marks}
+      ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
+        <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}
+        <div class="small" style="margin-top:6px">${r.duel.survived
+          ? '腕を認められ、この者は【人脈】に加わった。'
+          : `手傷を負った。〔${fac(r.argueF).name}〕−3、探りを1回失い、この者は二度と現れない。`}</div>
+      </div>` : ''}
       ${r.probed && r.gain > 0 ? `<div class="warn">※ 探りを入れたため、獲得が ${r.gainBeforeProbe} から ${r.gain} に下がりました（探り残り ${r.probesLeft} 回）</div>` : ''}
       ${r.waryBy >= 0 ? `<div class="warn">※ あなたの掲げる〔${fac(r.waryBy).name}〕への警戒により、${r.rawScore}枚一致が一段下げられました</div>` : ''}
       ${r.allOrNothing && r.score === 2 ? `<div class="warn">※ 転向は3枚すべて刺さらねば通りません。2枚では相手は動きませんでした</div>` : ''}
@@ -1773,8 +2026,8 @@ function wireSaveBox(){
 }
 
 function render(){
-  ({ title:viewTitle, meeting:viewMeeting, stance:viewStance,
-     cards:viewCards, result:viewResult, ending:viewEnding })[ui.screen]();
+  ({ title:viewTitle, meeting:viewMeeting, stance:viewStance, cards:viewCards,
+     duel:viewDuel, result:viewResult, ending:viewEnding })[ui.screen]();
   wireSaveBox();
   /* Enter / Space でも押せるようにする（role="button" を付けた要素すべて） */
   app.querySelectorAll('[role="button"]').forEach(el => el.onkeydown = e => {

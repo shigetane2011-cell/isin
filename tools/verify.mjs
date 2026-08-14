@@ -297,6 +297,67 @@ ok([...E.NOTES.keys()].filter(id => E.rankOfId(id) === 3).length === 16,
   ok([...E.NOTES.values()].every(v => !v.spot || v.spot.trim().length > 2), 'ゆかりの地の表記に空欄がない');
 }
 
+/* --- 5f2. 開口一番と立ち合い ---------------------------------------------- */
+head('5f2. 開口一番と立ち合い');
+ok(E.SAYS.size === 151 && E.CHARACTERS.every(c => E.SAYS.has(c.id)),
+   '151名全員に開口一番のセリフがある');
+ok(new Set([...E.SAYS.values()]).size === 151, '開口一番に重複がない');
+ok(E.DUELS.length === 3 && E.DUELS.every(d => d.label && d.win && d.lose),
+   '立ち合いの応じ方3通りに、勝ちと負けの両方の文がある');
+ok(E.DUEL_ANSWER.length === 6 && E.DUEL_ANSWER.every(a => a >= 0 && a <= 2),
+   '6つの動機型すべてに、通じる応じ方が対応している');
+ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在するIDだけを指している');
+{
+  const st = E.createState(1);
+  const c = E.CHAR_BY_ID.get(47);                       // 近藤勇（短気・利益=名誉）
+  const wrong = [0,1,2].map(k => [0,1,2,3,4,5].find(m => m !== c.correct[k]));
+  const conv = { charId:47, stance:'convert', ownF:2, argueF:4, cards:c.correct.slice(), probed:false };
+  ok(E.duelPending(st, conv), '短気な相手への転向は、論証が完璧でも立ち合いになる');
+  ok(!E.duelPending(st, { ...conv, stance:'support' }),
+     '短気な相手でも、支持が通れば立ち合いにならない');
+  ok(E.duelPending(st, { ...conv, stance:'support', cards:wrong }),
+     '短気な相手への支持が通らなければ立ち合いになる');
+  ok(!E.duelPending(st, { ...conv, charId:41 }), '短気でない人物では立ち合いが起きない');
+
+  const right = E.DUEL_ANSWER[c.correct[0]];
+  const won = E.resolve(st, { ...conv, duel: right });
+  const lost = E.resolve(st, { ...conv, duel: (right + 1) % 3 });
+  ok(won.report.duel.survived && won.next.contacts.includes(47),
+     '通じる応じ方なら切り抜け、その人物が人脈に加わる');
+  ok(!lost.report.duel.survived && lost.next.banned.includes(47)
+     && !lost.next.contacts.includes(47) && lost.next.probesUsed === 1,
+     '誤れば手傷を負い、出現停止になり、探りを1回失う');
+  ok(lost.next.currents[4] < won.next.currents[4], '敗れると主張していた勢力が削られる');
+  ok(E.resolve(st, conv).report.duel === null,
+     '応じ方が記録されていない古い保存コードでは、立ち合いは起きなかったものとして扱う');
+}
+{
+  let rt = true;
+  for (let seed = 1; seed <= 60; seed++) {
+    const rnd = E.mulberry32(seed * 31337);
+    let st = E.createState(seed); const acts = [];
+    while (!st.finished) {
+      if (E.pendingInterlude(st)) st = E.applyInterlude(st, 0);
+      if (st.finished) break;
+      const m = E.meetingList(st);
+      const id = m.normal.find(i => E.HOTHEADS.has(i)) ?? m.normal[0];
+      const c = E.CHAR_BY_ID.get(id);
+      const a = { charId:id, stance:'convert', ownF:c.factions[0], argueF:(c.factions[0]+1)%5,
+                  cards:c.correct.slice(), probed:false };
+      if (E.duelPending(st, a)) a.duel = Math.floor(rnd() * 3);
+      acts.push(a); st = E.resolve(st, a).next;
+    }
+    const d = E.decodeSave(E.encodeSave(st));
+    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(st)) rt = false;
+  }
+  ok(rt, '立ち合いの応じ方を含む保存コードが往復で一致する（60局）');
+  let rejected = 0;
+  for (const bad of ['IR4:1:1,0,0,0,000,0,9', 'IR4:1:1,0,0,0,000,0,x']) {
+    try { E.decodeSave(bad); } catch { rejected++; }
+  }
+  ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
+}
+
 /* --- 5g. 幕間「政変」 ------------------------------------------------------ */
 head('5g. 第8ターンの幕間');
 {
