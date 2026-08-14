@@ -140,6 +140,46 @@ console.log('滞在した場:', visited.join(' → '));
 console.log('縁の表示:', tieSeen ? `${tieSeen}件（例: ${tieSample}）` : 'なし');
 console.log('残した約束:', vowSeen + '件');
 if (!tieSeen) errs.push('縁（紹介・悪評）の表示が通しプレイで一度も出なかった');
+/* --- 2周目: 因縁の確認 ---------------------------------------------------
+   決裂した相手が荒事の場で待つ経路は、先に失敗しないと踏めない。
+   seed 1 は第2ターンで決裂するので、そこから再訪の札まで確実に辿れる。 */
+await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
+await p.fill('#seed', '1');
+if (await p.$('#start-normal')) await p.click('#start-normal'); else await p.click('#start');
+let revisitSeen = 0, revisitTaken = 0, reconciled = 0;
+for (let t = 0; t < 11; t++){
+  if (await p.$('.ending')) break;
+  if (await p.$('.interlude')){ await p.click('[data-pick="0"]'); await p.click('#ilnext');
+                                if (await p.$('.ending')) break; }
+  if (await p.$('[data-place]')){
+    /* 決裂した相手がいるなら荒事の場へ向かう */
+    const hot = await p.$('[data-place] .tag:text-is("荒事")');
+    await (hot ? (await hot.evaluateHandle(e => e.closest('[data-place]'))).asElement()
+               : await p.$('[data-place]')).click();
+  }
+  await p.waitForSelector('.person[data-id]');
+  const rv = await p.$('.person.revisit');
+  if (rv){ revisitSeen++; await rv.click(); revisitTaken++; }
+  else await p.click('.person[data-id]');
+  if (revisitTaken && rv && !(await p.$('.tie.bad')))
+    errs.push('再訪の相手を選んだのに、向き合う画面に〔再訪〕が出ていない');
+  if (await p.$('[data-own]')) await p.click('[data-own]');
+  await p.click('[data-stance="support"]');
+  await p.waitForSelector('[data-approach]');
+  await p.click('[data-approach]:not([disabled])');
+  await p.waitForSelector('.card, #go');
+  if (await p.$('#tutok')) await p.click('#tutok');
+  for (const c of [0,1,2]){ const e = await p.$(`.card[data-cat="${c}"]`); if (e) await e.click(); }
+  await p.click('#go');
+  if (await p.$('.duel')) await p.click('[data-duel="0"]');
+  await p.waitForSelector('.result');
+  if (await p.$('.result .vowline')) reconciled += await p.$$eval('.result .vowline', e => e.length);
+  const nx = await p.$('#next'); if (!nx) break; await nx.click();
+}
+console.log('再訪の札:', revisitSeen + '回（挑んだ ' + revisitTaken + '回）');
+if (!revisitSeen) errs.push('seed 1 で決裂したのに、荒事の場に再訪の札が出なかった');
+await p.screenshot({ path: shot('10-revisit.png'), fullPage: true });
+
 console.log('スクリーンショット:', sp);
 console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'JSエラーなし');
 await b.close();

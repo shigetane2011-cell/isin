@@ -133,6 +133,7 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person .nick{font-size:.82rem;color:var(--sumi2);margin-top:2px}
 .person .desc{font-size:.86rem;margin-top:8px;padding-left:10px;border-left:2px solid var(--line);color:var(--sumi2)}
 .person.intro{border-left:4px solid var(--kin)}
+.person.revisit{border-left:4px solid var(--shu)}
 .person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
 .person.place::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
   background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
@@ -1395,7 +1396,7 @@ function meetingList(st, place){
     if (!free(id)) { id = r; while (!free(id)) id = (id % maxId) + 1; }  // 条件を満たす者がいなければ場を無視
     taken.add(id); normal.push(id);
   });
-  return { base: b, normal, intro: introPick(st, taken) };
+  return { base: b, normal, intro: introPick(st, taken), revisit: revisitOf(st, place) };
 }
 
 /* 紹介枠: 人脈が空なら必ず null（原作の厳守事項）。
@@ -1470,7 +1471,12 @@ function scoreBreakdown(st, action){
   if (waryApplied) raw -= 1;
   const grudgeApplied = grudgedBy >= 0 && vouchedBy < 0 && raw >= 2;
   if (grudgeApplied) raw -= 1;
-  return { score: clamp(raw, 0, spec.cap), misfit, vouchedBy, grudgedBy, waryBy, waryApplied, grudgeApplied };
+  /* 一度決裂した相手が向こうから来た場合。本人が怒っているので、紹介では消えない。 */
+  const revisit = (st.banned || []).includes(action.charId);
+  const revisitApplied = revisit && raw >= 2;
+  if (revisitApplied) raw -= 1;
+  return { score: clamp(raw, 0, spec.cap), misfit, vouchedBy, grudgedBy, waryBy,
+           waryApplied, grudgeApplied, revisit, revisitApplied };
 }
 const scoreOf = (st, action) => scoreBreakdown(st, action).score;
 
@@ -1505,6 +1511,24 @@ function tieSay(st, charId, who, kind){
   const rnd = streamOf(st.seed, st.turn, 700003 + charId * ROSTER + who);
   return '「' + CHAR_BY_ID.get(who).name + list[Math.floor(rnd() * list.length)] + '」';
 }
+
+/* 再訪: 決裂させた相手は、荒事の場でだけ向こうから来る。
+   運では起こさない。「荒事の場へ行く」という選択そのものが引き金になる。
+   直近に決裂させた一人が来る。和解すれば人脈へ移り、次の決裂者が待つようになる。 */
+function revisitOf(st, place){
+  if (place == null || !PLACES[place].hot) return -1;
+  const b = st.banned || [];
+  return b.length ? b[b.length - 1] : -1;
+}
+const REVISIT_SAYS = [
+  '提灯の向こうに、見覚えのある影。「── あのときの言い草、忘れておらんぞ」',
+  '稽古の音が止んだ。振り返った顔に覚えがある。「よくもまあ、この場に来られたな」',
+  '暗がりから声がかかる。「探していた。逃げも隠れもせぬ性分は、認めてやる」',
+  '肩がぶつかった。詫びる前に相手が言う。「顔を上げろ。もう一度だけ聞いてやる」',
+  '刀の鯉口を切る音。「話があるなら、今ここで聞く。次はない」',
+];
+const revisitSay = (st, charId) =>
+  REVISIT_SAYS[Math.floor(streamOf(st.seed, st.turn, 910007 + charId)() * REVISIT_SAYS.length)];
 
 /* その人物が、こちらの旗色を見て警戒しているか */
 function waryOf(currents, charId){
@@ -1557,6 +1581,8 @@ function resolve(st, action){
      場は「相手には響かないが、ここでならやりようがある」という代替路である。 */
   const placeFits = action.place != null && PLACES[action.place].boost === approach;
   if (gain > 0 && (fits || placeFits)) gain += 1;
+  /* 一度決裂した相手を説き伏せたなら、その一手の意味は倍になる */
+  if (gain > 0 && sb.revisit) gain *= 2;
 
   /* 探った代償: その交渉で得られる時勢が1下がる（最低1）。
      元の獲得が大きい大物ほど、相対的な代償は軽く済む。 */
@@ -1582,6 +1608,9 @@ function resolve(st, action){
 
   const contacts = st.contacts.slice(), banned = st.banned.slice();
   if (succeeded && !contacts.includes(action.charId)) contacts.push(action.charId);
+  /* 和解。向こうから来た相手を説き伏せれば、出現停止は解ける */
+  const reconciled = succeeded && sb.revisit;
+  if (reconciled){ const bi = banned.indexOf(action.charId); if (bi >= 0) banned.splice(bi, 1); }
   if (score === 0 && !banned.includes(action.charId)) banned.push(action.charId);
 
   /* 立ち合い。action.duel が無い場合（幕間より前の保存コード）は起きなかったものとして扱う。 */
@@ -1628,6 +1657,7 @@ function resolve(st, action){
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     vouchedBy: sb.vouchedBy, grudgedBy: sb.grudgedBy,
     waryApplied: sb.waryApplied, grudgeApplied: sb.grudgeApplied,
+    revisit: sb.revisit, revisitApplied: sb.revisitApplied, reconciled,
     delta: cur.map((v, i) => v - before[i]),
     verdict: succeeded ? (score === 3 ? '大成功' : '成功') : ['決裂','失敗','失敗','失敗'][score],
     /* 立ち合いで覆ることがあるので、表示は実際の状態変化から決める */
@@ -1741,7 +1771,7 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
-  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -1975,7 +2005,7 @@ function viewMeeting(){
   const pl = E.PLACES[ui.place];
   const pfa = fac(pl.favor[0]).key, pfb = fac(pl.favor[pl.favor.length - 1]).key;
   const saidTies = new Set();          // 同じ画面で縁の台詞が重ならないように
-  const card = (id, isIntro) => {
+  const card = (id, isIntro, isRevisit) => {
     const c = E.CHAR_BY_ID.get(id), rk = E.rankOfId(id);
     const fl = c.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('');
     const pre = rk > era
@@ -1987,11 +2017,15 @@ function viewMeeting(){
     const tie = tieHTML(id, wb, saidTies);
     const wary = (wb >= 0 && E.vouchOf(st, id) < 0)
       ? `<div class="warn">※ あなたが掲げる〔${fac(wb).name}〕を警戒している。判定が一段下がります</div>` : '';
-    return `<div class="person ${isIntro?'intro':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
+    const again = isRevisit
+      ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, id))}
+         <span class="small">※ 一度決裂した相手。判定は一段重く、紹介の顔も通らない。
+         だが説き伏せられれば<b>得るものは倍</b>になり、出現停止も解ける</span></div>` : '';
+    return `<div class="person ${isIntro?'intro':''} ${isRevisit?'revisit':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
       <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
-      <div class="desc">${isIntro ? '[人脈] ' : '[情勢] '}${esc(c.desc)}</div>
-      ${tie}${pre}${wary}${hot}</div>`;
+      <div class="desc">${isRevisit ? '[因縁] ' : isIntro ? '[人脈] ' : '[情勢] '}${esc(c.desc)}</div>
+      ${again}${isRevisit ? '' : tie}${pre}${isRevisit ? '' : wary}${hot}</div>`;
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>面会可能な人物</h2>
@@ -2003,6 +2037,7 @@ function viewMeeting(){
       ${guidedTurn() ? coachHTML('二', '人物を一人選ぶ', 'まずは各人物の<b>【情勢】</b>を読み、誰が何に困り、何を欲しているかを見比べます。練習なので、今回は気になる相手を自由に選んでください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
+      ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
       <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
@@ -2185,7 +2220,10 @@ function viewStance(){
 
   app.innerHTML = headerHTML() + meetingVisualHTML(c) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
-      ${tieHTML(ui.charId, E.waryOf(st.currents, ui.charId))}
+      ${st.banned.includes(ui.charId)
+        ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, ui.charId))}
+           <span class="small">※ 一度決裂した相手。判定は一段重い。通れば得るものは倍</span></div>`
+        : tieHTML(ui.charId, E.waryOf(st.currents, ui.charId))}
       <div class="opening">「${esc(E.SAYS.get(ui.charId) || '')}」</div>
       ${guide}<div class="quote">${esc(c.desc)}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
@@ -2322,6 +2360,9 @@ function viewResult(){
       ${r.vouchedBy >= 0 ? `<div class="small"><span class="uibadge">※ ${esc(E.CHAR_BY_ID.get(r.vouchedBy).name)}の紹介が効いた。</span>${
         r.waryBy >= 0 ? `〔${fac(r.waryBy).name}〕への警戒を受けずに済んだ` : 'この相手は端からあなたを門前払いしなかった'}</div>` : ''}
       ${r.grudgeApplied ? `<div class="warn">※ ${esc(E.CHAR_BY_ID.get(r.grudgedBy).name)}を決裂させた噂が先に届いており、判定が一段下げられました</div>` : ''}
+      ${r.revisitApplied ? `<div class="warn">※ 一度決裂した相手なので、判定が一段下げられました</div>` : ''}
+      ${r.reconciled ? `<div class="vowline">→ <b>和解した。</b>${esc(c.name)}は出現停止を解かれ、【人脈】に加わった。
+        一度断たれた縁をつなぎ直したぶん、獲得は倍になっている。</div>` : ''}
       ${r.allOrNothing && r.score === 2 ? `<div class="warn">※ 転向は3枚すべて刺さらねば通りません。2枚では相手は動きませんでした</div>` : ''}
       ${r.premature ? `<div class="warn">※ 時期尚早のため、${E.RANKS[r.rank]}級ですが影響力は限定的です（ランク補正を無効化）</div>` : ''}
       ${r.penalty ? `<div class="warn">※ ${E.RANKS[r.rank]}級との交渉に失敗し時勢 -${r.penalty}</div>` : ''}

@@ -566,6 +566,69 @@ head('5f3c. 約束 ― 肚を割って明かした旗');
   ok(rt, '約束を含む盤面が保存コードの往復で一致する（40局・新しい欄は増やしていない）');
 }
 
+/* --- 5f3d. 再訪 ------------------------------------------------------------ */
+head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
+{
+  const hot = E.PLACES.map((p, i) => i).filter(i => E.PLACES[i].hot);
+  const calm = E.PLACES.map((p, i) => i).filter(i => !E.PLACES[i].hot);
+  ok(hot.length === 2 && calm.length === 4, '荒事の場は6つのうち2つ');
+  const base = E.createState(3);
+  ok(E.revisitOf(base, hot[0]) === -1, '決裂した相手がいなければ再訪は起きない');
+  const bad = Object.assign({}, base, { banned: [10, 25] });
+  ok(E.revisitOf(bad, calm[0]) === -1, '静かな場では、決裂した相手は現れない');
+  ok(E.revisitOf(bad, hot[0]) === 25, '荒事の場では、直近に決裂させた相手が来る');
+  ok(E.revisitOf(bad, null) === -1, '行き先が決まる前は再訪もない');
+  ok(E.meetingList(bad, hot[0]).revisit === 25, '面会リストに再訪枠が載る');
+  ok(E.meetingList(bad, hot[0]).normal.every(id => id !== 25), '再訪の相手は通常枠には出ない');
+  ok(E.meetingList(bad, hot[0]).normal.length === 3, '再訪は通常枠を潰さず、枠がひとつ増える');
+
+  /* 判定は一段重く、紹介では消えない */
+  const target = E.CHAR_BY_ID.get(25), f = target.factions[0];
+  const act = { charId: 25, stance:'support', ownF:f, argueF:f,
+                cards: target.correct.slice(), probed:false, approach:0, place: hot[0] };
+  const clean = Object.assign({}, base, { banned: [] });
+  ok(E.scoreOf(clean, act) === 3, '決裂していない相手なら3枚一致は大成功');
+  ok(E.scoreOf(bad, act) === 2, '再訪の相手は判定が一段重い');
+  /* 縁のある人脈を持たせても、本人の怒りは消えない */
+  let voucher = -1;
+  for (const [a, set] of E.TIE_GRAPH) if (set.has(25)) { voucher = a; break; }
+  if (voucher >= 0){
+    const withVouch = Object.assign({}, bad, { contacts: [voucher] });
+    ok(E.vouchOf(withVouch, 25) === voucher, '再訪の相手にも縁者はいる');
+    ok(E.scoreOf(withVouch, act) === 2, '紹介の顔では、決裂した本人の怒りは消えない');
+  } else ok(true, '（25番に縁者がいないため紹介の検査は省略）');
+
+  /* 通れば倍、和解して出現停止が解ける */
+  const rHit = E.resolve(bad, act);
+  const rBase = E.resolve(clean, act);
+  ok(rHit.report.reconciled === true, '説き伏せれば和解と報告される');
+  ok(!rHit.next.banned.includes(25), '和解すれば出現停止が解ける');
+  ok(rHit.next.contacts.includes(25), '和解した相手は人脈に加わる');
+  ok(rHit.report.gain > rBase.report.gain,
+     `和解の獲得は通常の大成功を上回る（再訪 ${rHit.report.gain} / 通常 ${rBase.report.gain}）`);
+  ok(rHit.report.verdict === '成功' && rBase.report.verdict === '大成功',
+     '再訪では大成功に届かない（一段重いので、3枚一致でようやく成功）');
+  {
+    const two = Object.assign({}, act, { cards: [target.correct[0], target.correct[1], (target.correct[2]+1)%6] });
+    ok(E.scoreOf(clean, two) === 2 && E.resolve(clean, two).report.gain > 0,
+       '通常なら2枚一致でも通る');
+    ok(E.scoreOf(bad, two) === 1 && E.resolve(bad, two).report.gain === 0,
+       '再訪は3枚すべて刺さらねば通らない（一段重いぶん、2枚では届かない）');
+  }
+  ok(rHit.next.banned.includes(10), 'ほかの決裂者はそのまま残る');
+  ok(E.revisitOf(rHit.next, hot[0]) === 10, '和解すると、次の決裂者が待つようになる');
+
+  /* 外せば何も変わらない */
+  const missAct = Object.assign({}, act, { cards: [(target.correct[0]+1)%6, (target.correct[1]+1)%6, (target.correct[2]+1)%6] });
+  const rMiss = E.resolve(bad, missAct);
+  ok(rMiss.report.reconciled === false && rMiss.next.banned.includes(25),
+     '説き伏せられなければ、出現停止は解けないまま');
+
+  /* 保存コードの往復 */
+  const d = E.decodeSave(E.encodeSave(rHit.next));
+  ok(d.actions.length === 1 && d.actions[0].charId === 25, '再訪の一手も保存コードに残る');
+}
+
 /* --- 5f4. 場 --------------------------------------------------------------- */
 head('5f4. 行き先');
 ok(E.PLACES.length === 6 && E.PLACES.every(p => p.name && p.desc && p.allow.length && p.favor.length),
