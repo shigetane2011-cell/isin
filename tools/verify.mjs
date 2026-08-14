@@ -170,9 +170,10 @@ ok(atEra(12, 47, 3).gain === 5, '中級期に中級級・大成功 → +5（+1�
 ok(atEra(12, 47, 2).gain === 3, '中級期に中級級・成功 → +3（+1補正）');
 ok(atEra(26, 91, 3).gain === 6, '上級期に上級級・大成功 → +6（+2補正）');
 ok(atEra(26, 91, 1).penalty === 1, '上級期に上級級・失敗 → 時勢-1');
-ok(atEra(40, 136, 3).gain === 8, '伝説期に伝説級・大成功 → +8（2倍）');
-ok(atEra(40, 136, 1).penalty === 3, '伝説期に伝説級・失敗 → 時勢-3');
-ok(atEra(12, 136, 1).penalty === 0, '時期尚早なら失敗ペナルティも無効');
+ok(atEra(40, 137, 3).gain === 8, '伝説期に伝説級・大成功 → +8（2倍）※働きかけが響かない人物で測る');
+ok(atEra(40, 136, 3).gain === 9, '響く働きかけなら、そこからさらに +1 される');
+ok(atEra(40, 137, 1).penalty === 3, '伝説期に伝説級・失敗 → 時勢-3');
+ok(atEra(12, 137, 1).penalty === 0, '時期尚早なら失敗ペナルティも無効');
 ok(atEra(26, 103, 3).waryBy === 0 && atEra(26, 103, 3).gain === 4,
    '公武26を掲げていると雄藩の西郷は警戒し、上級の+2補正を受け取れない');
 
@@ -356,6 +357,73 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
+}
+
+/* --- 5f3. 働きかけ --------------------------------------------------------- */
+head('5f3. 4つの働きかけ');
+ok(E.APPROACHES.length === 4 && E.APPROACHES.every(a => a.name && a.desc),
+   '働きかけが4通りあり、それぞれ説明がある');
+ok(String(E.APPROACHES.map(a => a.cards)) === '3,2,0,1',
+   '決定の形が違う（カード 3枚 / 2枚 / 0枚 / 1枚）');
+ok(E.APPROACHES.filter(a => a.cap === 3).length === 2, '大成功まで届くのは2通りだけ');
+ok([0,1,2,3].filter(i => E.canConvert(i)).length === 2, '転向を仕掛けられるのも同じ2通り');
+ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <= 3; }),
+   '151名全員に響く働きかけが定まる');
+{
+  const cnt = [0,0,0,0];
+  for (const c of E.CHARACTERS) cnt[E.approachOf(c.id)]++;
+  ok(cnt.every(n => n >= 15), `どの働きかけにも相手が十分いる（${cnt}）`);
+  console.log(`  響く働きかけの分布: ${E.APPROACHES.map((a,i) => a.name + ' ' + cnt[i]).join(' / ')}`);
+}
+{
+  const st = E.createState(1);
+  const pick = (id, ap, cards) => {
+    const c = E.CHAR_BY_ID.get(id);
+    return E.resolve(st, { charId:id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+                           cards: cards || c.correct.slice(), probed:false, approach:ap }).report;
+  };
+  const kondo = 47, fit = E.approachOf(kondo);
+  ok(pick(kondo, fit).fits && pick(kondo, fit).gain > pick(kondo, 0).gain,
+     '響く働きかけのほうが深く刺さる');
+  ok(pick(kondo, 0).gain > 0, '響かなくても「論じる」は通る（既定が詰まない）');
+
+  const taigi = E.CHARACTERS.find(c => c.correct[0] === 3);
+  ok(pick(taigi.id, 2).verdict === '決裂', '大義に生きる者に金品を贈るのは侮辱になる');
+  ok(pick(taigi.id, 2, null).gain === 0, 'その場合は何も得られない');
+
+  const sake = E.CHARACTERS.find(c => E.approachOf(c.id) === 1 && E.HOTHEADS.has(c.id));
+  ok(!E.duelPending(st, { charId:sake.id, stance:'convert', cards:[0,0,0], approach:1 }),
+     '杯を交わした相手は、短気でも刃を抜かない');
+  ok(E.resolve(st, { charId:47, stance:'support', ownF:2, argueF:2,
+                     cards:E.CHAR_BY_ID.get(47).correct.slice(), probed:false, approach:2 }).next.probesUsed === 1,
+     '金品を贈ると探りを1回使う');
+}
+{
+  /* 保存コードの往復と旧版互換 */
+  let rt = true;
+  for (let seed = 1; seed <= 60; seed++) {
+    const rnd = E.mulberry32(seed * 613);
+    let st = E.createState(seed);
+    while (!st.finished) {
+      if (E.pendingInterlude(st)) st = E.applyInterlude(st, 0);
+      if (st.finished) break;
+      const id = E.meetingList(st).normal[0], c = E.CHAR_BY_ID.get(id);
+      let ap = Math.floor(rnd() * 4);
+      if (ap === 2 && st.probesUsed >= E.PROBE_LIMIT) ap = 0;
+      const a = { charId:id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+                  cards:c.correct.slice(), probed:false, approach:ap };
+      if (E.duelPending(st, a)) a.duel = 0;
+      st = E.resolve(st, a).next;
+    }
+    const d = E.decodeSave(E.encodeSave(st));
+    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(st)) rt = false;
+  }
+  ok(rt, '働きかけを含む保存コードが往復で一致する（60局）');
+  let rejected = 0;
+  for (const bad of ['IR4:1:1,0,0,0,000,0,9', 'IR4:1:1,0,0,0,000,0,x,0']) {
+    try { E.decodeSave(bad); } catch { rejected++; }
+  }
+  ok(rejected === 2, '不正な働きかけ番号を弾く');
 }
 
 /* --- 5g. 幕間「政変」 ------------------------------------------------------ */

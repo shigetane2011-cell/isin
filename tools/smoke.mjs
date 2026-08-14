@@ -39,9 +39,13 @@ await p.click('.person');
 await p.waitForSelector('[data-stance], [data-own]');
 if (await p.$('[data-own]')) await p.click('[data-own]');
 await p.click('[data-stance="support"]');
-await p.waitForSelector('.card');
+await p.waitForSelector('[data-approach]');
+await p.screenshot({ path: shot('02b-approach.png'), fullPage: true });
+await p.click('[data-approach]:not([disabled])');
+await p.waitForSelector('.card, #go');
 await p.screenshot({ path: shot('03-cards.png'), fullPage: true });
-for (const cat of [0, 1, 2]) await p.click(`.card[data-cat="${cat}"]`);
+for (const el of await p.$$('.card[data-cat="0"], .card[data-cat="1"], .card[data-cat="2"]')) { }
+for (const cat of [0, 1, 2]) { const el = await p.$(`.card[data-cat="${cat}"]`); if (el) await el.click(); }
 console.log('組み上がった論証:', (await p.$$eval('.quote', els => els[els.length - 1].textContent)).slice(0, 40) + '…');
 await p.click('#go');
 if (await p.$('.duel')) {
@@ -70,9 +74,11 @@ for (let i = 0; i < 12; i++) {
   await p.click('.person');
   if (await p.$('[data-own]')) await p.click('[data-own]');
   await p.click('[data-stance="support"]');
-  await p.waitForSelector('.card');
+  await p.waitForSelector('[data-approach]');
+  await p.click('[data-approach]:not([disabled])');
+  await p.waitForSelector('.card, #go');
   if (await p.$('#tutok')) await p.click('#tutok');
-  for (const cat of [0, 1, 2]) await p.click(`.card[data-cat="${cat}"]`);
+  for (const cat of [0, 1, 2]) { const el = await p.$(`.card[data-cat="${cat}"]`); if (el) await el.click(); }
   await p.click('#go');
   if (await p.$('.duel')) await p.click('[data-duel="0"]');
   await p.waitForSelector('.result');

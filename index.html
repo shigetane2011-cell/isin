@@ -111,6 +111,9 @@ a.spot:hover{background:var(--ai);color:var(--washi2);border-bottom-color:transp
   background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.12),#fffdf7 48%,rgba(var(--tone-b,59,52,44),.10))}
 .interlude .title{font-size:1.4rem;letter-spacing:.14em;text-align:center;margin:6px 0 14px}
 button.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 16px;font-size:.92rem}
+button .small{color:inherit;opacity:.85}
+button:disabled{opacity:.45}
+button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .fate{border-left:3px solid var(--line);padding:8px 12px;margin:8px 0;font-size:.9rem}
 .fate.won{border-left-color:var(--yuhan)}
 .fate.lost{border-left-color:var(--sumi2);opacity:.85}
@@ -851,6 +854,35 @@ N(151,'孝明天皇の子。父の急逝により十四歳で践祚し、王政�
 
 
 
+
+/* --- 働きかけ -------------------------------------------------------------
+   同じ「3枚当てる」を10ターン繰り返すと単調になる。そこで、相手への
+   当たり方そのものを選べるようにした。4通りで**決定の形が違う**のが肝で、
+   カードを3枚組む／2枚だけ／1枚に賭ける／引かない、と手触りが変わる。
+
+   響く働きかけは「利益の型」からほぼ導ける（＝対話や探りで既に学んでいる
+   知識がそのまま効く）。そのうえで、型から外れる人物を手で指定してある。
+   ------------------------------------------------------------------------ */
+const APPROACHES = [
+  { name:'論じる',     cards:3, cap:3, desc:'利益・文脈・論理の3枚を組む。最も高く積めるが、読みが要る' },
+  { name:'酌み交わす', cards:2, cap:2, desc:'利益と文脈の2枚だけ。論理は問わない。杯を交わした相手は刃を抜かない' },
+  { name:'金品を贈る', cards:0, cap:2, desc:'言葉を尽くさず物で通す。探りを1回使う。大義に生きる者には侮辱になる' },
+  { name:'肚を割る',   cards:1, cap:3, desc:'利益の一点に賭け、こちらの旗色も明かす。当たれば大きいが、外せば決裂' },
+];
+/* 利益の型 → 既定で響く働きかけ */
+const APPROACH_BY_MOTIVE = [3, 2, 1, 0, 3, 0];
+/* 型から外れる人物。「豪商だが金では動かぬ」「力自慢だが酒で落ちる」の類い */
+const APPROACH_EXCEPTION = new Map([
+  [2,1],[13,1],[19,1],[26,2],[29,2],[49,1],[51,1],[59,1],[65,1],[80,1],[87,1],[89,1],
+  [95,3],[100,3],[103,3],[107,1],[116,0],[123,2],[129,3],[131,3],[134,1],
+  [138,2],[140,0],[144,3],[145,3],[147,0],[148,0],[149,1],[150,3],
+]);
+const approachOf = id => APPROACH_EXCEPTION.has(id)
+  ? APPROACH_EXCEPTION.get(id)
+  : APPROACH_BY_MOTIVE[CHAR_BY_ID.get(id).correct[0]];
+/* 転向は「攻撃」なので、大成功まで届く働きかけでしか仕掛けられない */
+const canConvert = ap => APPROACHES[ap].cap === 3;
+
 /* --- 開口一番 -------------------------------------------------------------
    面会した瞬間に相手が発する一言。人物ごとに固有で、その場の空気を作る。
    型の手がかりを兼ねることもあるが、それだけを頼りに当てられるほど直截ではない。
@@ -1123,6 +1155,7 @@ const DUEL_ANSWER = [0, 2, 2, 1, 0, 1];
    支持でも起きる ―― 見え透いた世辞は、この手の男をかえって怒らせる。 */
 function duelPending(st, action){
   if (!HOTHEADS.has(action.charId)) return false;
+  if ((action.approach ?? 0) === 1) return false;   // 杯を交わした相手は刀を抜かない
   /* 転向は「攻撃」。この手の男に仕掛ければ、通ろうと通るまいと刃が出る。
      支持なら、見え透いた世辞と受け取られたときだけ怒らせる。 */
   return action.stance === 'convert' || scoreOf(st, action) < 2;
@@ -1260,15 +1293,30 @@ function cardOptions(st, charId, faction){
 
 /* 論証文の組み立て。プレビューと判定で必ず同一の文字列になるよう1か所に集約する。
    ここで得られる文字数が、次ターンの基点IDを決める。 */
-function composeArgument(argueF, cards){
-  return [0,1,2].map(i => CARDS[argueF][i][cards[i]]).join('。') + '。';
+function composeArgument(argueF, cards, approach){
+  const n = APPROACHES[approach ?? 0].cards;
+  if (n === 0) return '（言葉ではなく、品を差し出した）';
+  return [0,1,2].slice(0, n).map(i => CARDS[argueF][i][cards[i]]).join('。') + '。';
 }
 
 /* 提示された論証が何枚刺さるか。警戒による格下げまで含めた実効の点数。 */
+/* 働きかけごとに、そもそも何を当てるのかが違う。
+   論じる=3枚 / 酌み交わす=利益と文脈の2枚 / 金品=当てるものなし / 肚を割る=利益の1枚。
+   そのうえで、響く働きかけなら一段良く、外した働きかけなら一段悪くなる。 */
 function scoreOf(st, action){
   const ch = CHAR_BY_ID.get(action.charId);
-  const raw = [0,1,2].filter(i => action.cards[i] === ch.correct[i]).length;
-  return (waryOf(st.currents, action.charId) >= 0 && raw >= 2) ? raw - 1 : raw;
+  const ap = action.approach ?? 0, spec = APPROACHES[ap];
+  let raw;
+  if (ap === 0)      raw = [0,1,2].filter(i => action.cards[i] === ch.correct[i]).length;
+  else if (ap === 1) raw = [0,1].filter(i => action.cards[i] === ch.correct[i]).length;
+  else if (ap === 2) raw = ch.correct[0] === 3 ? 0 : 2;   // 大義に生きる者に物を贈るのは侮辱
+  else               raw = action.cards[0] === ch.correct[0] ? 3 : 0;
+  /* 読み違えの罰は「相手を読んだ前提」の働きかけだけに課す。
+     論じる・酌み交わすは誰にでも一応通じる（最適ではないだけ）。
+     金品と肚を割るは相手を読み切った上での賭けなので、外せば裏目に出る。 */
+  if (ap >= 2 && approachOf(action.charId) !== ap) raw -= 1;
+  if (waryOf(st.currents, action.charId) >= 0 && raw >= 2) raw -= 1;  // 警戒は決裂までは落とさない
+  return clamp(raw, 0, spec.cap);
 }
 
 /* その人物が、こちらの旗色を見て警戒しているか */
@@ -1291,14 +1339,18 @@ function resolve(st, action){
   const premature = rank > era;                       // 時代整合性チェック
   const effRank = premature ? 0 : rank;               // 時期尚早ならボーナス無効（初級相当）
 
-  const hits = [0,1,2].map(i => action.cards[i] === ch.correct[i]);
+  const approach = action.approach ?? 0;
+  const apSpec = APPROACHES[approach];
+  const fits = approachOf(action.charId) === approach;
+  const nCards = apSpec.cards;
+  const hits = [0,1,2].map(i => i < nCards && action.cards[i] === ch.correct[i]);
   const rawScore = hits.filter(Boolean).length;
-  const text  = composeArgument(action.argueF, action.cards);
+  const text  = composeArgument(action.argueF, action.cards, approach);
   const len   = chars(text);
 
   /* 警戒: こちらの旗色が鮮明すぎると、判定が一段下がる（決裂までは落とさない） */
   const waryBy = waryOf(st.currents, action.charId);
-  const score  = (waryBy >= 0 && rawScore >= 2) ? rawScore - 1 : rawScore;
+  const score  = scoreOf(st, action);
 
   /* 探れるのは残り回数がある場合のみ。リプレイでも同じ判定になるよう状態から決める。 */
   const probed = !!action.probed && st.probesUsed < PROBE_LIMIT;
@@ -1311,6 +1363,9 @@ function resolve(st, action){
     else if (effRank === 2) gain += 2;
     else if (effRank === 3) gain *= 2;
   }
+  /* 響く働きかけで通れば、それだけ深く刺さる（上限2の働きかけでも報われるよう獲得に乗せる） */
+  if (gain > 0 && fits) gain += 1;
+
   /* 探った代償: その交渉で得られる時勢が1下がる（最低1）。
      元の獲得が大きい大物ほど、相対的な代償は軽く済む。 */
   const gainBeforeProbe = gain;
@@ -1329,6 +1384,8 @@ function resolve(st, action){
     if (action.stance === 'convert') cur[action.ownF] -= (score === 3 ? 2 : 1);
   }
   if (penalty) cur[action.stance === 'support' ? action.ownF : action.argueF] -= penalty;
+  /* 肚を割って外せば、明かした旗色ごと恥をかく */
+  if (approach === 3 && score === 0) cur[action.argueF] -= 2;
   for (let i = 0; i < 5; i++) cur[i] = clamp(cur[i], 0, CAP);
 
   const contacts = st.contacts.slice(), banned = st.banned.slice();
@@ -1356,7 +1413,8 @@ function resolve(st, action){
     seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned,
     lastLen: len,
     /* 立ち合いに敗れると、深追いする余裕を失う（探りを1回失う） */
-    probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
+    probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
+      + (approach === 2 ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
     interlude: st.interlude,
     actions: st.actions.concat([action]), finished: false,
   };
@@ -1364,7 +1422,7 @@ function resolve(st, action){
 
   return { next, report: {
     charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
-    gain, gainBeforeProbe, penalty, text, len, probed, duel,
+    gain, gainBeforeProbe, penalty, text, len, probed, duel, approach, fits, nCards,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     delta: cur.map((v, i) => v - before[i]),
@@ -1434,7 +1492,7 @@ function replay(seed, actions, interludeChoice){
 function encodeSave(st){
   return 'IR4:' + st.seed + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
-               a.probed ? 1 : 0].join(',') + (a.duel != null ? ',' + a.duel : ''))
+               a.probed ? 1 : 0, a.approach ?? 0].join(',') + (a.duel != null ? ',' + a.duel : ''))
     .join(';') + (st.interlude ? '#' + st.interlude.choice : '');
 }
 function decodeSave(code){
@@ -1453,10 +1511,12 @@ function decodeSave(code){
   const interludeChoice = hash >= 0 ? +choiceText : null;
   const body = hash >= 0 ? raw.slice(0, hash) : raw;
   const actions = !body ? [] : body.split(';').filter(Boolean).map(chunk => {
-    const [c, s2, o, f, k, h, dl] = chunk.split(',');
+    const [c, s2, o, f, k, h, apr, dl] = chunk.split(',');
+    if (apr !== undefined && !/^[0-3]$/.test(apr)) throw new Error('働きかけの番号が不正です');
     if (dl !== undefined && !/^[0-2]$/.test(dl)) throw new Error('立ち合いの応じ方が不正です');
     return { charId:+c, stance: +s2 === 0 ? 'support' : 'convert',
              ownF:+o, argueF:+f, cards: Array.from(k).map(Number), probed: +(h || 0) === 1,
+             approach: apr === undefined ? 0 : +apr,
              duel: dl === undefined ? null : +dl };
   });
   return { seed, actions, interludeChoice };
@@ -1470,7 +1530,8 @@ function hashState(st){
 }
 
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
-  TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES,
+  APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -1484,7 +1545,7 @@ const app = document.getElementById('app');
 const E = ENGINE;
 let st = null;
 let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
-           picks:[null,null,null], probed:false, asked:null, chatted:[],
+           picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
            opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null };
 
@@ -1700,7 +1761,7 @@ function viewMeeting(){
   app.querySelectorAll('.person').forEach(el => el.onclick = () => {
     ui.charId = +el.dataset.id; ui.intro = el.classList.contains('intro');
     ui.stance = null; ui.ownF = null; ui.argueF = null;
-    ui.picks = [null,null,null]; ui.probed = false; ui.asked = null; ui.chatted = [];
+    ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null; ui.chatted = [];
     ui.screen = 'stance'; render();
   });
 }
@@ -1759,10 +1820,24 @@ function viewStance(){
           <b>支持</b>は2枚一致でも通る。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
           <b>転向</b>は攻撃。<b>3枚すべて刺さらねば通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
         </div>`;
-    } else {
+    } else if (ui.stance === 'convert' && ui.argueF === null) {
       body = `<p><b>転向</b>を狙います。どの思想に引き込みますか？</p>
         <div class="row">${[0,1,2,3,4].filter(f => f !== ui.ownF).map(f =>
           `<button data-argue="${f}">${fac(f).name}（${fac(f).full}）</button>`).join('')}</div>`;
+    } else {
+      const left = E.PROBE_LIMIT - st.probesUsed;
+      body = `<p>どう働きかけますか？</p>
+        <div class="row" style="display:block">${E.APPROACHES.map((a, i) => {
+          const noConvert = ui.stance === 'convert' && !E.canConvert(i);
+          const noProbe = i === 2 && left <= 0;
+          const off = noConvert || noProbe;
+          const why = noConvert ? '（転向は論じるか肚を割るでしか通らない）'
+                    : noProbe ? '（探りを使い切っている）' : '';
+          return `<button class="choice" data-approach="${i}" ${off ? 'disabled' : ''}>
+            <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small">カード${a.cards}枚</span>`}
+            <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${esc(why)}</span></button>`;
+        }).join('')}</div>
+        <div class="small" style="margin-top:8px;opacity:.7">相手に響く当たり方は、その者が何を望んでいるかで決まります。</div>`;
     }
   }
   const wb0 = E.waryOf(st.currents, ui.charId);
@@ -1822,11 +1897,12 @@ function viewStance(){
   app.querySelectorAll('[data-own]').forEach(b => b.onclick = () => { ui.ownF = +b.dataset.own; render(); });
   app.querySelectorAll('[data-stance]').forEach(b => b.onclick = () => {
     ui.stance = b.dataset.stance;
-    if (ui.stance === 'support'){ ui.argueF = ui.ownF; ui.screen = 'cards'; }
+    if (ui.stance === 'support') ui.argueF = ui.ownF;
     render();
   });
-  app.querySelectorAll('[data-argue]').forEach(b => b.onclick = () => {
-    ui.argueF = +b.dataset.argue; ui.screen = 'cards'; render();
+  app.querySelectorAll('[data-argue]').forEach(b => b.onclick = () => { ui.argueF = +b.dataset.argue; render(); });
+  app.querySelectorAll('[data-approach]').forEach(b => b.onclick = () => {
+    ui.approach = +b.dataset.approach; ui.screen = 'cards'; render();
   });
   document.getElementById('back').onclick = () => { ui.screen = 'meeting'; render(); };
 }
@@ -1836,9 +1912,10 @@ function viewCards(){
   const c = E.CHAR_BY_ID.get(ui.charId);
   ui.opts = E.cardOptions(st, ui.charId, ui.argueF);
   const guided = guidedTurn();
-  const ready = ui.picks.every(p => p !== null);
+  const nCards = E.APPROACHES[ui.approach].cards;
+  const ready = [0,1,2].slice(0, nCards).every(i => ui.picks[i] !== null);
   const left = E.PROBE_LIMIT - st.probesUsed;
-  const text = ready ? E.composeArgument(ui.argueF, ui.picks) : '';
+  const text = ready ? E.composeArgument(ui.argueF, ui.picks, ui.approach) : '';
   app.innerHTML = headerHTML() +
     `<div class="panel tone-panel" style="${toneStyle([ui.argueF])}"><h2>${esc(c.name)}を${ui.stance === 'support' ? '支持する' : `${fac(ui.argueF).name}へ転向させる`}</h2>
       <div class="quote">${esc(c.desc)}</div>
@@ -1857,7 +1934,7 @@ function viewCards(){
             ? `<button class="probe" id="probe">この相手を探る（残り ${left} 回・獲得 −1）</button>`
             : '<span class="probed" style="opacity:.6">探りは使い切った（1局 ' + E.PROBE_LIMIT + ' 回まで）</span>'}
       </div>
-      ${E.CATS.map((cat, i) => `
+      ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
@@ -1883,10 +1960,10 @@ function viewCards(){
   });
   const pb = document.getElementById('probe');
   if (pb) pb.onclick = () => { ui.probed = true; render(); };
-  document.getElementById('back').onclick = () => { ui.stance = null; ui.argueF = null; ui.screen = 'stance'; render(); };
+  document.getElementById('back').onclick = () => { ui.approach = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
-    const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF,
-                argueF: ui.argueF, cards: ui.picks.slice(), probed: ui.probed };
+    const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
+                cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed, approach: ui.approach };
     if (E.duelPending(st, a)){ ui.duelAction = a; ui.screen = 'duel'; render(); return; }
     const r = E.resolve(st, a);
     st = r.next; ui.report = r.report; ui.screen = 'result'; render();
@@ -1917,7 +1994,7 @@ function viewDuel(){
 function viewResult(){
   const r = ui.report, c = E.CHAR_BY_ID.get(r.charId);
   const guidedResult = !!(ui.guidedTutorial && st.actions.length === 1);
-  const marks = r.hits.map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
+  const marks = r.hits.slice(0, r.nCards).map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
     h ? (r.probed ? '刺さった（探って得た）' : '刺さった')
       : `外れ（この人物に効くのは「${E.CATS[i].motives[c.correct[i]]}」）`}</div>`).join('');
   const d = r.delta.map((v,i) => v ? `<span class="${fac(i).cls}">[${fac(i).name}] ${v>0?'+':''}${v}</span>` : null)
@@ -1931,6 +2008,9 @@ function viewResult(){
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
       <div class="quote">「${esc(r.text)}」</div>
       ${marks}
+      <div class="small" style="margin-top:4px">働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
+        r.fits ? '　<span style="color:var(--yuhan)">◎ この者に響いた（獲得+1）</span>'
+               : r.approach >= 2 ? '　<span style="color:var(--shu)">読み違え（一段下がった）</span>' : ''}</div>
       ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
         <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}
         <div class="small" style="margin-top:6px">${r.duel.survived
