@@ -1,6 +1,6 @@
 # 維新の乱流 ― 幕末、日本の夜明けを設計せよ ―
 
-<img src="screenshot.png" alt="ゲーム画面" width="520">
+<img src="assets/hero-bakumatsu.webp" alt="幕末の城下と黒船を望み、それぞれの未来を見据える人々" width="760">
 
 幕末を舞台にした歴史設計シミュレーション。戦闘も領地経営もない。
 **人物の欲望・立場・論理を読み、言葉だけで歴史を動かす。**
@@ -11,7 +11,10 @@
 
 ## 遊ぶ
 
-`index.html` をブラウザで開くだけ。ビルド不要、依存なし、通信なし、外部ファイルなし。
+**[ブラウザで遊ぶ](https://shigetane2011-cell.github.io/isin/)**
+
+ローカルでは `index.html` をブラウザで開くだけ。ビルド不要、依存なし、通信なし。
+タイトル画面のみ `assets/hero-bakumatsu.webp` を読み込む。
 
 ## 30秒でわかる遊び方
 
@@ -114,7 +117,7 @@ node tools/verify.mjs      # 決定論とルールの検証（134項目）
 | 対象 | ライセンス |
 |:---|:---|
 | エンジン・UI実装・検証スクリプト | [MIT](LICENSE) |
-| 人物設定・カード本文・台詞・エンディング本文・文書 | [CC BY 4.0](LICENSE-CONTENT) |
+| 人物設定・カード本文・台詞・エンディング本文・ヒーロービジュアル・文書 | [CC BY 4.0](LICENSE-CONTENT) |
 
 エンジンは自由に流用してもらってかまわない。文章側は改変・再配布とも自由だが、
 **原著作者のクレジット表示**をお願いしたい。
@@ -127,7 +130,7 @@ node tools/verify.mjs      # 決定論とルールの検証（134項目）
 | `docs/spec.md` | 仕様書。原作からの変更点と、仕様の穴に置いた既定値の一覧 |
 | `tools/verify.mjs` | 決定論・ルールの検証（134項目） |
 | `tools/smoke.mjs` | ブラウザでの通しプレイ確認（要 Playwright） |
+| `assets/hero-bakumatsu.webp` | タイトル画面・OGP用のヒーロービジュアル |
 | `screenshot.png` | README 用の画面 |
 | `LICENSE` | コードのライセンス（MIT） |
 | `LICENSE-CONTENT` | 文章・ゲームコンテンツのライセンス（CC BY 4.0） |
-
