@@ -4,13 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>維新の乱流 ― 幕末、日本の夜明けを設計せよ ―</title>
-<meta name="description" content="幕末を舞台にした歴史設計シミュレーション。151名の人物と対話し、言葉で5つの時勢を動かして日本の未来を決める。LLMを使わない完全決定論エンジン、単一HTML、通信なし。">
+<meta name="description" content="幕末を舞台にした歴史設計シミュレーション。151名の人物と対話し、言葉で5つの時勢を動かして日本の未来を決める。LLMを使わない完全決定論エンジン、ビルド不要、通信なし。">
 <meta name="author" content="原案: ミッキーベルグ">
 <meta name="color-scheme" content="light">
 <meta property="og:type" content="website">
 <meta property="og:title" content="維新の乱流 ― 幕末、日本の夜明けを設計せよ ―">
 <meta property="og:description" content="人物の欲望・立場・論理を読み、言葉で歴史を動かす幕末シミュレーション。同じseedと同じ選択なら盤面は必ず同じになる完全決定論エンジン。">
+<meta property="og:url" content="https://shigetane2011-cell.github.io/isin/">
+<meta property="og:image" content="https://shigetane2011-cell.github.io/isin/assets/hero-bakumatsu.webp">
+<meta property="og:image:type" content="image/webp">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="幕末の城下と黒船を望み、それぞれの未来を見据える人々">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://shigetane2011-cell.github.io/isin/assets/hero-bakumatsu.webp">
+<link rel="preload" as="image" href="assets/hero-bakumatsu.webp" type="image/webp">
 <style>
 :root{
   --washi:#ece2cf; --washi2:#f6f0e1; --sumi:#1b1815; --sumi2:#3b342c;
@@ -31,6 +39,24 @@ body{
 header{border-bottom:3px double var(--sumi);padding-bottom:10px;margin-bottom:18px}
 h1{font-size:1.6rem;margin:0;letter-spacing:.16em}
 h1 .sub{display:block;font-size:.72rem;letter-spacing:.3em;color:var(--sumi2);margin-top:6px;font-weight:400}
+.title-hero{
+  position:relative;min-height:310px;margin:0 0 18px;overflow:hidden;
+  border:1px solid var(--line);background-color:var(--washi2);
+  background-image:linear-gradient(180deg,rgba(246,240,225,.08) 0%,rgba(236,226,207,0) 58%,rgba(236,226,207,.55) 100%),
+                   url("assets/hero-bakumatsu.webp");
+  background-position:center;background-size:cover;background-repeat:no-repeat;
+  box-shadow:0 2px 8px rgba(27,24,21,.12)
+}
+.title-hero::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 34px rgba(59,52,44,.12)
+}
+.title-hero .hero-copy{
+  position:absolute;z-index:1;top:24px;left:20px;right:20px;text-align:center;
+  color:var(--sumi);text-shadow:0 1px 0 rgba(255,253,247,.9),0 0 10px rgba(255,253,247,.75)
+}
+.title-hero h1{font-size:2.2rem;letter-spacing:.2em}
+.title-hero h1 .sub{font-size:.78rem;letter-spacing:.34em;color:var(--sumi2);margin-top:8px}
 .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.82rem;color:var(--sumi2);margin-top:10px}
 .meta b{font-weight:600;color:var(--sumi)}
 .panel{background:var(--washi2);border:1px solid var(--line);border-radius:2px;padding:14px 16px;margin:14px 0;
@@ -104,6 +130,12 @@ code.seed{font-family:monospace;background:#fff;border:1px solid var(--line);pad
 textarea{width:100%;font-family:monospace;font-size:.72rem;height:70px;border:1px solid var(--line);padding:6px;background:#fff}
 .pill{display:inline-block;font-size:.74rem;border:1px solid var(--line);background:#fff;padding:1px 8px;margin:2px 4px 2px 0;border-radius:10px}
 hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+@media (max-width:600px){
+  .title-hero{min-height:230px;background-position:center bottom}
+  .title-hero .hero-copy{top:18px;left:10px;right:10px}
+  .title-hero h1{font-size:1.7rem;letter-spacing:.14em}
+  .title-hero h1 .sub{font-size:.66rem;letter-spacing:.2em}
+}
 </style>
 </head>
 <body>
@@ -1215,7 +1247,9 @@ function headerHTML(){
 
 /* --- 画面: タイトル ------------------------------------------------------ */
 function viewTitle(){
-  app.innerHTML = `<header><h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1></header>
+  app.innerHTML = `<section class="title-hero" aria-label="幕末の城下と黒船を望み、それぞれの未来を見据える人々">
+    <div class="hero-copy"><h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1></div>
+  </section>
   <div class="panel">
     <p>本作は、<b>10ターン以内に理想の日本を創り上げる</b>シミュレーションです。到達できる未来は次の3系統・全16通り。</p>
     <ul style="padding-left:1.2em;margin:8px 0">
