@@ -13,15 +13,20 @@ const ok  = (c, m) => { c ? (pass++, console.log('  \x1b[32m✓\x1b[0m ' + m))
                           : (fail++, console.log('  \x1b[31m✗\x1b[0m ' + m)); };
 const head = m => console.log('\n\x1b[1m' + m + '\x1b[0m');
 
-/* --- 1. 非決定的APIの混入検査 ------------------------------------------- */
-head('1. 非決定的APIが混入していないか');
+/* --- 1. エンジンへの非決定的APIの混入検査 ------------------------------- */
+head('1. 決定論エンジンに非決定的APIが混入していないか');
 // コメントと文字列リテラルを除いた「実際に動くコード」だけを見る
-const code = html
+const code = src
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
   .replace(/^\s*\/\/.*$/gm, ' ');
 for (const bad of ['Math.random', 'Date.now', 'new Date(', 'performance.now', 'crypto.getRandomValues']) {
   ok(!code.includes(bad), `${bad} を使用していない`);
 }
+
+head('1b. 初回導線とseed生成');
+ok(html.includes('crypto.getRandomValues'), '初期seedをブラウザの乱数で生成する');
+ok(html.includes('start-guide') && html.includes('start-normal'), '初回だけガイド付き／通常開始を選べる');
+ok(html.includes('tutorialReasonHTML') && html.includes('guide-answer'), '第1ターンに正解と根拠を表示する');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
