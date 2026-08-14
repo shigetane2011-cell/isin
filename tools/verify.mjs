@@ -1,6 +1,6 @@
 /* 決定論の検証。index.html からエンジン部だけを抜き出して実行する。
    使い方: node tools/verify.mjs                                            */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const S = '/* ==ENGINE START== */', T = '/* ==ENGINE END== */';
@@ -41,6 +41,29 @@ head('1b. 初回導線とseed生成');
 ok(html.includes('crypto.getRandomValues'), '初期seedをブラウザの乱数で生成する');
 ok(html.includes('start-guide') && html.includes('start-normal'), '初回だけガイド付き／通常開始を選べる');
 ok(html.includes('tutorialReasonHTML') && html.includes('guide-answer'), '第1ターンに正解と根拠を表示する');
+
+head('1c. 主要人物の創作彩色肖像');
+const portraitFiles = [
+  [33,  'iwakura-tomomi.webp'],
+  [47,  'kondo-isami.webp'],
+  [95,  'katsu-kaishu.webp'],
+  [103, 'saigo-takamori.webp'],
+  [140, 'tokugawa-yoshinobu.webp'],
+  [142, 'kido-takayoshi.webp'],
+  [144, 'yoshida-shoin.webp'],
+  [145, 'sakamoto-ryoma.webp'],
+];
+const portraitURLs = portraitFiles.map(([, file]) =>
+  new URL(`../assets/portraits/${file}`, import.meta.url));
+ok(portraitURLs.every(url => existsSync(url) && statSync(url).size > 30_000),
+   '主要人物8名の肖像ファイルがあり、空画像ではない');
+ok(portraitFiles.every(([id, file]) =>
+   html.includes(`[${id},`) && html.includes(`assets/portraits/${file}`)),
+   '8名のIDと肖像ファイルが画面定義に結び付いている');
+ok(html.includes('characterVisualHTML(c)') && html.includes('portraitThumbHTML(id)'),
+   '候補一覧と個別面会の両方に肖像を表示する');
+ok(html.includes('本人と確定した写真はなく') && html.includes('キヨッソーネ肖像'),
+   '西郷隆盛を実在写真と誤認させない注記がある');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
@@ -427,16 +450,17 @@ head('5e2. 同梱画像が、エンジンの出しうる名前と一致してい
 
   /* 人物の絵。名簿と実ファイルが食い違えば404になるので、ここで固定する */
   {
-    const dir = at('assets/people');
+    const dir = at('assets/portraits');
     const files = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')) : [];
-    const onDisk = new Set(files.map(f => +f.replace('.webp', '')));
+    const onDisk = new Set(files.map(f => `assets/portraits/${f}`));
     const listed = E.PORTRAITS;
-    const ghost = [...listed].filter(id => !onDisk.has(id));
-    const orphan = [...onDisk].filter(id => !listed.has(id));
+    const paths = new Set([...listed.values()].map(p => p.src));
+    const ghost = [...paths].filter(path => !onDisk.has(path));
+    const orphan = [...onDisk].filter(path => !paths.has(path));
     ok(ghost.length === 0, `名簿にあって実体のない人物絵がない${ghost.length ? '（' + ghost.join(' ') + '）' : ''}`);
     ok(orphan.length === 0, `置いてあるのに名簿にない人物絵がない${orphan.length ? '（' + orphan.join(' ') + '）' : ''}`);
-    ok([...listed].every(id => E.CHAR_BY_ID.has(id)), '人物絵の名簿が実在する人物IDだけを指している');
-    ok([...listed].every(id => E.portraitOf(id) === `assets/people/${id}.webp`), '人物絵のパスが規則どおり');
+    ok([...listed.keys()].every(id => E.CHAR_BY_ID.has(id)), '人物絵の名簿が実在する人物IDだけを指している');
+    ok([...listed].every(([id, p]) => E.portraitOf(id) === p.src), '人物絵のパスが名簿どおり');
     ok(E.portraitOf(-1) === null, '絵のない人物には null が返り、勢力の情景で代わる');
     console.log(`     （人物絵 ${listed.size}/151枚。面会で絵が出る割合の目安: 伝説16枚=15% / 上級以上61枚=45% / 中級以上121枚=77%）`);
   }

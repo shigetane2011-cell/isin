@@ -17,6 +17,7 @@ Copyright (c) 2026 ミッキーベルグ
 - `assets/hero-bakumatsu.webp`（タイトル画面・OGP用ビジュアル）
 - `assets/factions/*.webp`（5勢力の面会ビジュアル）
 - `assets/endings/*.webp`（16通りのエンディングビジュアル）
+- `assets/portraits/*.webp`（史料肖像を参照した主要人物8名の創作彩色画。出典は同フォルダのREADMEを参照）
 - README、docs/spec.md などの文書
 
 ## 対象にならないもの（MITが適用されます）

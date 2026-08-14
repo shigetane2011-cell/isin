@@ -132,6 +132,12 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person .tag{font-size:.72rem;border:1px solid currentColor;padding:1px 6px;margin-left:8px;vertical-align:2px;border-radius:2px}
 .person .nick{font-size:.82rem;color:var(--sumi2);margin-top:2px}
 .person .desc{font-size:.86rem;margin-top:8px;padding-left:10px;border-left:2px solid var(--line);color:var(--sumi2)}
+.person.has-portrait{min-height:114px;padding-left:102px}
+.person-thumb{position:absolute;left:12px;top:12px;width:72px;height:90px;padding:3px;
+  background:linear-gradient(180deg,rgb(var(--tone-a,59,52,44)),rgb(var(--tone-b,59,52,44)));
+  box-shadow:0 0 0 1px rgba(27,24,21,.5),0 3px 8px rgba(27,24,21,.18)}
+.person-thumb img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 18%;
+  border:1px solid rgba(255,253,247,.72);background:var(--washi)}
 .person.intro{border-left:4px solid var(--kin)}
 .person.revisit{border-left:4px solid var(--shu)}
 /* 働きかけの早見表。人物ごとの情報ではなく、規則そのものを読めるようにする */
@@ -237,6 +243,28 @@ button.primary .small{color:inherit;opacity:.82}
   border-radius:2px;font-size:.7rem;font-weight:700;text-shadow:0 1px 1px rgba(27,24,21,.45);
   box-shadow:0 1px 0 rgba(255,253,247,.36) inset,0 2px 5px rgba(27,24,21,.28)}
 .faction-visual{margin-top:0}
+.portrait-stage{position:relative;overflow:hidden;aspect-ratio:2/1;margin:0 0 16px;border:5px solid transparent;
+  background:linear-gradient(var(--washi),var(--washi)) padding-box,
+    linear-gradient(90deg,rgb(var(--tone-a,59,52,44)),rgb(var(--tone-b,59,52,44))) border-box;
+  box-shadow:0 0 0 1px rgba(27,24,21,.62),0 0 0 4px rgba(154,132,96,.22),0 5px 14px rgba(27,24,21,.18)}
+.portrait-stage .portrait-backdrop{position:absolute;inset:3px 3px 3px 36%;display:flex;background:var(--washi2)}
+.portrait-stage .portrait-backdrop img{display:block;width:100%;height:100%;object-fit:cover;min-width:0;filter:saturate(.82)}
+.portrait-stage .portrait-backdrop.split img{width:50%}
+.portrait-stage .portrait-main{position:absolute;z-index:2;left:3px;top:3px;width:43%;height:calc(100% - 6px);
+  object-fit:cover;object-position:center 18%;border-right:2px solid rgb(var(--tone-a,59,52,44));background:var(--washi)}
+.portrait-stage::after{content:"";position:absolute;z-index:2;inset:3px;pointer-events:none;
+  background:linear-gradient(90deg,transparent 31%,rgba(var(--tone-a,59,52,44),.25) 44%,
+    rgba(var(--tone-b,59,52,44),.14) 72%,rgba(27,24,21,.12));mix-blend-mode:multiply}
+.portrait-stage::before{content:"";position:absolute;z-index:4;inset:3px;border:1px solid rgba(255,253,247,.55);
+  box-shadow:inset 0 0 0 1px rgba(27,24,21,.18);pointer-events:none}
+.portrait-stage .visual-key{position:absolute;z-index:5;right:12px;bottom:11px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.portrait-stage .visual-key span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;
+  background:rgba(var(--key-rgb,59,52,44),.92);color:#fff;border:1px solid rgba(255,253,247,.72);
+  border-radius:2px;font-size:.7rem;font-weight:700;text-shadow:0 1px 1px rgba(27,24,21,.45);
+  box-shadow:0 1px 0 rgba(255,253,247,.36) inset,0 2px 5px rgba(27,24,21,.28)}
+.portrait-source{position:absolute;z-index:5;right:12px;top:10px;max-width:52%;padding:3px 8px;
+  color:#fff;background:rgba(27,24,21,.72);border:1px solid rgba(255,253,247,.55);border-radius:2px;
+  font-size:.66rem;line-height:1.45;letter-spacing:.04em;text-shadow:0 1px 1px rgba(27,24,21,.55)}
 .small{font-size:.76rem;color:var(--sumi2)}
 code.seed{font-family:monospace;background:#fff;border:1px solid var(--line);padding:1px 6px}
 textarea{width:100%;font-family:monospace;font-size:.72rem;height:70px;border:1px solid var(--line);padding:6px;background:#fff}
@@ -249,6 +277,13 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .title-hero h1 .sub{font-size:.66rem;letter-spacing:.2em}
   .story-visual{aspect-ratio:16/7}
   .story-visual .visual-key{left:9px;bottom:8px}
+  .person.has-portrait{min-height:100px;padding-left:86px}
+  .person-thumb{left:10px;top:11px;width:60px;height:76px}
+  .portrait-stage{aspect-ratio:4/3}
+  .portrait-stage .portrait-main{width:52%}
+  .portrait-stage .portrait-backdrop{left:44%}
+  .portrait-stage .visual-key{right:9px;bottom:8px}
+  .portrait-source{right:9px;top:8px;max-width:44%;font-size:.59rem}
 }
 </style>
 </head>
@@ -1992,13 +2027,27 @@ function fateOf(charId, winners, n){
    分岐が増えないのはこのため。文章も3通り×勝敗の6つで、人物ごとには持たない。
    ------------------------------------------------------------------------ */
 /* --- 人物の絵 -------------------------------------------------------------
-   assets/people/<id>.webp を置き、ここにIDを足すと、その人物の面会画面が
-   勢力の情景から本人の絵に差し替わる。無ければ従来どおり勢力の情景を出す。
-   実体のないIDを載せると404になるので、名簿と実ファイルの一致は verify で検査する。
-   （面会で会う割合は 伝説15% / 上級以上45% / 中級以上77% なので、
-     16枚・61枚と段階的に足していける） */
-const PORTRAITS = new Set([]);
-const portraitOf = id => PORTRAITS.has(id) ? `assets/people/${id}.webp` : null;
+   史料を参照した創作彩色画。ファイルと出典表示をここで一対一に結び付ける。
+   無い人物は従来どおり勢力の情景を出し、追加時の食い違いは verify で検査する。 */
+const PORTRAITS = new Map([
+  [33,  { src:'assets/portraits/iwakura-tomomi.webp',
+           short:'国会図書館の肖像写真を参照', basis:'国立国会図書館「近代日本人の肖像」掲載写真を参照した創作彩色' }],
+  [47,  { src:'assets/portraits/kondo-isami.webp',
+           short:'国会図書館の肖像写真を参照', basis:'国立国会図書館「近代日本人の肖像」掲載写真を参照した創作彩色' }],
+  [95,  { src:'assets/portraits/katsu-kaishu.webp',
+           short:'国会図書館の肖像写真を参照', basis:'国立国会図書館「近代日本人の肖像」掲載写真を参照した創作彩色' }],
+  [103, { src:'assets/portraits/saigo-takamori.webp',
+           short:'キヨッソーネ肖像を参照', basis:'本人と確定した写真はなく、国立国会図書館掲載のキヨッソーネ肖像を参照した創作彩色' }],
+  [140, { src:'assets/portraits/tokugawa-yoshinobu.webp',
+           short:'国会図書館の肖像写真を参照', basis:'国立国会図書館「近代日本人の肖像」掲載写真・肖像を参照した創作彩色' }],
+  [142, { src:'assets/portraits/kido-takayoshi.webp',
+           short:'国会図書館の肖像写真を参照', basis:'国立国会図書館「近代日本人の肖像」掲載写真を参照した創作彩色' }],
+  [144, { src:'assets/portraits/yoshida-shoin.webp',
+           short:'国会図書館の肖像画を参照', basis:'国立国会図書館「近代日本人の肖像」掲載肖像画を参照した創作彩色' }],
+  [145, { src:'assets/portraits/sakamoto-ryoma.webp',
+           short:'文化遺産オンラインの湿板写真を参照', basis:'文化遺産オンライン掲載「坂本龍馬湿板写真」を参照した創作彩色' }],
+]);
+const portraitOf = id => PORTRAITS.get(id)?.src || null;
 
 const HOTHEADS = new Set([13,14,21,28,29,47,48,49,51,63,65,67,68,70,79,80,82,87,88,89,90,113,131,133,135]);
 const DUELS = [
@@ -2647,6 +2696,23 @@ function meetingVisualHTML(c){
   const srcs = fs.map(f => `assets/factions/${fac(f).key}.webp`);
   return storyVisualHTML(srcs, fs, `${c.name}が属する${fs.map(f => fac(f).full).join('と')}の情景`, 'faction-visual', false);
 }
+function characterVisualHTML(c){
+  const portrait = E.PORTRAITS.get(c.id);
+  if (!portrait) return meetingVisualHTML(c);
+  const fs = ui.ownF === null ? c.factions.slice() : [ui.ownF];
+  const backdrops = fs.map(f => `<img src="assets/factions/${fac(f).key}.webp" alt="" loading="eager" decoding="async">`).join('');
+  const keys = `<div class="visual-key">${fs.map(f =>
+    `<span class="${fac(f).cls}" style="--key-rgb:${FACTION_RGB[f]}"><i aria-hidden="true"></i>${fac(f).name}</span>`).join('')}</div>`;
+  return `<figure class="portrait-stage" style="${toneStyle(fs)}" role="img" aria-label="${esc(c.name)}。${esc(portrait.basis)}">
+    <div class="portrait-backdrop ${fs.length > 1 ? 'split' : ''}">${backdrops}</div>
+    <img class="portrait-main" src="${portrait.src}" alt="" loading="eager" decoding="async">
+    <div class="portrait-source" title="${esc(portrait.basis)}">創作彩色｜${esc(portrait.short)}</div>${keys}
+  </figure>`;
+}
+function portraitThumbHTML(id){
+  const portrait = E.PORTRAITS.get(id);
+  return portrait ? `<span class="person-thumb" aria-hidden="true"><img src="${portrait.src}" alt="" loading="lazy" decoding="async"></span>` : '';
+}
 function endingVisualHTML(e){
   const fs = E.winningFactions(e);
   let file = 'chaos';
@@ -2833,7 +2899,8 @@ function viewMeeting(){
       ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, id))}
          <span class="small">※ 一度決裂した相手。判定は一段重く、紹介の顔も通らない。
          だが説き伏せられれば<b>得るものは倍</b>になり、出現停止も解ける</span></div>` : '';
-    return `<div class="person ${isIntro?'intro':''} ${isRevisit?'revisit':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
+    return `<div class="person ${E.PORTRAITS.has(id)?'has-portrait':''} ${isIntro?'intro':''} ${isRevisit?'revisit':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
+      ${portraitThumbHTML(id)}
       <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
       <div class="desc">${isRevisit ? '[因縁] ' : isIntro ? '[人脈] ' : '[情勢] '}${esc(c.desc)}</div>
@@ -3046,7 +3113,7 @@ function viewStance(){
       : coachHTML('三', 'まずは支持と「論じる」で仕組みを覚える', '支持は<b>3枚中2枚一致でも成功</b>します。練習では転向と、論じる以外の働きかけを封じ、次の画面で正解と根拠を見ながら3枚を組みます。')
     : '';
 
-  app.innerHTML = headerHTML() + meetingVisualHTML(c) +
+  app.innerHTML = headerHTML() + characterVisualHTML(c) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       ${st.banned.includes(ui.charId)
         ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, ui.charId))}
