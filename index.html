@@ -137,6 +137,18 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person.place::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
   background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
 .uibadge{color:var(--kin);font-weight:600}
+/* 現在地の帯。行き先の札と同じ配色の筋を引き、いま居る場を面会画面にも残す */
+.here{position:relative;overflow:hidden;background:var(--washi);border:1px solid var(--line);
+  border-left:4px solid var(--sumi2);border-radius:2px;padding:9px 12px 10px 13px;margin:0 0 12px}
+.here::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
+.here .lbl{font-size:.72rem;letter-spacing:.18em;color:var(--sumi2);margin-right:10px}
+.here .nm{font-size:1rem;font-weight:600;letter-spacing:.06em}
+.here .tag{font-size:.72rem;border:1px solid currentColor;padding:1px 6px;margin-left:8px;
+  vertical-align:2px;border-radius:2px;color:var(--sumi2)}
+.here .desc{font-size:.82rem;color:var(--sumi2);margin-top:5px}
+.here .row{margin-top:8px}
+.here button{padding:6px 12px;font-size:.84rem}
 .warn{color:var(--shu);font-size:.78rem;margin-top:6px}
 button{font-family:inherit;font-size:.9rem;background:var(--washi2);border:1px solid var(--sumi2);color:var(--sumi);
   padding:8px 16px;border-radius:2px;cursor:pointer;letter-spacing:.08em}
@@ -1790,6 +1802,8 @@ function viewMeeting(){
   if (ui.place === null) return viewPlace();
   const m = E.meetingList(st, ui.place);
   const era = E.eraOf(st);
+  const pl = E.PLACES[ui.place];
+  const pfa = fac(pl.favor[0]).key, pfb = fac(pl.favor[pl.favor.length - 1]).key;
   const card = (id, isIntro) => {
     const c = E.CHAR_BY_ID.get(id), rk = E.rankOfId(id);
     const fl = c.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('');
@@ -1808,11 +1822,15 @@ function viewMeeting(){
   };
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel"><h2>面会可能な人物</h2>
+      <div class="here" style="--pf-a:var(--${pfa});--pf-b:var(--${pfb})">
+        <div><span class="lbl">現在地</span><span class="nm">${esc(pl.name)}</span><span class="tag">${esc(pl.where)}</span></div>
+        <div class="desc">${esc(pl.desc)}</div>
+        <div class="row"><button id="replace">行き先を変更する<span class="small">（面会候補も変わります）</span></button></div>
+      </div>
       ${guidedTurn() ? coachHTML('二', '人物を一人選ぶ', 'まずは各人物の<b>【情勢】</b>を読み、誰が何に困り、何を欲しているかを見比べます。練習なので、今回は気になる相手を自由に選んでください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
-      <div class="row"><button id="replace">行き先を選び直す</button></div>
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
         そこから3名が選ばれています。時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
