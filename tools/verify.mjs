@@ -426,6 +426,83 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
   ok(rejected === 2, '不正な働きかけ番号を弾く');
 }
 
+/* --- 5f4. 場 --------------------------------------------------------------- */
+head('5f4. 行き先');
+ok(E.PLACES.length === 6 && E.PLACES.every(p => p.name && p.desc && p.allow.length && p.favor.length),
+   '場が6つあり、それぞれ description・使える働きかけ・集まる勢力を持つ');
+ok(E.PLACES.every(p => p.allow.includes(0)), 'どの場でも「論じる」だけは必ずできる（詰まない）');
+ok(E.PLACES.every(p => p.allow.includes(p.boost)), 'その場で深く刺さる働きかけは、その場で使える');
+ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複していない');
+{
+  const early = E.placesOpen(E.createState(1));
+  const late = E.placesOpen(Object.assign(E.createState(1), { currents:[20,0,0,0,0] }));
+  ok(early.length === 5 && late.length === 6, '江戸城中は中級期になってから開く');
+}
+{
+  /* 場ごとに顔ぶれが偏るか */
+  const share = pl => {
+    const cnt = [0,0,0,0,0]; let tot = 0;
+    for (let seed = 1; seed <= 200; seed++)
+      for (const id of E.meetingList(E.createState(seed), pl).normal) {
+        E.CHAR_BY_ID.get(id).factions.forEach(f => cnt[f]++); tot++;
+      }
+    return cnt.map(n => n / tot);
+  };
+  const flat = share(null), gion = share(0), nagasaki = share(2);
+  ok(Math.max(...flat) < 0.30, `場を指定しなければ勢力は偏らない（最大 ${(Math.max(...flat)*100).toFixed(0)}%）`);
+  /* 縛るのは3枠中1枠なので、偏りは「無指定の1.5倍以上」を目安にする */
+  ok(gion[4] > flat[4] * 1.5,
+     `祇園の茶屋には抗戦の者が集まる（${(gion[4]*100).toFixed(0)}% / 無指定 ${(flat[4]*100).toFixed(0)}%）`);
+  ok(nagasaki[1] > flat[1] * 1.5,
+     `長崎の商館には開国の者が集まる（${(nagasaki[1]*100).toFixed(0)}% / 無指定 ${(flat[1]*100).toFixed(0)}%）`);
+}
+{
+  /* 場に合った働きかけは深く刺さる。場を渡しても盤面の決定論は保たれる */
+  const st = E.createState(1);
+  /* 相手には響かない働きかけでも、場が合えば助けになる（加点は重ならず最大+1） */
+  const nofit = E.CHARACTERS.find(x => E.approachOf(x.id) !== 1 && !E.HOTHEADS.has(x.id));
+  const at = pl => E.resolve(st, { charId:nofit.id, stance:'support', ownF:nofit.factions[0],
+                                   argueF:nofit.factions[0], cards:nofit.correct.slice(),
+                                   probed:false, approach:1, place:pl }).report;
+  ok(at(0).placeFits && !at(0).fits && at(0).gain > at(2).gain,
+     '相手に響かない働きかけでも、茶屋で酌み交わせば商館より深く刺さる');
+  const fitChar = E.CHAR_BY_ID.get(13);   // 酌み交わすが響く人物
+  const both = E.resolve(st, { charId:13, stance:'support', ownF:fitChar.factions[0],
+                               argueF:fitChar.factions[0], cards:fitChar.correct.slice(),
+                               probed:false, approach:1, place:0 }).report;
+  const only = E.resolve(st, { charId:13, stance:'support', ownF:fitChar.factions[0],
+                               argueF:fitChar.factions[0], cards:fitChar.correct.slice(),
+                               probed:false, approach:1, place:2 }).report;
+  ok(both.fits && both.placeFits && both.gain === only.gain,
+     '相手にも場にも合っても、加点は重ならない（最大+1）');
+  let rt = true;
+  for (let seed = 1; seed <= 60; seed++) {
+    const rnd = E.mulberry32(seed * 977);
+    let stx = E.createState(seed);
+    while (!stx.finished) {
+      if (E.pendingInterlude(stx)) stx = E.applyInterlude(stx, 0);
+      if (stx.finished) break;
+      const open = E.placesOpen(stx), pl = open[Math.floor(rnd() * open.length)];
+      const id = E.meetingList(stx, pl).normal[0], ch = E.CHAR_BY_ID.get(id);
+      const allow = E.PLACES[pl].allow;
+      let ap = allow[Math.floor(rnd() * allow.length)];
+      if (ap === 2 && stx.probesUsed >= E.PROBE_LIMIT) ap = 0;
+      const a = { charId:id, stance:'support', ownF:ch.factions[0], argueF:ch.factions[0],
+                  cards:ch.correct.slice(), probed:false, approach:ap, place:pl };
+      if (E.duelPending(stx, a)) a.duel = 0;
+      stx = E.resolve(stx, a).next;
+    }
+    const d = E.decodeSave(E.encodeSave(stx));
+    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(stx)) rt = false;
+  }
+  ok(rt, '場を含む保存コードが往復で一致する（60局）');
+  let rejected = 0;
+  for (const bad of ['IR4:1:1,0,0,0,000,0,0,9', 'IR4:1:1,0,0,0,000,0,0,z']) {
+    try { E.decodeSave(bad); } catch { rejected++; }
+  }
+  ok(rejected === 2, '不正な場の番号を弾く');
+}
+
 /* --- 5g. 幕間「政変」 ------------------------------------------------------ */
 head('5g. 第8ターンの幕間');
 {

@@ -30,12 +30,18 @@ await p.screenshot({ path: shot('01-title.png') });
 /* 初回は「ガイド付き／通常どおり」の2択、2回目以降は #start が出る */
 if (await p.$('#start-normal')) await p.click('#start-normal');
 else await p.click('#start');
-await p.waitForSelector('.person');
+await p.waitForSelector('[data-place], .person');
+if (await p.$('[data-place]')) {
+  console.log('行き先:', await p.$$eval('[data-place] .nm', e => e.map(x => x.textContent)));
+  await p.screenshot({ path: shot('01b-place.png'), fullPage: true });
+  await p.click('[data-place]');
+}
+await p.waitForSelector('.person[data-id]');
 console.log('面会者:', await p.$$eval('.person .nm', els => els.map(e => e.textContent)));
 await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
 
 /* 1人目を選ぶ → 支持 → カード3枚 */
-await p.click('.person');
+await p.click('.person[data-id]');
 await p.waitForSelector('[data-stance], [data-own]');
 if (await p.$('[data-own]')) await p.click('[data-own]');
 await p.click('[data-stance="support"]');
@@ -70,8 +76,9 @@ for (let i = 0; i < 12; i++) {
     await p.click('#ilnext');
     if (await p.$('.ending')) break;
   }
-  await p.waitForSelector('.person');
-  await p.click('.person');
+  if (await p.$('[data-place]')) await p.click('[data-place]');
+  await p.waitForSelector('.person[data-id]');
+  await p.click('.person[data-id]');
   if (await p.$('[data-own]')) await p.click('[data-own]');
   await p.click('[data-stance="support"]');
   await p.waitForSelector('[data-approach]');

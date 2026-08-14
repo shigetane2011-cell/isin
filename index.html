@@ -133,6 +133,7 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person .nick{font-size:.82rem;color:var(--sumi2);margin-top:2px}
 .person .desc{font-size:.86rem;margin-top:8px;padding-left:10px;border-left:2px solid var(--line);color:var(--sumi2)}
 .person.intro{border-left:4px solid var(--kin)}
+.person.place{border-left:4px solid var(--ai)}
 .warn{color:var(--shu);font-size:.78rem;margin-top:6px}
 button{font-family:inherit;font-size:.9rem;background:var(--washi2);border:1px solid var(--sumi2);color:var(--sumi);
   padding:8px 16px;border-radius:2px;cursor:pointer;letter-spacing:.08em}
@@ -855,6 +856,37 @@ N(151,'孝明天皇の子。父の急逝により十四歳で践祚し、王政�
 
 
 
+
+/* --- 場 -------------------------------------------------------------------
+   毎ターン、まず行き先を選ぶ。場によって出てくる勢力が偏り、
+   使える働きかけが変わり、その場に合った当たり方は深く刺さる。
+   「誰と会うか」の前に「どこへ行くか」という別種の判断を挟むための仕掛け。
+   ------------------------------------------------------------------------ */
+const PLACES = [
+  { name:'祇園の茶屋', where:'京',
+    desc:'三味線の音が障子越しに漏れてくる。ここでは誰もが少し口が軽くなる。',
+    favor:[0,4], allow:[0,1,3], boost:1 },
+  { name:'江戸城中', where:'江戸',
+    desc:'畳の目まで格式が決まっている。ここで酒を酌むことも、金を積むこともできない。',
+    favor:[2,0], allow:[0], boost:0, minRank:1, unlockEra:1 },
+  { name:'長崎の商館', where:'長崎',
+    desc:'硝子窓の向こうに帆柱が並ぶ。ここでは値のつかぬ話に意味はない。',
+    favor:[1], allow:[0,2,3], boost:2 },
+  { name:'藩邸の書院', where:'京',
+    desc:'国元の訛りが飛び交っている。腹の内を見せぬ者は、ここでは相手にされない。',
+    favor:[3,2], allow:[0,3], boost:3 },
+  { name:'壬生の屯所', where:'京',
+    desc:'稽古の音と血の匂いが同居している。気の短い者ばかりだ。',
+    favor:[2,4], allow:[0,1,3], boost:3, hot:true },
+  { name:'夜の街道', where:'街道',
+    desc:'提灯ひとつの闇。名も知れぬ者と、名を捨てた者が行き交う。',
+    favor:[4,3], allow:[0,1,3], boost:1, hot:true },
+];
+const placeAllows = (pl, ap) => PLACES[pl].allow.includes(ap);
+/* その時代に行ける場だけを返す */
+const placesOpen = st => PLACES.map((p, i) => i)
+  .filter(i => (PLACES[i].unlockEra ?? 0) <= eraOf(st) && i !== st.lastPlace);
+
 /* --- 働きかけ -------------------------------------------------------------
    同じ「3枚当てる」を10ターン繰り返すと単調になる。そこで、相手への
    当たり方そのものを選べるようにした。4通りで**決定の形が違う**のが肝で、
@@ -1220,7 +1252,7 @@ const INTERLUDE_TURN = 8;
 
 function createState(seed){
   return { seed: seed >>> 0, turn: 1, currents:[0,0,0,0,0],
-           contacts:[], banned:[], lastLen:0, probesUsed:0, interlude:null,
+           contacts:[], banned:[], lastLen:0, probesUsed:0, interlude:null, lastPlace:null,
            actions:[], finished:false };
 }
 const totalOf = st => st.currents.reduce((a,b)=>a+b,0);
@@ -1238,18 +1270,31 @@ function baseId(st){
 }
 
 /* 面会リスト: 通常枠3名 ＋ 紹介枠0..1名 */
-function meetingList(st){
+/* 場の指定がある場合、3枠のうち2枠までをその場に集まる勢力へ寄せる。
+   基点IDの算出はそのままで、前方送りの条件に「場に合うか」を足すだけ。 */
+function meetingList(st, place){
   const era = eraOf(st), maxId = MAX_ID_BY_ERA[era];
+  const pl = place == null ? null : PLACES[place];
   const b = baseId(st);
   const taken = new Set(), normal = [];
-  for (const raw of [b, b + 37, b + 73]){
+  const free = id => !taken.has(id) && !st.contacts.includes(id) && !st.banned.includes(id);
+  /* 場が縛るのは3枠のうち1枠だけ。強く縛ると「毎ターン目当ての勢力を引ける」
+     ようになり、誰と会えるかの制約が消えてしまう。荒事の場はもう1枠を短気な者に充てる。 */
+  const suits = (id, slot) => {
+    if (!pl) return true;
+    if (pl.minRank != null && rankOfId(id) < pl.minRank) return false;
+    if (slot === 0) return CHAR_BY_ID.get(id).factions.some(f => pl.favor.includes(f));
+    if (slot === 1 && pl.hot) return HOTHEADS.has(id);
+    return true;
+  };
+  [b, b + 37, b + 73].forEach((raw, slot) => {
     const r = raw > ROSTER ? raw - ROSTER : raw;
     let id = rankOfId(r) > era ? (r % 30) + 1 : r;   // ランク補正（強制変換）
     let guard = 0;
-    while (guard++ < 400 && (taken.has(id) || st.contacts.includes(id) || st.banned.includes(id)))
-      id = (id % maxId) + 1;                          // 重複・既獲得・決裂は前方へ送る
+    while (guard++ < 400 && !(free(id) && suits(id, slot))) id = (id % maxId) + 1;
+    if (!free(id)) { id = r; while (!free(id)) id = (id % maxId) + 1; }  // 条件を満たす者がいなければ場を無視
     taken.add(id); normal.push(id);
-  }
+  });
   return { base: b, normal, intro: introPick(st, taken) };
 }
 
@@ -1364,7 +1409,10 @@ function resolve(st, action){
     else if (effRank === 3) gain *= 2;
   }
   /* 響く働きかけで通れば、それだけ深く刺さる（上限2の働きかけでも報われるよう獲得に乗せる） */
-  if (gain > 0 && fits) gain += 1;
+  /* 場に合った当たり方も同じだけ効くが、両方は重ねない。
+     場は「相手には響かないが、ここでならやりようがある」という代替路である。 */
+  const placeFits = action.place != null && PLACES[action.place].boost === approach;
+  if (gain > 0 && (fits || placeFits)) gain += 1;
 
   /* 探った代償: その交渉で得られる時勢が1下がる（最低1）。
      元の獲得が大きい大物ほど、相対的な代償は軽く済む。 */
@@ -1411,7 +1459,7 @@ function resolve(st, action){
 
   const next = {
     seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned,
-    lastLen: len,
+    lastLen: len, lastPlace: action.place ?? null,
     /* 立ち合いに敗れると、深追いする余裕を失う（探りを1回失う） */
     probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
       + (approach === 2 ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
@@ -1423,6 +1471,7 @@ function resolve(st, action){
   return { next, report: {
     charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
     gain, gainBeforeProbe, penalty, text, len, probed, duel, approach, fits, nCards,
+    place: action.place ?? null, placeFits,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     delta: cur.map((v, i) => v - before[i]),
@@ -1492,7 +1541,8 @@ function replay(seed, actions, interludeChoice){
 function encodeSave(st){
   return 'IR4:' + st.seed + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
-               a.probed ? 1 : 0, a.approach ?? 0].join(',') + (a.duel != null ? ',' + a.duel : ''))
+               a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
+              + (a.duel != null ? ',' + a.duel : ''))
     .join(';') + (st.interlude ? '#' + st.interlude.choice : '');
 }
 function decodeSave(code){
@@ -1511,19 +1561,21 @@ function decodeSave(code){
   const interludeChoice = hash >= 0 ? +choiceText : null;
   const body = hash >= 0 ? raw.slice(0, hash) : raw;
   const actions = !body ? [] : body.split(';').filter(Boolean).map(chunk => {
-    const [c, s2, o, f, k, h, apr, dl] = chunk.split(',');
+    const [c, s2, o, f, k, h, apr, plc, dl] = chunk.split(',');
     if (apr !== undefined && !/^[0-3]$/.test(apr)) throw new Error('働きかけの番号が不正です');
+    if (plc !== undefined && plc !== '' && !/^[0-5]$/.test(plc)) throw new Error('場の番号が不正です');
     if (dl !== undefined && !/^[0-2]$/.test(dl)) throw new Error('立ち合いの応じ方が不正です');
     return { charId:+c, stance: +s2 === 0 ? 'support' : 'convert',
              ownF:+o, argueF:+f, cards: Array.from(k).map(Number), probed: +(h || 0) === 1,
              approach: apr === undefined ? 0 : +apr,
+             place: plc === undefined || plc === '' ? null : +plc,
              duel: dl === undefined ? null : +dl };
   });
   return { seed, actions, interludeChoice };
 }
 function hashState(st){
   const s = JSON.stringify([st.seed, st.turn, st.currents, st.contacts, st.banned,
-                            st.lastLen, st.probesUsed, st.interlude, st.finished]);
+                            st.lastLen, st.probesUsed, st.interlude, st.lastPlace, st.finished]);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, '0');
@@ -1531,7 +1583,8 @@ function hashState(st){
 
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES,
-  APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
+  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -1545,7 +1598,7 @@ const app = document.getElementById('app');
 const E = ENGINE;
 let st = null;
 let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
-           picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
+           place:null, picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
            opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null };
 
@@ -1702,7 +1755,7 @@ function viewTitle(){
     const v = parseInt(document.getElementById('seed').value, 10);
     st = E.createState(Number.isFinite(v) ? v : 1868);
     ui.seedDraft = st.seed; ui.guidedTutorial = guided; markTutorialSeen();
-    ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null;
+    ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null; ui.place = null;
     ui.screen = 'meeting'; render();
   };
   const start = document.getElementById('start');
@@ -1719,7 +1772,7 @@ function viewTitle(){
       const { seed, actions, interludeChoice } = E.decodeSave(document.getElementById('code').value);
       st = E.replay(seed, actions, interludeChoice).state;
       ui.seedDraft = seed; ui.guidedTutorial = false; markTutorialSeen();
-      ui.interludePicked = null; ui.interludeData = null;
+      ui.interludePicked = null; ui.interludeData = null; ui.place = null;
       ui.screen = st.finished ? 'ending' : 'meeting'; render();
     } catch (e){ document.getElementById('err').textContent = '読み込めません: ' + e.message; }
   };
@@ -1729,7 +1782,8 @@ function viewTitle(){
 function viewMeeting(){
   if (st.finished && ui.interludePicked === null) { ui.screen = 'ending'; return viewEnding(); }
   if (E.pendingInterlude(st) || ui.interludePicked !== null) return viewInterlude();
-  const m = E.meetingList(st);
+  if (ui.place === null) return viewPlace();
+  const m = E.meetingList(st, ui.place);
   const era = E.eraOf(st);
   const card = (id, isIntro) => {
     const c = E.CHAR_BY_ID.get(id), rk = E.rankOfId(id);
@@ -1753,16 +1807,52 @@ function viewMeeting(){
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
+      <div class="row"><button id="replace">行き先を選び直す</button></div>
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
         そこから3名が選ばれています。時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
       </details>
     </div>` + saveBoxHTML();
+  const rp = document.getElementById('replace');
+  if (rp) rp.onclick = () => { ui.place = null; render(); };
   app.querySelectorAll('.person').forEach(el => el.onclick = () => {
+    if (el.dataset.id === undefined) return;
     ui.charId = +el.dataset.id; ui.intro = el.classList.contains('intro');
     ui.stance = null; ui.ownF = null; ui.argueF = null;
     ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null; ui.chatted = [];
     ui.screen = 'stance'; render();
+  });
+}
+
+/* --- 画面: 行き先 --------------------------------------------------------- */
+function viewPlace(){
+  const open = E.placesOpen(st);
+    const locked = E.PLACES.map((p, i) => i).filter(i => !open.includes(i));
+  const card = i => {
+    const p = E.PLACES[i];
+    return `<div class="person place" data-place="${i}" role="button" tabindex="0">
+      <div><span class="nm">${esc(p.name)}</span><span class="tag">${esc(p.where)}</span>
+        ${p.favor.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('')}
+        ${p.hot ? '<span class="tag" style="color:var(--shu)">荒事</span>' : ''}</div>
+      <div class="desc">${esc(p.desc)}</div>
+      <div class="small" style="margin-top:6px">
+        使える働きかけ：${p.allow.map(a => E.APPROACHES[a].name).join('・')}
+        ／ この場で深く刺さるのは <b>${esc(E.APPROACHES[p.boost].name)}</b></div>
+    </div>`;
+  };
+  app.innerHTML = headerHTML() + chartHTML() +
+    `<div class="panel"><h2>どこへ行きますか</h2>
+      <div class="small" style="margin-bottom:8px">場によって集まる者が変わり、できる働きかけも変わります。</div>
+      ${open.map(card).join('')}
+      ${locked.map(i => `<div class="person" style="opacity:.4">
+        <div><span class="nm">${esc(E.PLACES[i].name)}</span><span class="tag">${esc(E.PLACES[i].where)}</span></div>
+        <div class="small">${i === st.lastPlace
+          ? '昨日も通った。続けて顔を出せば噂になる'
+          : `まだ登れる身分ではない（${E.ERAS[E.PLACES[i].unlockEra]}から）`}</div></div>`).join('')}
+    </div>` + saveBoxHTML();
+  app.querySelectorAll('[data-place]').forEach(el => el.onclick = () => { ui.place = +el.dataset.place; render(); });
+  app.querySelectorAll('[role="button"]').forEach(el => el.onkeydown = e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
   });
 }
 
@@ -1828,14 +1918,18 @@ function viewStance(){
       const left = E.PROBE_LIMIT - st.probesUsed;
       body = `<p>どう働きかけますか？</p>
         <div class="row" style="display:block">${E.APPROACHES.map((a, i) => {
+          const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
           const noConvert = ui.stance === 'convert' && !E.canConvert(i);
           const noProbe = i === 2 && left <= 0;
-          const off = noConvert || noProbe;
-          const why = noConvert ? '（転向は論じるか肚を割るでしか通らない）'
+          const off = noPlace || noConvert || noProbe;
+          const why = noPlace ? `（${esc(E.PLACES[ui.place].name)}ではできない）`
+                    : noConvert ? '（転向は論じるか肚を割るでしか通らない）'
                     : noProbe ? '（探りを使い切っている）' : '';
           return `<button class="choice" data-approach="${i}" ${off ? 'disabled' : ''}>
             <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small">カード${a.cards}枚</span>`}
-            <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${esc(why)}</span></button>`;
+            ${ui.place !== null && E.PLACES[ui.place].boost === i && !off
+              ? '<span class="small" style="color:var(--yuhan)">　◎ この場に合う</span>' : ''}
+            <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`;
         }).join('')}</div>
         <div class="small" style="margin-top:8px;opacity:.7">相手に響く当たり方は、その者が何を望んでいるかで決まります。</div>`;
     }
@@ -1963,7 +2057,8 @@ function viewCards(){
   document.getElementById('back').onclick = () => { ui.approach = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
     const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
-                cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed, approach: ui.approach };
+                cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed,
+                approach: ui.approach, place: ui.place };
     if (E.duelPending(st, a)){ ui.duelAction = a; ui.screen = 'duel'; render(); return; }
     const r = E.resolve(st, a);
     st = r.next; ui.report = r.report; ui.screen = 'result'; render();
@@ -2008,7 +2103,8 @@ function viewResult(){
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
       <div class="quote">「${esc(r.text)}」</div>
       ${marks}
-      <div class="small" style="margin-top:4px">働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
+      <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
+        r.placeFits ? '　<span style="color:var(--yuhan)">◎ 場に合った（獲得+1）</span>' : ''}${
         r.fits ? '　<span style="color:var(--yuhan)">◎ この者に響いた（獲得+1）</span>'
                : r.approach >= 2 ? '　<span style="color:var(--shu)">読み違え（一段下がった）</span>' : ''}</div>
       ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
