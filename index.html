@@ -75,6 +75,11 @@ h1 .sub{display:block;font-size:.72rem;letter-spacing:.3em;color:var(--sumi2);ma
 .panel.tone-panel .quote{border-left-color:rgb(var(--tone-a,59,52,44));
   background:linear-gradient(90deg,rgba(var(--tone-a,59,52,44),.09),rgba(var(--tone-b,59,52,44),.035) 72%,transparent);
   padding:7px 10px}
+.panel.tone-panel button.primary{color:#fff;border-color:rgb(var(--tone-a,59,52,44));
+  background:linear-gradient(rgba(27,24,21,.16),rgba(27,24,21,.16)),rgb(var(--tone-a,59,52,44));
+  box-shadow:inset 0 1px 0 rgba(255,253,247,.2)}
+.panel.tone-panel button.primary:hover:not(:disabled){
+  background:linear-gradient(rgba(27,24,21,.3),rgba(27,24,21,.3)),rgb(var(--tone-a,59,52,44))}
 pre.chart{font-family:"SFMono-Regular",Consolas,"Noto Sans Mono CJK JP",monospace;
   font-size:.82rem;line-height:1.55;margin:0;white-space:pre;overflow-x:auto;color:var(--sumi)}
 pre.chart .u{color:var(--shu);font-weight:700}
