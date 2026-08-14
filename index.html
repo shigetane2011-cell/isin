@@ -142,6 +142,9 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .legend .small{margin-top:7px;opacity:.75}
 .opening.sit{color:var(--sumi2);font-size:.95rem;margin:-6px 0 10px}
 .pre{font-size:.86rem;color:var(--sumi2);margin:6px 0 2px;letter-spacing:.02em}
+/* 人物の絵。勢力の情景は横長の帯だが、本人の絵は縦長で中央に置く */
+.story-visual.portrait-visual .visual-images{max-width:340px;margin:0 auto}
+.story-visual.portrait-visual img{aspect-ratio:3/4;object-fit:cover}
 .card .mv{color:var(--sumi2);font-weight:600;margin-right:2px}
 .card.sel .mv,.card.ans .mv{color:inherit}
 .person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
@@ -1988,6 +1991,15 @@ function fateOf(charId, winners, n){
    すでに対話や探りで型を掴んでいれば切り抜けられる ―― 既存の読みがそのまま効く。
    分岐が増えないのはこのため。文章も3通り×勝敗の6つで、人物ごとには持たない。
    ------------------------------------------------------------------------ */
+/* --- 人物の絵 -------------------------------------------------------------
+   assets/people/<id>.webp を置き、ここにIDを足すと、その人物の面会画面が
+   勢力の情景から本人の絵に差し替わる。無ければ従来どおり勢力の情景を出す。
+   実体のないIDを載せると404になるので、名簿と実ファイルの一致は verify で検査する。
+   （面会で会う割合は 伝説15% / 上級以上45% / 中級以上77% なので、
+     16枚・61枚と段階的に足していける） */
+const PORTRAITS = new Set([]);
+const portraitOf = id => PORTRAITS.has(id) ? `assets/people/${id}.webp` : null;
+
 const HOTHEADS = new Set([13,14,21,28,29,47,48,49,51,63,65,67,68,70,79,80,82,87,88,89,90,113,131,133,135]);
 const DUELS = [
   { label:'抜き合わせる', win:'刃を交えたのは三合だった。相手が先に引いた。「……できるな」と、低く笑う。',
@@ -2554,7 +2566,7 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, VOICES, VOICE_IDS, voiceOf, replyOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
-  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -2628,6 +2640,10 @@ function storyVisualHTML(srcs, factions, alt, extraClass, eager){
 }
 function meetingVisualHTML(c){
   const fs = ui.ownF === null ? c.factions.slice() : [ui.ownF];
+  /* 本人の絵があればそれを出す。無い人物は勢力の情景で代える。 */
+  const portrait = E.portraitOf(c.id);
+  if (portrait)
+    return storyVisualHTML([portrait], fs, `${c.name} — ${c.nick}`, 'portrait-visual', false);
   const srcs = fs.map(f => `assets/factions/${fac(f).key}.webp`);
   return storyVisualHTML(srcs, fs, `${c.name}が属する${fs.map(f => fac(f).full).join('と')}の情景`, 'faction-visual', false);
 }

@@ -425,6 +425,22 @@ head('5e2. 同梱画像が、エンジンの出しうる名前と一致してい
   const files = new Set(want.filter(f => f.startsWith('assets/endings/')));
   ok(files.size === 16, `エンディング画像が16通りぶんある（実測 ${files.size}枚）`);
 
+  /* 人物の絵。名簿と実ファイルが食い違えば404になるので、ここで固定する */
+  {
+    const dir = at('assets/people');
+    const files = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')) : [];
+    const onDisk = new Set(files.map(f => +f.replace('.webp', '')));
+    const listed = E.PORTRAITS;
+    const ghost = [...listed].filter(id => !onDisk.has(id));
+    const orphan = [...onDisk].filter(id => !listed.has(id));
+    ok(ghost.length === 0, `名簿にあって実体のない人物絵がない${ghost.length ? '（' + ghost.join(' ') + '）' : ''}`);
+    ok(orphan.length === 0, `置いてあるのに名簿にない人物絵がない${orphan.length ? '（' + orphan.join(' ') + '）' : ''}`);
+    ok([...listed].every(id => E.CHAR_BY_ID.has(id)), '人物絵の名簿が実在する人物IDだけを指している');
+    ok([...listed].every(id => E.portraitOf(id) === `assets/people/${id}.webp`), '人物絵のパスが規則どおり');
+    ok(E.portraitOf(-1) === null, '絵のない人物には null が返り、勢力の情景で代わる');
+    console.log(`     （人物絵 ${listed.size}/151枚。面会で絵が出る割合の目安: 伝説16枚=15% / 上級以上61枚=45% / 中級以上121枚=77%）`);
+  }
+
   /* 公開URLを指すメタタグが、同梱してある画像を指している */
   ok(html.includes('og:image') && html.includes('assets/hero-bakumatsu.webp'),
      'OGP画像が同梱のヒーロー画像を指している');
