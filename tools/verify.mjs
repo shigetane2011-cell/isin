@@ -158,7 +158,10 @@ function probe(seed, charId, stance, argueF, score) {
 }
 ok(probe(1, 1, 'support', 0, 3).gain === 4, '初級・大成功 → +4');
 ok(probe(1, 1, 'support', 0, 2).gain === 2, '初級・成功 → +2');
-ok(probe(1, 1, 'support', 0, 1).gain === 0, '初級・失敗 → 変動なし');
+ok(probe(1, 1, 'support', 0, 1).gain === 1 && probe(1, 1, 'support', 0, 1).partial,
+   '初級・1枚一致 → 手応え +1（常にちょうど1）');
+ok(!probe(1, 1, 'support', 0, 1).contactAdded, '手応えでは人脈に加わらない');
+ok(probe(1, 1, 'convert', 0, 1).gain === 0, '転向に手応えはない（全か無か）');
 ok(probe(1, 1, 'support', 0, 0).gain === 0 && probe(1, 1, 'support', 0, 0).bannedNow, '初級・決裂 → 出現停止');
 const pre = probe(1, 145, 'support', 1, 3);
 ok(pre.premature && pre.gain === 4, '初級期に伝説級 → 時期尚早でボーナス無効（+4のまま）');
@@ -183,10 +186,18 @@ function atEra(total, charId, score, stance = 'support', argueF = null) {
 ok(atEra(12, 47, 3).gain === 5, '中級期に中級級・大成功 → +5（+1補正）');
 ok(atEra(12, 47, 2).gain === 3, '中級期に中級級・成功 → +3（+1補正）');
 ok(atEra(26, 91, 3).gain === 6, '上級期に上級級・大成功 → +6（+2補正）');
-ok(atEra(26, 91, 1).penalty === 1, '上級期に上級級・失敗 → 時勢-1');
+ok(atEra(26, 91, 1).penalty === 1, '上級期に上級級・1枚どまり → 代償は変わらず 時勢-1');
 ok(atEra(40, 137, 3).gain === 8, '伝説期に伝説級・大成功 → +8（2倍）※働きかけが響かない人物で測る');
 ok(atEra(40, 136, 3).gain === 9, '響く働きかけなら、そこからさらに +1 される');
-ok(atEra(40, 137, 1).penalty === 3, '伝説期に伝説級・失敗 → 時勢-3');
+ok(atEra(40, 137, 1).penalty === 3, '伝説期に伝説級・1枚どまり → 代償は変わらず 時勢-3');
+{
+  /* 手応えを入れても、大物への当てずっぽうが得になってはいけない */
+  const r = atEra(40, 137, 1);
+  ok(r.gain === 1 && r.penalty === 3 && r.delta.reduce((a,b)=>a+b,0) < 0,
+     '伝説級に1枚だけ刺しても、差し引きでは損のまま（賭ける抑止が消えていない）');
+  ok(atEra(40, 137, 1).gain === atEra(12, 47, 1).gain,
+     '手応えはランクによらず常に1（大物ほど得になったりしない）');
+}
 ok(atEra(12, 137, 1).penalty === 0, '時期尚早なら失敗ペナルティも無効');
 ok(atEra(26, 103, 3).waryBy === 0 && atEra(26, 103, 3).gain === 4,
    '公武26を掲げていると雄藩の西郷は警戒し、上級の+2補正を受け取れない');
@@ -213,8 +224,10 @@ ok(E.OPPOSED.every((foes, f) => !foes.includes(f)), '自分自身を対立相手
   };
   ok(run(below, yuhan, 3).verdict === '大成功', '警戒されていなければ3枚一致は大成功');
   ok(run(at, yuhan, 3).verdict === '成功',     '警戒されると3枚一致でも成功どまり');
-  ok(run(at, yuhan, 2).verdict === '失敗',     '警戒されると2枚一致は失敗に落ちる');
-  ok(run(at, yuhan, 1).verdict === '失敗',     '警戒されても失敗より下（決裂）には落ちない');
+  ok(run(at, yuhan, 2).verdict === '手応え',   '警戒されると2枚一致は手応えどまりに落ちる');
+  ok(run(at, yuhan, 2).gain === 1,             'そのとき動く時勢は1だけ');
+  ok(run(at, yuhan, 1).verdict === '手応え' && run(at, yuhan, 1).verdict !== '決裂',
+     '警戒されても決裂までは落ちない（1枚一致は手応えのまま）');
   ok(run(at, yuhan, 0).verdict === '決裂',     '0枚一致は警戒の有無にかかわらず決裂');
 }
 
@@ -612,8 +625,9 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
     const two = Object.assign({}, act, { cards: [target.correct[0], target.correct[1], (target.correct[2]+1)%6] });
     ok(E.scoreOf(clean, two) === 2 && E.resolve(clean, two).report.gain > 0,
        '通常なら2枚一致でも通る');
-    ok(E.scoreOf(bad, two) === 1 && E.resolve(bad, two).report.gain === 0,
-       '再訪は3枚すべて刺さらねば通らない（一段重いぶん、2枚では届かない）');
+    ok(E.scoreOf(bad, two) === 1 && E.resolve(bad, two).report.partial,
+       '再訪は3枚すべて刺さらねば和解に届かない（2枚では手応えどまり）');
+    ok(!E.resolve(bad, two).report.reconciled, '手応えでは出現停止は解けない');
   }
   ok(rHit.next.banned.includes(10), 'ほかの決裂者はそのまま残る');
   ok(E.revisitOf(rHit.next, hot[0]) === 10, '和解すると、次の決裂者が待つようになる');
@@ -659,7 +673,7 @@ head('5f3e. 転向は一段でも下がれば通らない（表示が事実と�
   const wary = Object.assign({}, st0, { currents: cur });
   const r4 = E.resolve(wary, mk(nofit, 'support', 3)).report;
   ok(E.waryOf(cur, nofit.id) >= 0, '警戒が成立している');
-  ok(r4.score < 2 && r4.gain === 0, '読み違えと警戒が重なれば、支持でも通らない');
+  ok(r4.score < 2 && !r4.contactAdded, '読み違えと警戒が重なれば、支持でも人脈には届かない');
 }
 
 /* --- 5f4. 場 --------------------------------------------------------------- */

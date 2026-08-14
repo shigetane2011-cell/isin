@@ -140,6 +140,8 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .legend>div{margin-top:4px}
 .legend .hit{color:var(--kin);font-weight:600}
 .legend .small{margin-top:7px;opacity:.75}
+.card .mv{color:var(--sumi2);font-weight:600;margin-right:2px}
+.card.sel .mv,.card.ans .mv{color:inherit}
 .person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
 .person.place::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
   background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
@@ -200,6 +202,7 @@ button.primary .small{color:inherit;opacity:.82}
   background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.16),rgba(var(--tone-b,59,52,44),.07) 52%,var(--washi2) 82%);
   box-shadow:inset 5px 0 0 rgba(var(--tone-a,59,52,44),.2),0 2px 7px rgba(27,24,21,.09)}
 .result.failed{background:linear-gradient(105deg,rgba(27,24,21,.16),var(--washi2) 62%);border-color:var(--sumi2)}
+.result.partial{background:linear-gradient(105deg,rgba(27,24,21,.09),var(--washi2) 70%);border-color:var(--line)}
 .result .verdict{display:inline-block;font-size:1.2rem;letter-spacing:.2em;font-weight:600;padding:2px 10px;
   background:rgba(var(--tone-a,59,52,44),.1);border-bottom:2px solid rgba(var(--tone-a,59,52,44),.5)}
 .v3{color:var(--kin)}.v2{color:var(--ai)}.v1{color:var(--sumi2)}.v0{color:#000;background:var(--sumi);color:var(--washi);padding:2px 10px}
@@ -330,7 +333,7 @@ const CARDS = [
   '禁裏御料の差配に、貴殿の手が入る道がございます',
   '宮中に列なれば、いかなる嵐も御簾の内までは届きますまい',
   '万世一系の御稜威を仰ぐ。それ以上の大義がありましょうか',
-  '朝命という、いかなる兵より強き力を貴殿の手に',
+  '朝命さえ下れば、諸藩の兵はそのまま貴殿の指揮下に入りまする',
   '有職故実に通じた者こそ、次の世の礎となりましょう'],
  ['御家の血筋が背負うてきたもの、軽々に捨てられぬのは承知しております',
   '上つ方への御奉公を欠かせぬ御立場、重々わかっております',
@@ -359,7 +362,7 @@ const CARDS = [
   '身分低き者ほど、異国では才のみで測られまする'],
  ['富国が目的なれば、鎖して痩せてゆく道は手段が矛盾しております',
   'まず交易で力を蓄え、然る後に対等を迫るが順序にござる',
-  '彼我の軍艦の数を並べれば、答えは既に出ておりましょう',
+  '彼我の艦の数を並べれば、釣り合いはあちらにござる。まず均衡を取り戻すが先',
   '条約を破れば、我らのほうが不義の側に立たされまする',
   '攘夷が正しくとも、勝てぬ戦は損にございます',
   '世界が動いておりまする。開くも閉ざすも、もはや選べませぬ']],
@@ -381,12 +384,12 @@ const CARDS = [
   '今幕府が倒れれば、力の均衡が崩れて内乱となりましょう',
   '征夷大将軍の職は勅許によるもの。名分は幕府にござる',
   '誰が治めようと、年貢が入り市が立てばよいのでございます',
-  '三百年の重みは、一夜の激情では覆りませぬ']],
+  '一夜の激情で覆るものではございませぬ。時勢は三百年の側にござる']],
 [ /* 雄藩 */
  ['藩の名を天下に轟かす、またとない好機にございます',
   '専売の利をもってすれば、藩庫は数年で満ちましょう',
   '大藩が連なれば、どの家も単独では潰されませぬ',
-  '有能なる者が国を動かす。それが筋にございましょう',
+  '生まれではなく志で人を択ぶ国を作る。これに勝る大義がございましょうか',
   '薩長の兵と洋式銃は、既に幕軍を凌いでおります',
   '藩校に集うた俊英こそが、次の世を回しまする'],
  ['御家の家格が枷になっておるのは、拙者とて同じにござる',
@@ -403,11 +406,11 @@ const CARDS = [
   '雄藩の台頭はもう止まりませぬ。乗るか、退くかのみ']],
 [ /* 抗戦 */
  ['一命を賭した者の名は、志士の間で不滅となりましょう',
-  '豪商から軍資を引き出す道なら、いくらでもございます',
+  '志に金を出した商人が、次の世で真っ先に潤いまする',
   '先んじて斬らねば、次に斬られるのは我らにございます',
   '大義のために死ぬ。それ以上の生き方がありますか',
   '刃は今すぐ振るえまする。艦の来るのを待つ必要はない',
-  '松下村塾の学は、行うためにこそございました'],
+  '兵書も蘭学も、いま国を動かすために読まれております。貴殿の学こそ要る'],
  ['御家を捨てる覚悟、拙者にも覚えがございます',
   '主命と己の信、その板挟みは苦しゅうございましょう',
   '打ちこわしの声をお聞きになりましたか。民はもう限界です',
@@ -416,7 +419,7 @@ const CARDS = [
   '身分低き我らにこそ、失うものはございませぬ'],
  ['夷を討つが目的なら、夷と結ぶ手は目的そのものを裏切ります',
   '今は雌伏し、機を待って一挙に、と申されるのですな',
-  '恐怖こそが力にございます。相手が退けば我らの勝ち',
+  '一藩の兵では敵いませぬ。されど同時に立てば、幕軍とて手が回りませぬ',
   '勅諚に攘夷とござる。従わぬ幕府こそ賊にございます',
   '議論は要りませぬ。斬れば事は動きまする',
   'もはや血を見ずには収まりませぬ。時勢がそう申しております']],
@@ -1576,8 +1579,14 @@ function resolve(st, action){
 
   /* 転向は「攻撃」。3枚すべて刺さらねば通らない全か無かの賭け。 */
   const allOrNothing = action.stance === 'convert';
-  let gain = score === 3 ? 4 : (score === 2 && !allOrNothing) ? 2 : 0;
-  if (gain > 0){
+  /* 手応え: 1枚しか刺さらなくても、支持なら時勢が1だけ動く。
+     1枠しか読めない打ち手は4割強のターンが完全な空振りになり、
+     「1枠=29% / 2枠=93%」という崖ができていた。その中間を埋めるための段。
+     ただし常にちょうど1で、ランク加算も響いた加算も乗らない。
+     人脈にも加わらず、約束も残らない ―― 上の天井は動かさない。 */
+  const partial = score === 1 && !allOrNothing;
+  let gain = score === 3 ? 4 : (score === 2 && !allOrNothing) ? 2 : partial ? 1 : 0;
+  if (gain > 0 && !partial){
     if (effRank === 1) gain += 1;
     else if (effRank === 2) gain += 2;
     else if (effRank === 3) gain *= 2;
@@ -1586,9 +1595,9 @@ function resolve(st, action){
   /* 場に合った当たり方も同じだけ効くが、両方は重ねない。
      場は「相手には響かないが、ここでならやりようがある」という代替路である。 */
   const placeFits = action.place != null && PLACES[action.place].boost === approach;
-  if (gain > 0 && (fits || placeFits)) gain += 1;
+  if (gain > 0 && !partial && (fits || placeFits)) gain += 1;
   /* 一度決裂した相手を説き伏せたなら、その一手の意味は倍になる */
-  if (gain > 0 && sb.revisit) gain *= 2;
+  if (gain > 0 && !partial && sb.revisit) gain *= 2;
 
   /* 探った代償: その交渉で得られる時勢が1下がる（最低1）。
      元の獲得が大きい大物ほど、相対的な代償は軽く済む。 */
@@ -1596,7 +1605,9 @@ function resolve(st, action){
   if (gain > 0 && probed) gain = Math.max(1, gain - 1);
   const succeeded = gain > 0;
   let penalty = 0;
-  if (!succeeded && !premature){
+  /* 手応えどまりは「動かせなかった」ことに変わりないので、大物の代償は別に払う。
+     ここを免除すると、伝説級への当てずっぽうが -3 から +1 に変わってしまう。 */
+  if ((!succeeded || partial) && !premature){
     if (effRank === 2) penalty = 1;
     else if (effRank === 3) penalty = 3;
   }
@@ -1612,10 +1623,12 @@ function resolve(st, action){
   if (approach === 3 && score === 0) cur[action.argueF] -= 2;
   for (let i = 0; i < 5; i++) cur[i] = clamp(cur[i], 0, CAP);
 
+  /* 手応えどまりでは人脈にも加わらないし、和解もしない */
+  const won = succeeded && !partial;
   const contacts = st.contacts.slice(), banned = st.banned.slice();
-  if (succeeded && !contacts.includes(action.charId)) contacts.push(action.charId);
+  if (won && !contacts.includes(action.charId)) contacts.push(action.charId);
   /* 和解。向こうから来た相手を説き伏せれば、出現停止は解ける */
-  const reconciled = succeeded && sb.revisit;
+  const reconciled = won && sb.revisit;
   if (reconciled){ const bi = banned.indexOf(action.charId); if (bi >= 0) banned.splice(bi, 1); }
   if (score === 0 && !banned.includes(action.charId)) banned.push(action.charId);
 
@@ -1640,7 +1653,7 @@ function resolve(st, action){
      腹を割って本心を明かした相手にだけ残るので、論じるだけで通した相手には残らない。
      終局でその旗が採られていなければ、約束を違えたことになる。 */
   const promises = (st.promises || []).slice();
-  const promised = approach === 3 && succeeded && !banned.includes(action.charId)
+  const promised = approach === 3 && won && !banned.includes(action.charId)
                    && !promises.some(pm => pm.id === action.charId);
   if (promised) promises.push({ id: action.charId, f: action.argueF });
 
@@ -1665,7 +1678,9 @@ function resolve(st, action){
     waryApplied: sb.waryApplied, grudgeApplied: sb.grudgeApplied,
     revisit: sb.revisit, revisitApplied: sb.revisitApplied, reconciled, misfit: sb.misfit,
     delta: cur.map((v, i) => v - before[i]),
-    verdict: succeeded ? (score === 3 ? '大成功' : '成功') : ['決裂','失敗','失敗','失敗'][score],
+    partial,
+    verdict: partial ? '手応え' : succeeded ? (score === 3 ? '大成功' : '成功')
+                                            : ['決裂','失敗','失敗','失敗'][score],
     /* 立ち合いで覆ることがあるので、表示は実際の状態変化から決める */
     promised, promisedF: promised ? action.argueF : -1,
     contactAdded: contacts.includes(action.charId) && !st.contacts.includes(action.charId),
@@ -2162,7 +2177,7 @@ function viewStance(){
         </div>
         ${E.HOTHEADS.has(ui.charId) ? '<div class="warn">この者は気が短い。<b>転向を仕掛ければ必ず刃が出る</b>。支持でも、通らなければ怒らせる。</div>' : ''}
         <div class="small" style="margin-top:10px">
-          <b>支持</b>は2枚一致でも通る。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
+          <b>支持</b>は2枚一致でも通る（1枚でも時勢が1だけ動く「手応え」になる）。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
           <b>転向</b>は攻撃。<b>満点でしか通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
           一段でも下がれば通らないので、警戒や読み違えがあると札が刺さっても届かない。
         </div>`;
@@ -2316,12 +2331,14 @@ function viewCards(){
       </div>
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
+        ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.75">〔　〕はその札が訴えかける先です。この人物が何を欲しているかを当ててください。</div>' : ''}
         ${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
           const isAns = (ui.probed || guided) && isCorrect;
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
           return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${guided && !isCorrect ? '-1' : '0'}" aria-disabled="${guided && !isCorrect}" aria-pressed="${ui.picks[i]===o.motive}">${
-            isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}〔${esc(E.CATS[i].motives[o.motive])}〕</span> ` : ''}${esc(o.text)}${
+            isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}</span> ` : ''
+          }<span class="mv">〔${esc(E.CATS[i].motives[o.motive])}〕</span>${esc(o.text)}${
             guided && isCorrect ? tutorialReasonHTML(c, i) : ''}</div>`;
         }).join('')}
       `).join('')}
@@ -2381,7 +2398,7 @@ function viewResult(){
   const d = r.delta.map((v,i) => v ? `<span class="${fac(i).cls}">[${fac(i).name}] ${v>0?'+':''}${v}</span>` : null)
     .filter(Boolean).join('　') || '変動なし';
   app.innerHTML = headerHTML() +
-    `<div class="result ${r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
+    `<div class="result ${r.partial ? 'partial' : r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
       ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「探る」を使うか、賭けてください。') : ''}
       ${factionLegendHTML([r.argueF])}
@@ -2425,6 +2442,9 @@ function viewResult(){
       ${r.premature ? `<div class="warn">※ 時期尚早のため、${E.RANKS[r.rank]}級ですが影響力は限定的です（ランク補正を無効化）</div>` : ''}
       ${r.penalty ? `<div class="warn">※ ${E.RANKS[r.rank]}級との交渉に失敗し時勢 -${r.penalty}</div>` : ''}
       <div class="delta">${d}</div>
+      ${r.partial ? `<div class="warn" style="color:var(--sumi2)">※ 刺さったのは1枚だけ。相手は動きませんでしたが、
+        言葉は残りました（〔${fac(r.argueF).name}〕+1）。<b>人脈には加わりません</b>${
+        r.penalty ? `。${E.RANKS[r.rank]}級を動かせなかった代償は、そのまま払います` : ''}</div>` : ''}
       ${r.contactAdded ? `<div class="small">→ ${esc(c.name)}が【人脈】に加わった。</div>` : ''}
       ${r.promised ? `<div class="vowline">→ 肚を割って〔${fac(r.promisedF).name}〕の旗を明かした。
         <b>${esc(c.name)}との約束が残る。</b>この旗が最後に採られていなければ、約束を違えたことになる。</div>` : ''}
