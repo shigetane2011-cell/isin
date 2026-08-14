@@ -134,6 +134,12 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .person .desc{font-size:.86rem;margin-top:8px;padding-left:10px;border-left:2px solid var(--line);color:var(--sumi2)}
 .person.intro{border-left:4px solid var(--kin)}
 .person.revisit{border-left:4px solid var(--shu)}
+/* 働きかけの早見表。人物ごとの情報ではなく、規則そのものを読めるようにする */
+.legend{margin:8px 0 4px;padding:9px 12px;background:var(--washi);border:1px solid var(--line);
+  border-radius:2px;font-size:.84rem}
+.legend>div{margin-top:4px}
+.legend .hit{color:var(--kin);font-weight:600}
+.legend .small{margin-top:7px;opacity:.75}
 .person.place{border-left:4px solid var(--sumi2);position:relative;overflow:hidden}
 .person.place::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
   background:linear-gradient(180deg,var(--pf-a,var(--sumi2)),var(--pf-b,var(--sumi2)))}
@@ -1968,6 +1974,19 @@ function viewTitle(){
   };
 }
 
+/* どの働きかけが誰に響くのかの早見表。人物ごとの情報ではなく規則そのものを、
+   選ぶその場で読めるようにする。APPROACH_BY_MOTIVE から作るので規則と食い違わない。 */
+function approachLegendHTML(mark){
+  const by = E.APPROACHES.map(() => []);
+  E.APPROACH_BY_MOTIVE.forEach((ap, m) => by[ap].push(E.CATS[0].motives[m]));
+  return `<div class="legend"><b>響く当たり方は、相手が「何を欲しているか」で決まります</b>
+    ${E.APPROACHES.map((a, i) => `<div class="${mark === i ? 'hit' : ''}">${
+      mark === i ? '◎ ' : '・'}<b>${esc(a.name)}</b> ─ ${
+      by[i].map(esc).join('／')} を欲する者に響く</div>`).join('')}
+    <div class="small">欲しているものは、面会中に<b>一つだけ問える</b>ほか、
+      【情勢】の描写からも読めます。「探る」でも分かります。</div></div>`;
+}
+
 /* 縁の表示。面会の札でも、相手と向き合う画面でも同じものを出す。
    said を渡すと、同じ画面で言い回しが重なったときに台詞を省いて短い形にする。 */
 function tieHTML(id, wb, said){
@@ -2153,7 +2172,18 @@ function viewStance(){
           `<button data-argue="${f}">${fac(f).name}（${fac(f).full}）</button>`).join('')}</div>`;
     } else {
       const left = E.PROBE_LIMIT - st.probesUsed;
+      /* 欲しているものを聞き出していれば、そこから読める働きかけに印を付ける。
+         印は「聞き出した内容から筋どおりに読むとこれ」であって、正解の開示ではない。
+         そう見えて違う者が29名いる（その手掛かりは【情勢】の描写にある）。 */
+      const knownMotive = (ui.asked === 0 || guidedTurn()) ? c.correct[0] : null;
+      const impliedAp = knownMotive === null ? -1 : E.APPROACH_BY_MOTIVE[knownMotive];
       body = `<p>どう働きかけますか？</p>
+        ${approachLegendHTML(impliedAp)}
+        ${knownMotive !== null ? `<div class="small" style="margin:8px 0">
+          聞き出したところ、この人物が欲しているのは <span class="uibadge">〔${
+          esc(E.CATS[0].motives[knownMotive])}〕</span>。
+          筋どおりなら <b>${esc(E.APPROACHES[impliedAp].name)}</b> が響きます
+          <span style="opacity:.7">（そう見えて違う者もいます）</span></div>` : ''}
         <div class="row" style="display:block">${E.APPROACHES.map((a, i) => {
           const noGuide = guidedTurn() && i !== 0;
           const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
@@ -2172,14 +2202,16 @@ function viewStance(){
               ? '<span class="small" style="color:var(--shu)">　※ 読み違えれば、札が刺さっても転向は通らない</span>' : ''}
             <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`;
         }).join('')}</div>
-        <div class="small" style="margin-top:8px;opacity:.7">相手に響く当たり方は、その者が何を望んでいるかで決まります。</div>`;
+        <div class="small" style="margin-top:8px;opacity:.7">響けば獲得が1増えます。金品と肚を割るは<b>相手を読み切った前提の賭け</b>なので、外すと逆に一段下がります。</div>`;
     }
   }
   const wb0 = E.waryOf(st.currents, ui.charId);
   const said = [];
   if (ui.asked !== null)
     said.push(`<div class="say"><span class="q">「${esc(E.QUESTIONS[ui.asked].chip)}か」</span><br>${
-      esc(E.REPLIES[ui.asked][c.correct[ui.asked]])}</div>`);
+      esc(E.REPLIES[ui.asked][c.correct[ui.asked]])}
+      <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[ui.asked].name)}</b>は
+      <span class="uibadge">〔${esc(E.CATS[ui.asked].motives[c.correct[ui.asked]])}〕</span></div></div>`);
   for (const k of ui.chatted)
     said.push(k === 'impression'
       ? `<div class="say"><span class="q">「拙者をどう見ておられる」</span><br>${
@@ -2258,13 +2290,16 @@ function viewCards(){
   app.innerHTML = headerHTML() +
     `<div class="panel tone-panel" style="${toneStyle([ui.argueF])}"><h2>${esc(c.name)}を${ui.stance === 'support' ? '支持する' : `${fac(ui.argueF).name}へ転向させる`}</h2>
       <div class="quote">${esc(c.desc)}</div>
-      <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは相手の型</b>で決まります。</div>
+      <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは、相手が何を欲しているか</b>で決まります。</div>
       ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
       ${ui.asked !== null ? `<div class="say"><span class="q">「${esc(E.QUESTIONS[ui.asked].chip)}か」</span><br>${
-        esc(E.REPLIES[ui.asked][c.correct[ui.asked]])}</div>` : ''}
+        esc(E.REPLIES[ui.asked][c.correct[ui.asked]])}
+        <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[ui.asked].name)}</b>は
+        <span class="uibadge">〔${esc(E.CATS[ui.asked].motives[c.correct[ui.asked]])}〕</span></div></div>` : ''}
       ${ui.stance === 'convert' ? `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
         ui.approach >= 2 ? `<br>さらに<b>${esc(E.APPROACHES[ui.approach].name)}は相手を読み切った前提の賭け</b>です。
-        型を読み違えていれば一段下がり、置いた札が刺さっていても転向には届きません。` : ''}${
+        <b>この人物が欲しているもの</b>を読み違えていれば一段下がり、
+        置いた札が刺さっていても転向には届きません。` : ''}${
         E.waryOf(st.currents, ui.charId) >= 0 && E.vouchOf(st, ui.charId) < 0
           ? '<br>警戒されている相手なので、ここからさらに一段下がります。転向は通りません。' : ''}${
         st.banned.includes(ui.charId)
@@ -2286,7 +2321,7 @@ function viewCards(){
           const isAns = (ui.probed || guided) && isCorrect;
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
           return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${guided && !isCorrect ? '-1' : '0'}" aria-disabled="${guided && !isCorrect}" aria-pressed="${ui.picks[i]===o.motive}">${
-            isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}</span> ` : ''}${esc(o.text)}${
+            isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}〔${esc(E.CATS[i].motives[o.motive])}〕</span> ` : ''}${esc(o.text)}${
             guided && isCorrect ? tutorialReasonHTML(c, i) : ''}</div>`;
         }).join('')}
       `).join('')}
@@ -2348,7 +2383,7 @@ function viewResult(){
   app.innerHTML = headerHTML() +
     `<div class="result ${r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
-      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から三枚の型を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「探る」を使うか、賭けてください。') : ''}
+      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「探る」を使うか、賭けてください。') : ''}
       ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
@@ -2357,7 +2392,7 @@ function viewResult(){
       <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
         r.placeFits ? '　<span class="uibadge">◎ 場に合った（獲得+1）</span>' : ''}${
         r.fits ? '　<span class="uibadge">◎ この者に響いた（獲得+1）</span>'
-               : r.approach >= 2 ? `　<span style="color:var(--shu)">読み違え ― ${esc(E.APPROACHES[r.approach].name)}はこの者の型ではなかった（一段下がった）</span>` : ''}</div>
+               : r.approach >= 2 ? `　<span style="color:var(--shu)">読み違え ― この者が欲していたのは〔${esc(E.CATS[0].motives[c.correct[0]])}〕で、${esc(E.APPROACHES[r.approach].name)}は響かなかった（一段下がった）</span>` : ''}</div>
       ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
         <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}
         <div class="small" style="margin-top:6px">${r.duel.survived
@@ -2375,7 +2410,7 @@ function viewResult(){
       ${(() => {
         if (!r.allOrNothing || r.score === 3) return '';
         const why = [];
-        if (r.misfit) why.push(`${esc(E.APPROACHES[r.approach].name)}が<b>この者の型ではなかった</b>`);
+        if (r.misfit) why.push(`この者が欲していたのは〔${esc(E.CATS[0].motives[c.correct[0]])}〕で、<b>${esc(E.APPROACHES[r.approach].name)}は響かなかった</b>`);
         if (r.waryApplied) why.push(`〔${fac(r.waryBy).name}〕への<b>警戒</b>`);
         if (r.grudgeApplied) why.push(`<b>決裂の噂</b>が届いていた`);
         if (r.revisitApplied) why.push(`<b>一度決裂した相手</b>だった`);
