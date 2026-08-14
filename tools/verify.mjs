@@ -23,6 +23,20 @@ for (const bad of ['Math.random', 'Date.now', 'new Date(', 'performance.now', 'c
   ok(!code.includes(bad), `${bad} を使用していない`);
 }
 
+head('1a. 混入していない文字');
+{
+  /* 生成の過程で、日本語のつもりの箇所にキリル文字などが紛れ込んだことが何度かある。
+     読めば分かる類いだが、151名分の台詞を毎回目視するのは無理なので機械で見る。 */
+  const stray = /[\u0400-\u04FF\u0370-\u03FF\u0600-\u06FF\u0590-\u05FF]+/g;
+  for (const [name, text] of [['index.html', html],
+      ['README.md', readFileSync(new URL('../README.md', import.meta.url), 'utf8')],
+      ['docs/spec.md', readFileSync(new URL('../docs/spec.md', import.meta.url), 'utf8')]]){
+    const hit = text.match(stray);
+    ok(!hit, `${name} にキリル文字・ギリシャ文字などが混入していない${
+      hit ? '（検出: ' + [...new Set(hit)].join(' ') + '）' : ''}`);
+  }
+}
+
 head('1b. 初回導線とseed生成');
 ok(html.includes('crypto.getRandomValues'), '初期seedをブラウザの乱数で生成する');
 ok(html.includes('start-guide') && html.includes('start-normal'), '初回だけガイド付き／通常開始を選べる');
@@ -479,6 +493,79 @@ head('5f3b. 縁 ― 人脈の顔と、決裂の悪評');
   ok(agree, 'scoreOf と内訳の判定が常に一致する（200通り）');
 }
 
+/* --- 5f3c. 約束 ------------------------------------------------------------ */
+head('5f3c. 約束 ― 肚を割って明かした旗');
+{
+  const st0 = E.createState(11);
+  ok(Array.isArray(st0.promises) && st0.promises.length === 0, '初期状態に約束はない');
+  /* 肚を割る（働きかけ3）が型に合う人物を一人取る */
+  const target = E.CHARACTERS.find(c => E.approachOf(c.id) === 3 && c.factions.length === 1);
+  ok(target != null, '肚を割るのが型の人物が名簿にいる');
+  const f = target.factions[0];
+  const act = (ap, hit) => ({ charId: target.id, stance:'support', ownF:f, argueF:f,
+    cards: hit ? target.correct.slice() : [(target.correct[0]+1)%6, 0, 0],
+    probed:false, approach: ap, place: null });
+
+  const hara = E.resolve(st0, act(3, true));
+  ok(hara.report.score >= 2, '肚を割って一点が当たれば通る');
+  ok(hara.next.promises.length === 1 && hara.next.promises[0].id === target.id,
+     '肚を割って通れば、その相手との約束が残る');
+  ok(hara.next.promises[0].f === f, '約束はそのとき掲げた旗で残る');
+  ok(hara.report.promised === true && hara.report.promisedF === f, '報告にも約束が載る');
+
+  const ronjiru = E.resolve(st0, act(0, true));
+  ok(ronjiru.report.score === 3 && ronjiru.next.promises.length === 0,
+     '論じるで大成功しても約束は残らない（本心を明かしていない）');
+  const miss = E.resolve(st0, act(3, false));
+  ok(miss.report.score < 2 && miss.next.promises.length === 0, '肚を割って外せば約束も残らない');
+
+  /* 同じ相手に二度は残らない */
+  const twice = E.resolve(Object.assign({}, st0, { promises:[{id:target.id, f:0}] }), act(3, true));
+  ok(twice.next.promises.length === 1, '同じ相手との約束は重ならない');
+
+  /* 果たした／違えた の仕分け */
+  const stp = Object.assign({}, st0, { promises:[{id:1,f:1},{id:2,f:4}] });
+  const solo = { kind:'solo', faction:1 };
+  const pr = E.promiseReport(stp, solo);
+  ok(pr.kept.length === 1 && pr.kept[0].f === 1, '採られた旗の約束は果たしたと数える');
+  ok(pr.broken.length === 1 && pr.broken[0].f === 4, '採られなかった旗の約束は違えたと数える');
+  const chaos = E.promiseReport(stp, { kind:'chaos' });
+  ok(chaos.kept.length === 0 && chaos.broken.length === 2, '混沌エンドでは約束はすべて違える');
+  const combo = E.promiseReport(stp, { kind:'combo', pair:[1,4] });
+  ok(combo.kept.length === 2, '複合エンドは、どちらの旗も果たしたと数える');
+
+  ok(E.PROMISE_FATES.length === 5
+     && E.PROMISE_FATES.every(x => x.length === 2 && x.every(a => a.length === 3 && a.every(t => t.length > 10))),
+     '約束の後日談が5勢力×果たした／違えた×3通りある');
+  ok(E.promiseFate(1, true) !== E.promiseFate(1, false), '果たしたときと違えたときで文が違う');
+  ok(new Set([0,1,2].map(n => E.promiseFate(1, false, n))).size === 3,
+     '同じ旗でも言い回しが3通りに散る（同勢力の約束が同文にならない）');
+  ok(E.promiseFate(1, false, 3) === E.promiseFate(1, false, 0), '番号は巡回する');
+
+  /* 保存コードの往復で約束まで一致する */
+  let rt = true;
+  for (let seed = 1; seed <= 40; seed++){
+    const rnd = E.mulberry32(seed * 5387);
+    let stx = E.createState(seed);
+    while (!stx.finished){
+      if (E.pendingInterlude(stx)) stx = E.applyInterlude(stx, 0);
+      if (stx.finished) break;
+      const open = E.placesOpen(stx), pl = open[Math.floor(rnd() * open.length)];
+      const id = E.meetingList(stx, pl).normal[0], ch = E.CHAR_BY_ID.get(id);
+      const ap = E.placeAllows(pl, 3) ? 3 : 0;          // なるべく肚を割る
+      const a = { charId:id, stance:'support', ownF:ch.factions[0], argueF:ch.factions[0],
+                  cards:ch.correct.slice(), probed:false, approach:ap, place:pl };
+      if (E.duelPending(stx, a)) a.duel = 0;
+      stx = E.resolve(stx, a).next;
+    }
+    const d = E.decodeSave(E.encodeSave(stx));
+    const back = E.replay(d.seed, d.actions, d.interludeChoice).state;
+    if (E.hashState(back) !== E.hashState(stx)) rt = false;
+    if (JSON.stringify(back.promises) !== JSON.stringify(stx.promises)) rt = false;
+  }
+  ok(rt, '約束を含む盤面が保存コードの往復で一致する（40局・新しい欄は増やしていない）');
+}
+
 /* --- 5f4. 場 --------------------------------------------------------------- */
 head('5f4. 行き先');
 ok(E.PLACES.length === 6 && E.PLACES.every(p => p.name && p.desc && p.allow.length && p.favor.length),
@@ -684,8 +771,16 @@ ok(E.CHARACTERS.every(c => {
 ok(!([...E.FATES.values()].flat().some(t =>
   /内閣総理大臣|明治政府|維新三傑|元老|大日本帝国憲法|日露戦争|司法卿|内務卿|太政大臣|開拓使長官|学習院長/.test(t))),
    '後日談に、代替史では成立しない明治固有の官職・事績が混じっていない');
-ok(E.FATE_TEMPLATE.length === 5 && E.FATE_TEMPLATE.every(t => t.length === 2),
-   '中級・初級のひな型が5勢力 × 勝敗の2通り揃っている');
+ok(E.FATE_TEMPLATE.length === 5
+   && E.FATE_TEMPLATE.every(t => t.length === 2 && t.every(a => a.length === 3 && a.every(x => x.length > 10))),
+   '中級・初級のひな型が5勢力 × 勝敗 × 3通り揃っている');
+{
+  const noName = E.CHARACTERS.find(c => !E.FATES.has(c.id));
+  ok(new Set([0,1,2].map(n => E.fateOf(noName.id, [], n).text)).size === 3,
+     'ひな型の後日談は言い回しが3通りに散る（同勢力の無名人物が同文にならない）');
+  ok(E.fateOf(103, [3], 0).text === E.fateOf(103, [3], 2).text,
+     '個別の後日談を持つ人物は、番号を変えても文が変わらない');
+}
 {
   const solo = E.winningFactions({ kind:'solo', faction:2 });
   const combo = E.winningFactions({ kind:'combo', pair:[1,3] });

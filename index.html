@@ -143,6 +143,13 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .tie.bad{border-left-color:var(--shu);background:rgba(176,58,46,.06)}
 .tie .who{font-weight:600;letter-spacing:.04em}
 .tie .small{display:block;margin-top:4px;color:var(--sumi2)}
+/* 約束。腹を割って明かした旗は、終局まで持ち越される */
+.pill.vow{border-color:var(--kin)}
+.tag.vow{color:var(--kin);border-color:var(--kin)}
+.fate .tag{font-size:.72rem;border:1px solid currentColor;padding:1px 6px;margin:0 4px 0 8px;
+  vertical-align:1px;border-radius:2px}
+.vowline{margin-top:8px;padding:7px 11px;border-left:3px solid var(--kin);
+  background:rgba(160,120,40,.08);font-size:.84rem;border-radius:2px}
 /* 現在地の帯。行き先の札と同じ配色の筋を引き、いま居る場を面会画面にも残す */
 .here{position:relative;overflow:hidden;background:var(--washi);border:1px solid var(--line);
   border-left:4px solid var(--sumi2);border-radius:2px;padding:9px 12px 10px 13px;margin:0 0 12px}
@@ -920,7 +927,7 @@ const APPROACHES = [
   { name:'論じる',     cards:3, cap:3, desc:'利益・文脈・論理の3枚を組む。最も高く積めるが、読みが要る' },
   { name:'酌み交わす', cards:2, cap:2, desc:'利益と文脈の2枚だけ。論理は問わない。杯を交わした相手は刃を抜かない' },
   { name:'金品を贈る', cards:0, cap:2, desc:'言葉を尽くさず物で通す。探りを1回使う。大義に生きる者には侮辱になる' },
-  { name:'肚を割る',   cards:1, cap:3, desc:'利益の一点に賭け、こちらの旗色も明かす。当たれば大きいが、外せば決裂' },
+  { name:'肚を割る',   cards:1, cap:3, desc:'利益の一点に賭け、こちらの旗色も明かす。当たれば大きいが、外せば決裂。通れば約束が残る' },
 ];
 /* 利益の型 → 既定で響く働きかけ */
 const APPROACH_BY_MOTIVE = [3, 2, 1, 0, 3, 0];
@@ -1167,23 +1174,95 @@ F(151,'少年帝は、自らの名を冠した時代を生きることになる�
 ]);
 /* 中級・初級は勢力ごとのひな型で語る */
 const FATE_TEMPLATE = [
-  ['朝廷に連なる末席を得て、望んだとおりの静かな日々を送った。','御所の灯が遠ざかるのを、ただ見ているほかなかった。'],
-  ['開いた港とともに身を立て、異国の言葉を話す子を持った。','港は閉じ、それまでの伝手はすべて役に立たなくなった。'],
-  ['秩序は守られ、その禄は次の代にも受け継がれた。','徳川の名とともに職を失い、刀を売って商いを始めた。'],
-  ['藩の名が天下に通じるようになり、その末端で仕事を得た。','藩は消え、県になった。自分が何者だったかを説明できなくなった。'],
-  ['振るった刃は義挙と呼ばれ、その名は志士の列に加えられた。','時代は刃を必要としなくなり、その手だけが残された。'],
+  [['朝廷に連なる末席を得て、望んだとおりの静かな日々を送った。',
+    '御所に出入りする役を得た。望みは小さく、そして叶った。',
+    '公家の家宰として仕え、書き物のうちに一生を終えた。'],
+   ['御所の灯が遠ざかるのを、ただ見ているほかなかった。',
+    '朝廷の名を口にする者がいなくなり、拠り所を失った。',
+    '仕えるべき筋がどこにあるのか、最後まで分からずじまいだった。']],
+  [['開いた港とともに身を立て、異国の言葉を話す子を持った。',
+    '交易の帳場に座り、若い者に算盤と英語を教えた。',
+    '船荷を捌く仕事に落ち着き、海の向こうを見たまま老いた。'],
+   ['港は閉じ、それまでの伝手はすべて役に立たなくなった。',
+    '覚えた異国の言葉を使う相手が、ついに現れなかった。',
+    '船を待って浜に通ったが、来るのは漁船ばかりだった。']],
+  [['秩序は守られ、その禄は次の代にも受け継がれた。',
+    '役目は変わらず残り、同じ門をくぐって同じ務めを果たした。',
+    '徳川の名のもとで隠居し、孫に古い作法を教えた。'],
+   ['徳川の名とともに職を失い、刀を売って商いを始めた。',
+    '禄を離れ、慣れない鍬を持った。手の豆をよく人に見せた。',
+    '仕える先が消え、名字を呼ばれることもなくなった。']],
+  [['藩の名が天下に通じるようになり、その末端で仕事を得た。',
+    '国元の言葉のまま中央へ出て、任された務めを果たし続けた。',
+    '藩校の後輩たちが登っていくのを、下から支えた。'],
+   ['藩は消え、県になった。自分が何者だったかを説明できなくなった。',
+    '国元へ戻ったが、戻るべき国がもう無かった。',
+    '藩の名を書いた看板が下ろされる日、何も言わずに立っていた。']],
+  [['振るった刃は義挙と呼ばれ、その名は志士の列に加えられた。',
+    '取った刃が正しかったことになり、若い者に語り継がれた。',
+    '刀を捨てず、捨てなくてよい世が来た。'],
+   ['時代は刃を必要としなくなり、その手だけが残された。',
+    '志を語る相手が減り、やがて誰にも語らなくなった。',
+    '抜くべき時を待ち続け、待っていることを忘れた。']],
 ];
+/* 約束の行方。勝敗ではなく「あの夜の言葉が守られたか」で語る。
+   [果たした, 違えた] を、約束した旗ごとに持つ。 */
+const PROMISE_FATES = [
+  [['朝廷と幕府はひとつになった。あの夜の言葉に嘘はなかった、といまも人に言う。',
+    '御所と城が同じ卓を囲む日を見た。あなたの名を、その席で口にしたという。',
+    '約束どおりの世が来た。以後、公家にも武家にも臆せず出入りするようになった。'],
+   ['「朝廷と幕府をひとつに」と聞いた夜のことを、いまも人に話す。話し終えると、決まって黙る。',
+    '御所と城は、ついに同じ卓に着かなかった。あなたの名は、もう口にしない。',
+    'ひとつになる世を待っていた。待っているあいだに、どちらも形を変えてしまった。']],
+  [['港は開いた。約束を守る者だった、と異国の名を挙げながら語る。',
+    '帆柱の並ぶ海を見て、あの夜の話は本当だったと呟いた。',
+    '開かれた港で身を立てた。取引の相手には、必ずあなたの名を出す。'],
+   ['「港を開く」と言った者がいた、と語る。港の話になると、そこから先は続けない。',
+    '帆柱の見えない海を眺めている。あの夜の話を、誰にも確かめられないまま。',
+    '異国の言葉を覚えたが、使う相手がいなくなった。約束は届かなかった。']],
+  [['徳川の秩序は残った。あなたが腹を割って言ったとおりになった。',
+    '禄は次の代へ渡った。あの夜の約束が守られたからだ、と子に語っている。',
+    '城は落ちなかった。その一事だけで、あなたを信じてよかったと言う。'],
+   ['徳川の世を守ると聞いていた。守られなかったことを、ついにあなたには言わずじまいだった。',
+    '禄を失い、刀を売った。売り値の話はするが、あの夜の話はしない。',
+    '城が明け渡される日、あなたの言葉を思い出したという。それきりだ。']],
+  [['藩の名は天下に通った。あの夜そう約された、と誇らしげに言う。',
+    '国元の訛りのまま、中央で仕事をしている。約束は果たされた。',
+    '藩の名を冠した事業が残った。その由来を訊かれるたび、あなたの話をする。'],
+   ['藩の名が立つ日を待っていた。待っているうちに、藩そのものが無くなった。',
+    '国元へ帰ったが、帰る国が県になっていた。約束の相手を恨みはしなかった。',
+    '天下に通るはずの名は、書類の上から消えた。誰のせいにもしていない。']],
+  [['刃を取る日は来た。約束は違えられなかった、とだけ言い残している。',
+    '義挙と呼ばれる側に立った。あの夜の言葉が、そこまで連れて行った。',
+    '振るった刃は正しかったことになった。あなたに礼を言う機会はなかったが。'],
+   ['刃を取る日を約された。その日は来ず、抜かぬまま刀を売ったという。',
+    '義挙の側に立つはずだった。時代は刃を要らないと言い、その手だけが残った。',
+    '「そのときが来たら呼べ」と言っていた。呼ばれないまま、名は消えた。']],
+];
+const promiseFate = (f, kept, n) => { const a = PROMISE_FATES[f][kept ? 0 : 1];
+  return a[((n || 0) % a.length + a.length) % a.length]; };
+
 /* エンディングで採られた勢力の集合 */
 function winningFactions(ending){
   if (ending.kind === 'solo') return [ending.faction];
   if (ending.kind === 'combo') return ending.pair.slice();
   return [];
 }
-function fateOf(charId, winners){
+/* 果たした約束と、違えた約束 */
+function promiseReport(st, ending){
+  const winners = winningFactions(ending), kept = [], broken = [];
+  for (const p of (st.promises || [])) (winners.includes(p.f) ? kept : broken).push(p);
+  return { kept, broken };
+}
+/* n を渡すと、ひな型の言い回しをずらせる。
+   同じ勢力の無名の人物が並んだとき、同じ文が続かないようにするため。 */
+function fateOf(charId, winners, n){
   const ch = CHAR_BY_ID.get(charId);
   const won = ch.factions.some(f => winners.includes(f));
-  const pair = FATES.get(charId) || FATE_TEMPLATE[ch.factions[0]];
-  return { won, text: pair[won ? 0 : 1] };
+  const named = FATES.get(charId);
+  if (named) return { won, text: named[won ? 0 : 1] };
+  const a = FATE_TEMPLATE[ch.factions[0]][won ? 0 : 1];
+  return { won, text: a[((n || 0) % a.length + a.length) % a.length] };
 }
 
 
@@ -1273,7 +1352,7 @@ const INTERLUDE_TURN = 8;
 
 function createState(seed){
   return { seed: seed >>> 0, turn: 1, currents:[0,0,0,0,0],
-           contacts:[], banned:[], lastLen:0, probesUsed:0, interlude:null, lastPlace:null,
+           contacts:[], banned:[], promises:[], lastLen:0, probesUsed:0, interlude:null, lastPlace:null,
            actions:[], finished:false };
 }
 const totalOf = st => st.currents.reduce((a,b)=>a+b,0);
@@ -1522,8 +1601,16 @@ function resolve(st, action){
     }
   }
 
+  /* 約束: 肚を割って通った相手には、そのとき掲げた旗の約束が残る。
+     腹を割って本心を明かした相手にだけ残るので、論じるだけで通した相手には残らない。
+     終局でその旗が採られていなければ、約束を違えたことになる。 */
+  const promises = (st.promises || []).slice();
+  const promised = approach === 3 && succeeded && !banned.includes(action.charId)
+                   && !promises.some(pm => pm.id === action.charId);
+  if (promised) promises.push({ id: action.charId, f: action.argueF });
+
   const next = {
-    seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned,
+    seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned, promises,
     lastLen: len, lastPlace: action.place ?? null,
     /* 立ち合いに敗れると、深追いする余裕を失う（探りを1回失う） */
     probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
@@ -1544,6 +1631,7 @@ function resolve(st, action){
     delta: cur.map((v, i) => v - before[i]),
     verdict: succeeded ? (score === 3 ? '大成功' : '成功') : ['決裂','失敗','失敗','失敗'][score],
     /* 立ち合いで覆ることがあるので、表示は実際の状態変化から決める */
+    promised, promisedF: promised ? action.argueF : -1,
     contactAdded: contacts.includes(action.charId) && !st.contacts.includes(action.charId),
     bannedNow: banned.includes(action.charId) && !st.banned.includes(action.charId),
   }};
@@ -1644,7 +1732,7 @@ function decodeSave(code){
 }
 function hashState(st){
   const s = JSON.stringify([st.seed, st.turn, st.currents, st.contacts, st.banned,
-                            st.lastLen, st.probesUsed, st.interlude, st.lastPlace, st.finished]);
+                            st.promises, st.lastLen, st.probesUsed, st.interlude, st.lastPlace, st.finished]);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, '0');
@@ -1653,7 +1741,7 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
-  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, FATES, FATE_TEMPLATE, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, INTERLUDES, ENDINGS, MAX_TURN, GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, resolve, evaluateEnding, replay,
   encodeSave, decodeSave, hashState };
@@ -1755,6 +1843,9 @@ function chartHTML(){
   return `<div class="panel"><h2>時勢チャート</h2><pre class="chart">${s.trimEnd()}</pre>
     ${foes.length ? `<div class="small" style="margin-top:8px;color:var(--shu)">${foes.join('<br>')}</div>` : ''}
     <div style="margin-top:10px"><span class="small">【獲得した人脈】</span><br>${list}</div>
+    ${st.promises.length ? `<div style="margin-top:6px"><span class="small">【残した約束】</span> ${
+      st.promises.map(pm => `<span class="pill vow">${esc(E.CHAR_BY_ID.get(pm.id).name)}へ〔<span class="${
+        fac(pm.f).cls}">${fac(pm.f).name}</span>〕</span>`).join('')}</div>` : ''}
     ${st.banned.length ? `<div style="margin-top:6px"><span class="small">【決裂・出現停止】</span> ${
       st.banned.map(id=>`<span class="pill">${esc(E.CHAR_BY_ID.get(id).name)}</span>`).join('')}</div>` : ''}
   </div>`;
@@ -2236,6 +2327,8 @@ function viewResult(){
       ${r.penalty ? `<div class="warn">※ ${E.RANKS[r.rank]}級との交渉に失敗し時勢 -${r.penalty}</div>` : ''}
       <div class="delta">${d}</div>
       ${r.contactAdded ? `<div class="small">→ ${esc(c.name)}が【人脈】に加わった。</div>` : ''}
+      ${r.promised ? `<div class="vowline">→ 肚を割って〔${fac(r.promisedF).name}〕の旗を明かした。
+        <b>${esc(c.name)}との約束が残る。</b>この旗が最後に採られていなければ、約束を違えたことになる。</div>` : ''}
       ${r.bannedNow ? `<div class="small">→ ${esc(c.name)}は激怒し、二度と現れない。<b>その縁筋も閉じた</b>（${
         [...(E.TIE_GRAPH.get(r.charId) || [])].slice(0, 4).map(i => esc(E.CHAR_BY_ID.get(i).name)).join('・') || '縁者なし'
       }${(E.TIE_GRAPH.get(r.charId)?.size || 0) > 4 ? ' ほか' : ''} からの紹介が絶えた）</div>` : ''}
@@ -2264,6 +2357,7 @@ function viewEnding(){
       ${e.p.map((para,i) => `<h3>${heads[i]}</h3><p>${esc(para)}</p>`).join('')}
       ${st.interlude ? `<h3>あの夜の選択</h3><p>『${esc(st.interlude.title)}』において、あなたは<b>${
         esc(st.interlude.tag)}</b>。<br>${esc(st.interlude.after || '')}</p>` : ''}
+      ${promisesHTML(e)}
       ${epilogueHTML(e)}
     </div>` + saveBoxHTML() +
     `<div class="row"><button class="primary" id="again">最初から</button></div>`;
@@ -2278,6 +2372,25 @@ const CREDIT = `<hr><div class="small" style="text-align:center;opacity:.7;paddi
   史実を題材としたフィクションであり、人物像・勢力分類はゲーム上の解釈です。
 </div>`;
 
+/* 肚を割って交わした約束が、選んだ未来の中で果たされたか */
+function promisesHTML(ending){
+  if (!st.promises.length) return '';
+  const pr = E.promiseReport(st, ending);
+  const used = new Set();
+  const line = (pm, kept) => {
+    const c = E.CHAR_BY_ID.get(pm.id);
+    let n = pm.id, t = E.promiseFate(pm.f, kept, n);
+    for (let k = 0; k < 3 && used.has(t); k++) t = E.promiseFate(pm.f, kept, ++n);
+    used.add(t);
+    return `<div class="fate ${kept ? 'won' : 'lost'}">
+      <b>${esc(c.name)}</b><span class="tag ${fac(pm.f).cls}">${fac(pm.f).name}</span>
+      <span class="small" style="opacity:.6">${kept ? '果たした' : '違えた'}</span><br>${esc(t)}</div>`;
+  };
+  return `<h3>交わした約束</h3>
+    <p class="small">肚を割って明かした旗は ${st.promises.length} 本。うち <b>${pr.kept.length} 本</b>を果たした。</p>
+    ${pr.kept.map(pm => line(pm, true)).join('')}${pr.broken.map(pm => line(pm, false)).join('')}`;
+}
+
 /* 築いた人脈が、選んだ未来の中でどうなったか */
 function epilogueHTML(ending){
   if (!st.contacts.length && !st.banned.length) return '';
@@ -2285,10 +2398,16 @@ function epilogueHTML(ending){
   const sorted = st.contacts.slice().sort((a, b) =>
     E.rankOfId(b) - E.rankOfId(a) || a - b);
   const shown = sorted.slice(0, 5), rest = sorted.slice(5);
+  const vow = new Set(st.promises.map(pm => pm.id));
+  const usedFate = new Set();
   const line = id => {
-    const c = E.CHAR_BY_ID.get(id), f = E.fateOf(id, winners);
+    const c = E.CHAR_BY_ID.get(id);
+    let n = id, f = E.fateOf(id, winners, n);
+    for (let k = 0; k < 3 && usedFate.has(f.text); k++) f = E.fateOf(id, winners, ++n);
+    usedFate.add(f.text);
     return `<div class="fate ${f.won ? 'won' : 'lost'}">
       <b>${esc(c.name)}</b><span class="tag ${fac(c.factions[0]).cls}">${fac(c.factions[0]).name}</span>
+      ${vow.has(id) ? '<span class="tag vow">約束</span>' : ''}
       <span class="small" style="opacity:.6">${f.won ? 'あなたの側に' : 'あなたの外に'}</span><br>${esc(f.text)}</div>`;
   };
   return `<h3>その後の人々</h3>

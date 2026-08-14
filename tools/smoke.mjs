@@ -65,7 +65,13 @@ if (await p.$('[data-own]')) await p.click('[data-own]');
 await p.click('[data-stance="support"]');
 await p.waitForSelector('[data-approach]');
 await p.screenshot({ path: shot('02b-approach.png'), fullPage: true });
-await p.click('[data-approach]:not([disabled])');
+/* 肚を割る（約束が残る働きかけ）を優先して踏む */
+let vowSeen = 0;
+const pickApproach = async () => {
+  const hara = await p.$('[data-approach="3"]:not([disabled])');
+  await (hara || await p.$('[data-approach]:not([disabled])')).click();
+};
+await pickApproach();
 await p.waitForSelector('.card, #go');
 await p.screenshot({ path: shot('03-cards.png'), fullPage: true });
 for (const el of await p.$$('.card[data-cat="0"], .card[data-cat="1"], .card[data-cat="2"]')) { }
@@ -78,6 +84,7 @@ if (await p.$('.duel')) {
   await p.click('[data-duel="0"]');
 }
 await p.waitForSelector('.result');
+vowSeen += await p.$$eval('.vowline', e => e.length);
 console.log('判定:', await p.$eval('.verdict', e => e.textContent));
 await p.screenshot({ path: shot('04b-result.png'), fullPage: true });
 
@@ -101,17 +108,22 @@ for (let i = 0; i < 12; i++) {
   if (await p.$('[data-own]')) await p.click('[data-own]');
   await p.click('[data-stance="support"]');
   await p.waitForSelector('[data-approach]');
-  await p.click('[data-approach]:not([disabled])');
+  await pickApproach();
   await p.waitForSelector('.card, #go');
   if (await p.$('#tutok')) await p.click('#tutok');
   for (const cat of [0, 1, 2]) { const el = await p.$(`.card[data-cat="${cat}"]`); if (el) await el.click(); }
   await p.click('#go');
   if (await p.$('.duel')) await p.click('[data-duel="0"]');
   await p.waitForSelector('.result');
+  vowSeen += await p.$$eval('.vowline', e => e.length);
 }
 await p.waitForSelector('.ending');
 console.log('エンディング:', await p.$eval('.ending .title', e => e.textContent));
-console.log('見出し:', await p.$$eval('.ending h3', e => e.map(x => x.textContent).join(' / ')));
+const heads = await p.$$eval('.ending h3', e => e.map(x => x.textContent));
+console.log('見出し:', heads.join(' / '));
+if (vowSeen && !heads.includes('交わした約束'))
+  errs.push('約束を残したのに、エンディングに「交わした約束」が出ていない');
+if (!vowSeen) errs.push('肚を割る働きかけを優先したのに、約束が一度も残らなかった');
 const code = await p.$eval('#savebox', e => e.value);
 console.log('保存コード:', code.slice(0, 70) + '…');
 await p.screenshot({ path: shot('06-ending.png'), fullPage: true });
@@ -126,6 +138,7 @@ console.log('復元後のエンディング:', restored);
 
 console.log('滞在した場:', visited.join(' → '));
 console.log('縁の表示:', tieSeen ? `${tieSeen}件（例: ${tieSample}）` : 'なし');
+console.log('残した約束:', vowSeen + '件');
 if (!tieSeen) errs.push('縁（紹介・悪評）の表示が通しプレイで一度も出なかった');
 console.log('スクリーンショット:', sp);
 console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'JSエラーなし');
