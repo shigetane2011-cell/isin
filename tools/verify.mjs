@@ -390,6 +390,46 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
   }
 }
 
+/* --- 5e2. 同梱画像 --------------------------------------------------------- */
+head('5e2. 同梱画像が、エンジンの出しうる名前と一致しているか');
+{
+  /* エンディング画像の名前は勢力キーと組合せから組み立てられる。
+     勢力キーを変えると16枚が黙って404になるので、名前の対応をここで固定する。 */
+  const { existsSync, readdirSync } = await import('node:fs');
+  const { resolve, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const at = p => resolve(root, p);
+
+  ok(html.includes("let file = 'chaos';")
+     && html.includes("file = `solo-${fac(e.faction).key}`")
+     && html.includes("file = `combo-${e.pair.slice().sort((a,b)=>a-b).join('-')}`"),
+     'エンディング画像の命名規則が想定どおり（chaos / solo-勢力キー / combo-番号-番号）');
+
+  const want = ['assets/hero-bakumatsu.webp', 'assets/endings/chaos.webp'];
+  for (const f of E.FACTIONS) want.push(`assets/factions/${f.key}.webp`);
+  for (let f = 0; f < 5; f++) want.push(`assets/endings/solo-${E.FACTIONS[f].key}.webp`);
+  for (let a = 0; a < 5; a++) for (let b = a + 1; b < 5; b++)
+    want.push(`assets/endings/combo-${a}-${b}.webp`);
+  ok(want.length === 22, `エンジンが要求しうる画像は22枚（実測 ${want.length}枚）`);
+  const missing = want.filter(f => !existsSync(at(f)));
+  ok(missing.length === 0, `22枚すべてが同梱されている${missing.length ? '（欠落: ' + missing.join(' ') + '）' : ''}`);
+
+  const have = [...readdirSync(at('assets/endings')).map(f => 'assets/endings/' + f),
+                ...readdirSync(at('assets/factions')).map(f => 'assets/factions/' + f)];
+  const extra = have.filter(f => !want.includes(f));
+  ok(extra.length === 0, `使われていない画像がない${extra.length ? '（余り: ' + extra.join(' ') + '）' : ''}`);
+  ok(have.every(f => f.endsWith('.webp')), '同梱画像はすべて webp');
+
+  /* 到達しうるエンディング16通りが、それぞれ別の絵を持つ */
+  const files = new Set(want.filter(f => f.startsWith('assets/endings/')));
+  ok(files.size === 16, `エンディング画像が16通りぶんある（実測 ${files.size}枚）`);
+
+  /* 公開URLを指すメタタグが、同梱してある画像を指している */
+  ok(html.includes('og:image') && html.includes('assets/hero-bakumatsu.webp'),
+     'OGP画像が同梱のヒーロー画像を指している');
+}
+
 /* --- 5f. 余話（史実の短評と関連作品） ------------------------------------- */
 head('5f. 余話のデータ整合性');
 ok([...E.NOTES.keys()].every(id => E.CHAR_BY_ID.has(id)), '余話が実在する人物IDだけを指している');
