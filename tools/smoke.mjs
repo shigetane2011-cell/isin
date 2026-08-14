@@ -131,6 +131,10 @@ await p.screenshot({ path: shot('06-ending.png'), fullPage: true });
 
 /* 保存コードから復元できるか */
 await p.click('#again');
+/* 保存欄はタイトルで畳んである。開いてから入れる */
+const fold = await p.$('details:has(#code)');
+if (fold) await fold.evaluate(e => { e.open = true; });
+await p.waitForSelector('#code', { state: 'visible' });
 await p.fill('#code', code);
 await p.click('#load');
 await p.waitForSelector('.ending');

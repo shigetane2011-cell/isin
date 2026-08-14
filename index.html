@@ -164,6 +164,7 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 /* 働きかけの早見表。人物ごとの情報ではなく、規則そのものを読めるようにする */
 .legend{margin:8px 0 4px;padding:9px 12px;background:var(--washi);border:1px solid var(--line);
   border-radius:2px;font-size:.84rem}
+.legend>summary{cursor:pointer;color:var(--sumi2)}
 .legend>div{margin-top:4px}
 .legend .hit{color:var(--kin);font-weight:600}
 .legend .small{margin-top:7px;opacity:.75}
@@ -1201,7 +1202,7 @@ const ENDINGS = {
 /* --- 対話（チップ式） ----------------------------------------------------
    面会した相手には、踏み込んだ問いを **一つだけ** ぶつけられる。
    返答はその人物の「刺さる型」をそのまま語るので、対応するカードが読める。
-   世間話は何度でも聞けるが、型の手がかりにはならない（雰囲気のためのもの）。
+   その者の時勢観は、問わずとも情勢描写の下に出る（雰囲気のためのもので、手がかりではない）。
    一つに絞っているのは実測による。二つ聞けると初心者でも84%通ってしまい、
    腕前の差が消える。一問なら 名手98% / 上手91% / 普通75% / 初心39% に収まる。
    ------------------------------------------------------------------------ */
@@ -2234,7 +2235,7 @@ const INTERLUDES = {
 
 /* --- 状態 ---------------------------------------------------------------- */
 const MAX_TURN = 10, GOAL = 30, COMBO_GOAL = 28, CAP = 40, COMBO_MIN = 10;
-/* 相手を「探る」と3つの正解がすべて分かるが、手の内を明かした分だけ影響力が落ち、
+/* 「さらに聞き出す」と3つの正解がすべて分かるが、手の内を明かした分だけ影響力が落ち、
    その交渉の獲得が1下がる。使えるのは1局に PROBE_LIMIT 回まで。
    回数を切らないと、探り続けるだけで勝ててしまい賭けが消える。 */
 const PROBE_LIMIT = 4;
@@ -2958,28 +2959,41 @@ function viewTitle(){
     <div class="hero-copy"><h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1></div>
   </section>
   <div class="panel">
-    <p>本作は、<b>10ターン以内に理想の日本を創り上げる</b>シミュレーションです。到達できる未来は次の3系統・全16通り。</p>
+    <p>本作は、<b>10ターン以内に理想の日本を創り上げる</b>シミュレーションです。
+    人物を読み、言葉で説き伏せて、時勢を動かします。到達できる未来は<b>全16通り</b>。</p>
     ${factionLegendHTML()}
-    <ul style="padding-left:1.2em;margin:8px 0">
-      <li><b>複合革命（通常）</b>：上位2つの時勢の<b>合計が28以上、かつ両方10以上</b> — 10通り（組み合わせごとに別の未来）</li>
-      <li><b>単独覇権（高難度）</b>：いずれか1つの時勢が<b>30以上</b> — 5通り。到達すれば複合より優先</li>
-      <li><b>混沌</b>：いずれも満たさなければ『歴史の藻屑』</li>
-    </ul>
-    <ol style="padding-left:1.2em">
-      <li><b>場と旅程</b>：場によって会える人物と働きかけが変わります。京・江戸・長崎を直行すると、その日は旅疲れで通常の面会候補が1名減ります。夜の街道を挟めば減りません。</li>
-      <li><b>時代のうねり</b>：どの勢力を伸ばしても『時代の熱量（合計値）』は高まり、より高位の人物が登場します。</li>
-      <li><b>人脈と時期尚早</b>：『人脈』を使えばまだ時代に出てこない大物を呼べますが、時代が追いついていない場合、説得の効果は制限されます。</li>
-      <li><b>対話と転向</b>：相手を支持するか、論破して『転向』させるか。言葉で歴史を設計してください。</li>
-    </ol>
-    <hr>
-    <p class="small">説得は<b>論証カード</b>で行います。「利益提示・文脈理解・論理整合」の3枚を選び、その人物に本当に刺さる組み合わせを当ててください。手がかりは各人物の【情勢】描写です。</p>
-    <p class="small"><b>最初の一局は、相性のよい二勢力を10以上ずつ育てる複合革命がおすすめです。</b>盤面には、いま最も近い複合と単独の結末を常に表示します。</p>
-    <p class="small"><b>支持</b>は一段下でも通ります（さらに一段下なら「手応え」で時勢が1だけ動く）。<b>転向</b>は攻撃なので<b>満点でしか通りません</b> ― 一段でも下がれば、札が刺さっていても届きません。<br>
-    そして<b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>（いずれかの時勢が12以上で、対立勢力の人物は判定が一段下がる）。寄せ切るか、抑えて回るかが最大の判断です。</p>
-    <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答はその者に何が刺さるかを語るので、どのカードを選ぶべきかが読めます。世間話は何度でもできます。</p>
-    <p class="small">それでも読み切れないときは<b>「探る」</b>で3つの正解をすべて開けられます。ただし手の内を明かした分だけ影響力が落ち、<b>その交渉の獲得が1下がります</b>。使えるのは<b>1局に4回まで</b>。<br>
-    元の獲得が大きい大物ほど代償は相対的に軽いので、<b>探りは大物と、失敗できない転向に取っておくのが得</b>です。</p>
-    <p class="small">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</p>
+    <div class="small" style="margin:6px 0 2px">
+      <b>複合革命</b>（通常）上位2つの合計28以上・両方10以上 ― 10通り　／
+      <b>単独覇権</b>（高難度）いずれか1つが30以上 ― 5通り　／
+      満たさなければ『歴史の藻屑』</div>
+    <p class="small" style="margin-top:10px"><b>最初の一局は、相性のよい二勢力を10以上ずつ育てる複合革命がおすすめです。</b>
+    盤面には、いま最も近い複合と単独の結末が常に出ています。</p>
+
+    <details class="detail"><summary>一手の流れ</summary>
+      <ol style="padding-left:1.2em;margin:6px 0">
+        <li><b>どこへ行き、誰に会うか</b>を決める。場によって集まる者と、できる働きかけが変わります。
+          京・江戸・長崎を直行した日は旅疲れで面会候補が1名減り、夜の街道を挟めば減りません。</li>
+        <li><b>対話</b>で相手を読む。踏み込んだ問いは一つだけ。足りなければ代償つきで聞き出せます。</li>
+        <li><b>支持</b>するか、<b>論破して転向</b>させるかを決める。</li>
+        <li><b>働きかけ</b>を選び、<b>論証カード</b>を組む。</li>
+      </ol>
+    </details>
+
+    <details class="detail"><summary>説得の仕組み</summary>
+      <p class="small">説得は<b>論証カード</b>で行います。「利益提示・文脈理解・論理整合」の3枚を選び、
+      その人物に本当に刺さる組み合わせを当ててください。手がかりは各人物の【情勢】描写と、対話の返答です。</p>
+      <p class="small"><b>支持</b>は一段下でも通ります（さらに一段下なら「手応え」で時勢が1だけ動く）。
+      <b>転向</b>は攻撃なので<b>満点でしか通りません</b> ― 一段でも下がれば、札が刺さっていても届きません。</p>
+      <p class="small"><b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>
+      （いずれかの時勢が12以上で、対立勢力の人物は判定が一段下がる）。寄せ切るか、抑えて回るかが最大の判断です。</p>
+      <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答はその者に何が刺さるかを語ります。
+      読み切れないときは<b>「さらに聞き出す」</b>で3つとも開けられますが、
+      <b>その交渉の獲得が1下がり</b>、使えるのは<b>1局に4回まで</b>。
+      元の獲得が大きい大物ほど代償は軽いので、大物と、失敗できない転向に取っておくのが得です。</p>
+      <p class="small"><b>時代のうねり</b>：どの勢力を伸ばしても合計値は高まり、より高位の人物が現れます。
+      『人脈』を使えばまだ時代に出てこない大物を呼べますが、時代が追いついていなければ効果は制限されます。</p>
+    </details>
+
     <div class="row" style="align-items:center">
       <label class="small">seed <input id="seed" type="number" min="1" max="999999999" value="${ui.seedDraft}" style="width:9em;font-family:monospace;padding:5px;border:1px solid var(--line)"></label>
       <button class="chip" id="reroll-seed">seedを振り直す</button>
@@ -2991,13 +3005,18 @@ function viewTitle(){
       第2ターンからは通常ルールに戻ります。不要なら説明なしで始められます。</p>
       <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
     </div>` : ''}
-    <hr>
-    <div class="small">保存コードから再開：</div>
-    <textarea id="code" placeholder="IR4:1868:47,0,2,2,053,0;...#1"></textarea>
-    <div class="row"><button id="load">再開する</button></div>
-    <div id="err" class="warn"></div>
-    <hr>
-    <p class="small" style="opacity:.85">※ 本作は史実を題材にした<b>フィクション</b>です。人物の勢力分類・性格づけ・台詞・「刺さる動機」は、すべてゲーム上の解釈であり、史実の評価ではありません。実在の人物・団体への評価を意図するものではありません。</p>
+    <details class="detail"><summary>保存コードから再開する</summary>
+      <textarea id="code" placeholder="IR4:1868:47,0,2,2,053,0;...#0.1"></textarea>
+      <div class="row"><button id="load">再開する</button></div>
+      <div id="err" class="warn"></div>
+      <div class="small" style="margin-top:6px;opacity:.8">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</div>
+    </details>
+    <details class="detail"><summary>本作について</summary>
+      <p class="small" style="opacity:.85">史実を題材にした<b>フィクション</b>です。人物の勢力分類・性格づけ・台詞・「刺さる動機」は、
+      すべてゲーム上の解釈であり、史実の評価ではありません。実在の人物・団体への評価を意図するものではありません。</p>
+      <p class="small" style="opacity:.85">同梱の肖像は史料画像を参照した創作彩色画です。出典は
+      <code>assets/portraits/README.md</code> に一覧してあります。</p>
+    </details>
   </div>`;
   const startGame = guided => {
     const v = parseInt(document.getElementById('seed').value, 10);
@@ -3031,12 +3050,12 @@ function viewTitle(){
 function approachLegendHTML(mark){
   const by = E.APPROACHES.map(() => []);
   E.APPROACH_BY_MOTIVE.forEach((ap, m) => by[ap].push(E.CATS[0].motives[m]));
-  return `<div class="legend"><b>響く当たり方は、相手が「何を欲しているか」で決まります</b>
+  return `<details class="detail legend"><summary>どの当たり方が誰に響くか</summary>
     ${E.APPROACHES.map((a, i) => `<div class="${mark === i ? 'hit' : ''}">${
       mark === i ? '◎ ' : '・'}<b>${esc(a.name)}</b> ─ ${
       by[i].map(esc).join('／')} を欲する者に響く</div>`).join('')}
     <div class="small">欲しているものは、面会中に<b>一つだけ問える</b>ほか、
-      【情勢】の描写からも読めます。「探る」でも分かります。</div></div>`;
+      【情勢】の描写からも読めます。「さらに聞き出す」でも分かります。</div></details>`;
 }
 
 /* 縁の表示。面会の札でも、相手と向き合う画面でも同じものを出す。
@@ -3137,7 +3156,6 @@ function viewMeeting(){
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
-      <div class="small" style="margin-top:10px">誰と会いますか？（人脈を駆使し、維新のパズルを完成させてください）</div>
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
         そこから${m.normal.length}名が選ばれています。${fatigue ? '遠路を直行した旅疲れで、通常枠が1名減っています。' : ''}時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
@@ -3209,11 +3227,12 @@ function viewStance(){
           <button data-stance="convert" ${guidedTurn() ? 'disabled' : ''}>論破して転向させる<span class="small">（別の思想に引き込む）</span></button>
         </div>
         ${E.HOTHEADS.has(ui.charId) ? '<div class="warn">この者は気が短い。<b>転向を仕掛ければ必ず刃が出る</b>。支持でも、通らなければ怒らせる。</div>' : ''}
-        <div class="small" style="margin-top:10px">
-          <b>支持</b>は2枚一致でも通る（1枚でも時勢が1だけ動く「手応え」になる）。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
+        <details class="detail"><summary>支持と転向のちがい</summary>
+          <div class="small"><b>支持</b>は一段下でも通る（さらに一段下なら「手応え」で時勢が1だけ動く）。
+          だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
           <b>転向</b>は攻撃。<b>満点でしか通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
-          一段でも下がれば通らないので、警戒や読み違えがあると札が刺さっても届かない。
-        </div>`;
+          一段でも下がれば通らないので、警戒や読み違えがあると札が刺さっても届かない。</div>
+        </details>`;
     } else if (ui.stance === 'convert' && ui.argueF === null) {
       body = `<p><b>転向</b>を狙います。どの思想に引き込みますか？</p>
         <div class="row">${[0,1,2,3,4].filter(f => f !== ui.ownF).map(f =>
@@ -3279,7 +3298,7 @@ function viewStance(){
     </div>
     <div class="row">
       ${guidedTurn()
-        ? '<span class="probed">練習中 — 三つとも開示しています（探りは消費しません）</span>'
+        ? '<span class="probed">練習中 — 三つとも開示しています（回数は消費しません）</span>'
         : ui.probed
         ? '<span class="probed">◎ 残らず聞き出した — この交渉の獲得は 1 下がる</span>'
         : probeLeft > 0
@@ -3371,7 +3390,7 @@ function viewCards(){
       <div class="pre">切り出し：「${esc(E.preambleOf(st, ui.charId, ui.place))} ──」</div>
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
-        ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.75">〔　〕はその札が訴えかける先です。この人物が何を欲しているかを当ててください。</div>' : ''}
+        ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.7">〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。</div>' : ''}
         ${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
           const isAns = (ui.probed || guided) && isCorrect;
@@ -3444,7 +3463,7 @@ function viewResult(){
   app.innerHTML = headerHTML() +
     `<div class="result ${r.partial ? 'partial' : r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
-      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「探る」を使うか、賭けてください。') : ''}
+      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「さらに聞き出す」を使うか、賭けてください。') : ''}
       ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
