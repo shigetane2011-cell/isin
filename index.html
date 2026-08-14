@@ -1657,7 +1657,7 @@ function resolve(st, action){
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     vouchedBy: sb.vouchedBy, grudgedBy: sb.grudgedBy,
     waryApplied: sb.waryApplied, grudgeApplied: sb.grudgeApplied,
-    revisit: sb.revisit, revisitApplied: sb.revisitApplied, reconciled,
+    revisit: sb.revisit, revisitApplied: sb.revisitApplied, reconciled, misfit: sb.misfit,
     delta: cur.map((v, i) => v - before[i]),
     verdict: succeeded ? (score === 3 ? '大成功' : '成功') : ['決裂','失敗','失敗','失敗'][score],
     /* 立ち合いで覆ることがあるので、表示は実際の状態変化から決める */
@@ -2144,7 +2144,8 @@ function viewStance(){
         ${E.HOTHEADS.has(ui.charId) ? '<div class="warn">この者は気が短い。<b>転向を仕掛ければ必ず刃が出る</b>。支持でも、通らなければ怒らせる。</div>' : ''}
         <div class="small" style="margin-top:10px">
           <b>支持</b>は2枚一致でも通る。だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
-          <b>転向</b>は攻撃。<b>3枚すべて刺さらねば通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
+          <b>転向</b>は攻撃。<b>満点でしか通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
+          一段でも下がれば通らないので、警戒や読み違えがあると札が刺さっても届かない。
         </div>`;
     } else if (ui.stance === 'convert' && ui.argueF === null) {
       body = `<p><b>転向</b>を狙います。どの思想に引き込みますか？</p>
@@ -2167,6 +2168,8 @@ function viewStance(){
             <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small">カード${a.cards}枚</span>`}
             ${ui.place !== null && E.PLACES[ui.place].boost === i && !off
               ? '<span class="small uibadge">　◎ この場に合う</span>' : ''}
+            ${ui.stance === 'convert' && i >= 2 && !off
+              ? '<span class="small" style="color:var(--shu)">　※ 読み違えれば、札が刺さっても転向は通らない</span>' : ''}
             <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`;
         }).join('')}</div>
         <div class="small" style="margin-top:8px;opacity:.7">相手に響く当たり方は、その者が何を望んでいるかで決まります。</div>`;
@@ -2259,7 +2262,13 @@ function viewCards(){
       ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
       ${ui.asked !== null ? `<div class="say"><span class="q">「${esc(E.QUESTIONS[ui.asked].chip)}か」</span><br>${
         esc(E.REPLIES[ui.asked][c.correct[ui.asked]])}</div>` : ''}
-      ${ui.stance === 'convert' ? '<div class="warn">転向は3枚すべて刺さらねば通りません。</div>' : ''}
+      ${ui.stance === 'convert' ? `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
+        ui.approach >= 2 ? `<br>さらに<b>${esc(E.APPROACHES[ui.approach].name)}は相手を読み切った前提の賭け</b>です。
+        型を読み違えていれば一段下がり、置いた札が刺さっていても転向には届きません。` : ''}${
+        E.waryOf(st.currents, ui.charId) >= 0 && E.vouchOf(st, ui.charId) < 0
+          ? '<br>警戒されている相手なので、ここからさらに一段下がります。転向は通りません。' : ''}${
+        st.banned.includes(ui.charId)
+          ? '<br>一度決裂した相手なので、ここからさらに一段下がります。転向は通りません。' : ''}</div>` : ''}
       ${E.waryOf(st.currents, ui.charId) >= 0 ? '<div class="warn">警戒されているため、判定は一段下がります。</div>' : ''}
       <div class="row" style="margin-top:12px">
         ${guided
@@ -2348,7 +2357,7 @@ function viewResult(){
       <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
         r.placeFits ? '　<span class="uibadge">◎ 場に合った（獲得+1）</span>' : ''}${
         r.fits ? '　<span class="uibadge">◎ この者に響いた（獲得+1）</span>'
-               : r.approach >= 2 ? '　<span style="color:var(--shu)">読み違え（一段下がった）</span>' : ''}</div>
+               : r.approach >= 2 ? `　<span style="color:var(--shu)">読み違え ― ${esc(E.APPROACHES[r.approach].name)}はこの者の型ではなかった（一段下がった）</span>` : ''}</div>
       ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
         <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}
         <div class="small" style="margin-top:6px">${r.duel.survived
@@ -2363,7 +2372,21 @@ function viewResult(){
       ${r.revisitApplied ? `<div class="warn">※ 一度決裂した相手なので、判定が一段下げられました</div>` : ''}
       ${r.reconciled ? `<div class="vowline">→ <b>和解した。</b>${esc(c.name)}は出現停止を解かれ、【人脈】に加わった。
         一度断たれた縁をつなぎ直したぶん、獲得は倍になっている。</div>` : ''}
-      ${r.allOrNothing && r.score === 2 ? `<div class="warn">※ 転向は3枚すべて刺さらねば通りません。2枚では相手は動きませんでした</div>` : ''}
+      ${(() => {
+        if (!r.allOrNothing || r.score === 3) return '';
+        const why = [];
+        if (r.misfit) why.push(`${esc(E.APPROACHES[r.approach].name)}が<b>この者の型ではなかった</b>`);
+        if (r.waryApplied) why.push(`〔${fac(r.waryBy).name}〕への<b>警戒</b>`);
+        if (r.grudgeApplied) why.push(`<b>決裂の噂</b>が届いていた`);
+        if (r.revisitApplied) why.push(`<b>一度決裂した相手</b>だった`);
+        if (r.rawScore < r.nCards)
+          return `<div class="warn">※ 転向は満点でしか通りません。置いた${r.nCards}枚のうち刺さったのは ${r.rawScore} 枚で、相手は動きませんでした</div>`;
+        if (!why.length) return '';
+        return `<div class="warn">※ <b>置いた${r.nCards}枚はすべて刺さっていました。</b>
+          しかし${why.join('、')}ため判定が下がり、転向に必要な満点に届きませんでした。<br>
+          転向は一段でも下がれば通りません。${r.score >= 2
+            ? '<b>支持であれば、この一致で通っていました</b>' : ''}</div>`;
+      })()}
       ${r.premature ? `<div class="warn">※ 時期尚早のため、${E.RANKS[r.rank]}級ですが影響力は限定的です（ランク補正を無効化）</div>` : ''}
       ${r.penalty ? `<div class="warn">※ ${E.RANKS[r.rank]}級との交渉に失敗し時勢 -${r.penalty}</div>` : ''}
       <div class="delta">${d}</div>

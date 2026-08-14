@@ -629,6 +629,39 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
   ok(d.actions.length === 1 && d.actions[0].charId === 25, '再訪の一手も保存コードに残る');
 }
 
+/* --- 5f3e. 転向と読み違えの重なり ------------------------------------------ */
+head('5f3e. 転向は一段でも下がれば通らない（表示が事実と合っているか）');
+{
+  const st0 = E.createState(1);
+  const fit   = E.CHARACTERS.find(c => E.approachOf(c.id) === 3 && c.factions.length === 1);
+  const nofit = E.CHARACTERS.find(c => E.approachOf(c.id) !== 3 && c.factions.length === 1);
+  const mk = (c, stance, ap) => ({ charId:c.id, stance, ownF:c.factions[0],
+    argueF: stance === 'convert' ? [0,1,2,3,4].find(f => !c.factions.includes(f)) : c.factions[0],
+    cards: c.correct.slice(), probed:false, approach: ap, place:null });
+
+  const a1 = mk(fit, 'convert', 3), r1 = E.resolve(st0, a1).report;
+  ok(r1.score === 3 && r1.gain > 0, '型が合っていれば、肚を割っての転向は通る');
+  ok(r1.nCards === 1 && r1.rawScore === 1, '肚を割るで置く札は1枚で、それが刺さっている');
+
+  const a2 = mk(nofit, 'convert', 3), r2 = E.resolve(st0, a2).report;
+  ok(r2.misfit === true, '型が合わなければ読み違えとして報告される');
+  ok(r2.rawScore === r2.nCards, '置いた札はすべて刺さっていた（外したのではない）');
+  ok(r2.score === 2 && r2.gain === 0,
+     '読み違えの一段で満点を割り、転向は通らない ― 札が刺さっていても失敗する');
+  ok(r2.verdict === '失敗', 'この場合の判定は失敗（決裂ではない）');
+  /* 結果画面は「支持なら通っていた」と言う。それが本当か確かめる */
+  const r3 = E.resolve(st0, mk(nofit, 'support', 3)).report;
+  ok(r3.score === 2 && r3.gain > 0, '同じ一致でも、支持であれば通る');
+
+  /* 警戒が重なった場合、支持でも通らないので「支持なら通った」とは言えない */
+  const wf = E.OPPOSED[nofit.factions[0]][0];
+  const cur = [0,0,0,0,0]; cur[wf] = E.WARY_LINE;
+  const wary = Object.assign({}, st0, { currents: cur });
+  const r4 = E.resolve(wary, mk(nofit, 'support', 3)).report;
+  ok(E.waryOf(cur, nofit.id) >= 0, '警戒が成立している');
+  ok(r4.score < 2 && r4.gain === 0, '読み違えと警戒が重なれば、支持でも通らない');
+}
+
 /* --- 5f4. 場 --------------------------------------------------------------- */
 head('5f4. 行き先');
 ok(E.PLACES.length === 6 && E.PLACES.every(p => p.name && p.desc && p.allow.length && p.favor.length),
