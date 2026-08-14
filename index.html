@@ -2262,12 +2262,12 @@ function scoreBreakdown(st, action){
   if (waryApplied) raw -= 1;
   const grudgeApplied = grudgedBy >= 0 && vouchedBy < 0 && raw >= 2;
   if (grudgeApplied) raw -= 1;
-  /* 一度決裂した相手が向こうから来た場合。本人が怒っているので、紹介では消えない。 */
+  /* 一度決裂した相手が向こうから来た場合。判定は普通どおりで、通れば和解する。
+     以前は「一段重い」「通れば倍」を重ねていたが、規則を2つ減らしても難易度は
+     ほとんど動かず（普通 19%→22%）、和解の成立回数はむしろ増えた。 */
   const revisit = (st.banned || []).includes(action.charId);
-  const revisitApplied = revisit && raw >= 2;
-  if (revisitApplied) raw -= 1;
   return { score: clamp(raw, 0, spec.cap), misfit, vouchedBy, grudgedBy, waryBy,
-           waryApplied, grudgeApplied, revisit, revisitApplied };
+           waryApplied, grudgeApplied, revisit };
 }
 const scoreOf = (st, action) => scoreBreakdown(st, action).score;
 
@@ -2429,8 +2429,6 @@ function resolve(st, action){
      場は「相手には響かないが、ここでならやりようがある」という代替路である。 */
   const placeFits = action.place != null && PLACES[action.place].boost === approach;
   if (gain > 0 && !partial && (fits || placeFits)) gain += 1;
-  /* 一度決裂した相手を説き伏せたなら、その一手の意味は倍になる */
-  if (gain > 0 && !partial && sb.revisit) gain *= 2;
 
   /* 探った代償: その交渉で得られる時勢が1下がる（最低1）。
      元の獲得が大きい大物ほど、相対的な代償は軽く済む。 */
@@ -2509,7 +2507,7 @@ function resolve(st, action){
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
     vouchedBy: sb.vouchedBy, grudgedBy: sb.grudgedBy,
     waryApplied: sb.waryApplied, grudgeApplied: sb.grudgeApplied,
-    revisit: sb.revisit, revisitApplied: sb.revisitApplied, reconciled, misfit: sb.misfit,
+    revisit: sb.revisit, reconciled, misfit: sb.misfit,
     delta: cur.map((v, i) => v - before[i]),
     partial,
     verdict: partial ? '手応え' : succeeded ? (score === 3 ? '大成功' : '成功')
@@ -2909,8 +2907,7 @@ function viewMeeting(){
       ? `<div class="warn">※ あなたが掲げる〔${fac(wb).name}〕を警戒している。判定が一段下がります</div>` : '';
     const again = isRevisit
       ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, id))}
-         <span class="small">※ 一度決裂した相手。判定は一段重く、紹介の顔も通らない。
-         だが説き伏せられれば<b>得るものは倍</b>になり、出現停止も解ける</span></div>` : '';
+         <span class="small">※ 一度決裂した相手。<b>説き伏せれば和解し</b>、出現停止が解けて人脈に加わる</span></div>` : '';
     return `<div class="person ${E.PORTRAITS.has(id)?'has-portrait':''} ${isIntro?'intro':''} ${isRevisit?'revisit':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
       ${portraitThumbHTML(id)}
       <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
@@ -3112,7 +3109,7 @@ function viewStance(){
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       ${st.banned.includes(ui.charId)
         ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, ui.charId))}
-           <span class="small">※ 一度決裂した相手。判定は一段重い。通れば得るものは倍</span></div>`
+           <span class="small">※ 一度決裂した相手。説き伏せれば和解する</span></div>`
         : tieHTML(ui.charId, E.waryOf(st.currents, ui.charId))}
       <div class="opening">「${esc(E.SAYS.get(ui.charId) || '')}」</div>
       ${(() => { const sit = E.situationOf(st, ui.charId, ui.place);
@@ -3162,8 +3159,7 @@ function viewCards(){
         置いた札が刺さっていても転向には届きません。` : ''}${
         E.waryOf(st.currents, ui.charId) >= 0 && E.vouchOf(st, ui.charId) < 0
           ? '<br>警戒されている相手なので、ここからさらに一段下がります。転向は通りません。' : ''}${
-        st.banned.includes(ui.charId)
-          ? '<br>一度決裂した相手なので、ここからさらに一段下がります。転向は通りません。' : ''}</div>` : ''}
+        ''}</div>` : ''}
       ${E.waryOf(st.currents, ui.charId) >= 0 ? '<div class="warn">警戒されているため、判定は一段下がります。</div>' : ''}
       <div class="row" style="margin-top:12px">
         ${guided
@@ -3269,16 +3265,14 @@ function viewResult(){
       ${r.vouchedBy >= 0 ? `<div class="small"><span class="uibadge">※ ${esc(E.CHAR_BY_ID.get(r.vouchedBy).name)}の紹介が効いた。</span>${
         r.waryBy >= 0 ? `〔${fac(r.waryBy).name}〕への警戒を受けずに済んだ` : 'この相手は端からあなたを門前払いしなかった'}</div>` : ''}
       ${r.grudgeApplied ? `<div class="warn">※ ${esc(E.CHAR_BY_ID.get(r.grudgedBy).name)}を決裂させた噂が先に届いており、判定が一段下げられました</div>` : ''}
-      ${r.revisitApplied ? `<div class="warn">※ 一度決裂した相手なので、判定が一段下げられました</div>` : ''}
       ${r.reconciled ? `<div class="vowline">→ <b>和解した。</b>${esc(c.name)}は出現停止を解かれ、【人脈】に加わった。
-        一度断たれた縁をつなぎ直したぶん、獲得は倍になっている。</div>` : ''}
+        一度断たれた縁が、つなぎ直された。</div>` : ''}
       ${(() => {
         if (!r.allOrNothing || r.score === 3) return '';
         const why = [];
         if (r.misfit) why.push(`この者が欲していたのは〔${esc(E.CATS[0].motives[c.correct[0]])}〕で、<b>${esc(E.APPROACHES[r.approach].name)}は響かなかった</b>`);
         if (r.waryApplied) why.push(`〔${fac(r.waryBy).name}〕への<b>警戒</b>`);
         if (r.grudgeApplied) why.push(`<b>決裂の噂</b>が届いていた`);
-        if (r.revisitApplied) why.push(`<b>一度決裂した相手</b>だった`);
         if (r.rawScore < r.nCards)
           return `<div class="warn">※ 転向は満点でしか通りません。置いた${r.nCards}枚のうち刺さったのは ${r.rawScore} 枚で、相手は動きませんでした</div>`;
         if (!why.length) return '';

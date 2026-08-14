@@ -788,15 +788,7 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
                 cards: target.correct.slice(), probed:false, approach:0, place: hot[0] };
   const clean = Object.assign({}, base, { banned: [] });
   ok(E.scoreOf(clean, act) === 3, '決裂していない相手なら3枚一致は大成功');
-  ok(E.scoreOf(bad, act) === 2, '再訪の相手は判定が一段重い');
-  /* 縁のある人脈を持たせても、本人の怒りは消えない */
-  let voucher = -1;
-  for (const [a, set] of E.TIE_GRAPH) if (set.has(25)) { voucher = a; break; }
-  if (voucher >= 0){
-    const withVouch = Object.assign({}, bad, { contacts: [voucher] });
-    ok(E.vouchOf(withVouch, 25) === voucher, '再訪の相手にも縁者はいる');
-    ok(E.scoreOf(withVouch, act) === 2, '紹介の顔では、決裂した本人の怒りは消えない');
-  } else ok(true, '（25番に縁者がいないため紹介の検査は省略）');
+  ok(E.scoreOf(bad, act) === 3, '再訪でも判定は普通どおり（規則を減らした）');
 
   /* 通れば倍、和解して出現停止が解ける */
   const rHit = E.resolve(bad, act);
@@ -804,18 +796,20 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
   ok(rHit.report.reconciled === true, '説き伏せれば和解と報告される');
   ok(!rHit.next.banned.includes(25), '和解すれば出現停止が解ける');
   ok(rHit.next.contacts.includes(25), '和解した相手は人脈に加わる');
-  ok(rHit.report.gain > rBase.report.gain,
-     `和解の獲得は通常の大成功を上回る（再訪 ${rHit.report.gain} / 通常 ${rBase.report.gain}）`);
-  ok(rHit.report.verdict === '成功' && rBase.report.verdict === '大成功',
-     '再訪では大成功に届かない（一段重いので、3枚一致でようやく成功）');
+  ok(rHit.report.gain === rBase.report.gain,
+     `和解しても獲得は通常どおり（再訪 ${rHit.report.gain} / 通常 ${rBase.report.gain}）`);
+  ok(rHit.report.verdict === rBase.report.verdict, '判定の呼び名も通常と同じ');
   {
     const two = Object.assign({}, act, { cards: [target.correct[0], target.correct[1], (target.correct[2]+1)%6] });
-    ok(E.scoreOf(clean, two) === 2 && E.resolve(clean, two).report.gain > 0,
-       '通常なら2枚一致でも通る');
-    ok(E.scoreOf(bad, two) === 1 && E.resolve(bad, two).report.partial,
-       '再訪は3枚すべて刺さらねば和解に届かない（2枚では手応えどまり）');
-    ok(!E.resolve(bad, two).report.reconciled, '手応えでは出現停止は解けない');
+    ok(E.scoreOf(bad, two) === 2 && E.resolve(bad, two).report.reconciled,
+       '再訪も2枚一致で通り、和解する（通常の交渉と同じ条件）');
+    const one = Object.assign({}, act, { cards: [target.correct[0], (target.correct[1]+1)%6, (target.correct[2]+1)%6] });
+    ok(E.resolve(bad, one).report.partial && !E.resolve(bad, one).report.reconciled,
+       '手応えどまりでは出現停止は解けない');
   }
+  /* 規則は「向こうから来る」「通れば和解する」の2つに減っている */
+  ok(E.scoreBreakdown(bad, act).revisit === true && !('revisitApplied' in E.scoreBreakdown(bad, act)),
+     '再訪による判定の上下がなくなっている');
   ok(rHit.next.banned.includes(10), 'ほかの決裂者はそのまま残る');
   ok(E.revisitOf(rHit.next, hot[0]) === 10, '和解すると、次の決裂者が待つようになる');
 
