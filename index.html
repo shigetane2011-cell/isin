@@ -286,6 +286,11 @@ button.primary .small{color:inherit;opacity:.82}
 .phead{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
 .phead .small{opacity:.7}
 .pacts{display:flex;gap:6px;margin-top:5px}
+.pill.live b{color:var(--kin);margin-left:3px}
+.pill.spent{opacity:.55}
+.person.visit{border-color:var(--kin);box-shadow:inset 0 0 0 1px var(--kin)}
+.person.visit .desc{color:var(--sumi)}
+.visit-note{margin-top:6px;background:#fffdf6;border-left:3px solid var(--kin);padding:7px 10px;line-height:1.65}
 .origin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin:8px 0}
 .origin{border:1px solid var(--line);background:#fff;padding:10px 12px;cursor:pointer}
 .origin:hover{border-color:var(--kin)}
@@ -3267,7 +3272,9 @@ function resolve(st, action){
 
   const next = {
     seed: st.seed, origin: st.origin ?? 0, turn: st.turn + 1, currents: cur, contacts, banned, promises,
-    lastLen: len, lastPlace: action.place ?? null,
+    lastLen: len,
+    /* 来訪に応じた手は移動していないので、直前の場は変わらない（連泊の抜け道を作らない） */
+    lastPlace: action.place != null ? action.place : (st.lastPlace ?? null),
     /* 立ち合いに敗れると、深追いする余裕を失う（一度きりの奥の手を失う） */
     probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
       + (approach === 2 ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
@@ -3331,6 +3338,45 @@ function applyInterlude(st, choice){
     /* 幕間の増減で上限に達したら、その時点で終局とする（交渉と同じ扱い） */
     finished: st.finished || cur.some(v => v >= CAP),
   });
+}
+
+/* --- 来訪 -----------------------------------------------------------------
+   人脈は平均9.5人まで増えるが、そのうち5.4人（57%）は一度も何もしない。
+   紹介枠と縁の判定に使われるだけで、集めた名前の半分以上が眠っていた。
+
+   そこで、人脈の誰かが向こうから訪ねてくる手を足す。連れてくるのは、その人脈と
+   史実の縁で繋がる未獲得の人物。応じると移動しないので、
+   ・旅疲れがない（都市を跨いでも候補が減らない）
+   ・場の縛りがない（四つの働きかけがすべて使える）
+   ・連れてきた人脈が顔になるので、旗色の警戒も悪評も通らない
+   代わりに、場の◎（獲得+1）は乗らず、三人から選ぶこともできない。
+   盤面には何も足していない（seed・ターン・人脈から導く派生）。
+   ------------------------------------------------------------------------ */
+const VISIT_TURN = 3;              /* 人脈が育つまでは起きない */
+const VISIT_RATE = 0.40;
+const VISIT_SAYS = [
+  '客を連れてきた。おぬしなら、話が通ると思うてな。',
+  '客人をお連れ申した。貴殿なら話が通ると存じましてな。',
+  'お客さんをお連れしましたよ。あなたなら話が通ると思いまして。',
+  'お客様をお連れしました。あなたなら、お話が通ると思いまして。',
+];
+function visitOf(st){
+  const contacts = st.contacts || [];
+  if (st.turn < VISIT_TURN || contacts.length < 2 || st.finished) return null;
+  const rnd = streamOf(st.seed, st.turn, 5150);
+  if (rnd() >= VISIT_RATE) return null;
+  const excl = new Set([...contacts, ...(st.banned || [])]);
+  /* 決裂させた相手の縁筋は、こちらを訪ねてこない */
+  for (const b of st.banned || []) for (const t of (TIE_GRAPH.get(b) || [])) excl.add(t);
+  const maxId = MAX_ID_BY_ERA[eraOf(st)];
+  const pairs = [];
+  for (const h of contacts)
+    for (const g of (TIE_GRAPH.get(h) || []))
+      if (!excl.has(g) && g <= maxId) pairs.push([h, g]);
+  if (!pairs.length) return null;
+  pairs.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const [host, guest] = pairs[Math.floor(rnd() * pairs.length)];
+  return { host, guest, say: VISIT_SAYS[TONE_OF_VOICE[voiceOf(host)]] };
 }
 
 /* --- エンディング判定 ---------------------------------------------------- */
@@ -3447,7 +3493,7 @@ const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_B
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, GESTURES, gestureOf, SCENE_SAYS, SCENE_ORDER, SCENE_KEYS, sceneOf, sceneSayOf, ORIGINS, RECEPTIONS, receptionKind, receptionOf, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
-  PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, visitOf, VISIT_TURN, VISIT_RATE, VISIT_SAYS, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
   playerStanding, playerEpilogue, encodeSave, decodeSave, hashState };
@@ -3625,8 +3671,16 @@ function chartHTML(compact){
   const foes = E.FACTIONS.map((f, i) => st.currents[i] >= E.WARY_LINE
     ? `<span class="${f.cls}">${f.name}</span>を掲げるため <span class="warn" style="display:inline">${
         E.OPPOSED[i].map(o => E.FACTIONS[o].name).join('・')}</span> の人物が警戒中` : null).filter(Boolean);
+  /* 人脈は名前を並べるだけの戦利品だった。その人から繋がる未獲得の人物の数を添えると、
+     誰が扉を持っていて誰が持っていないかが読める。来訪も紹介も、この数から起きる。 */
+  const openings = id => [...(E.TIE_GRAPH.get(id) || [])]
+    .filter(t => !st.contacts.includes(t) && !st.banned.includes(t)).length;
   const list = st.contacts.length
-    ? st.contacts.map(id => `<span class="pill">${esc(E.CHAR_BY_ID.get(id).name)}</span>`).join('')
+    ? st.contacts.map(id => { const n = openings(id);
+        return `<span class="pill ${n ? 'live' : 'spent'}">${esc(E.CHAR_BY_ID.get(id).name)}${
+          n ? `<b>+${n}</b>` : ''}</span>`; }).join('')
+      + `<div class="small" style="margin-top:4px;opacity:.75">＋の数は、その人から繋がる未獲得の人物。
+         <b>この人たちが紹介を連れてくるし、向こうから訪ねてもきます。</b>数字のない人からは、もう新しい縁は出ません。</div>`
     : '<span class="small">なし</span>';
   const foesHTML = foes.length
     ? `<div class="small" style="margin-top:8px;color:var(--shu)">${foes.join('<br>')}</div>` : '';
@@ -3907,6 +3961,24 @@ function viewMeeting(){
         ${travelNote}
       </div>
       ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
+      ${(() => {
+        const v = E.visitOf(st);
+        if (!v) return '';
+        const g = E.CHAR_BY_ID.get(v.guest), h = E.CHAR_BY_ID.get(v.host);
+        const rk = E.rankOfId(v.guest);
+        return `<div class="person visit ${E.PORTRAITS.has(v.guest)?'has-portrait':''}" style="${
+          toneStyle(g.factions)}" data-id="${v.guest}" data-visit="1" role="button" tabindex="0">
+          ${portraitThumbHTML(v.guest)}
+          <div><span class="nm">${esc(g.name)}</span><span class="tag">${E.RANKS[rk]}</span>${
+            g.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('')}</div>
+          <div class="nick">— ${esc(g.nick)} —</div>
+          <div class="tie"><span class="who">〔${esc(h.name)}の来訪〕</span>${esc(v.say)}</div>
+          <div class="desc">[来訪] ${esc(g.desc)}</div>
+          <div class="small visit-note"><b>応じれば移動しません。</b>旅疲れを受けず、
+            <b>場の縛りもないので四つの働きかけがすべて使えます</b>。${esc(h.name)}の顔が立つので警戒も悪評も通りません。
+            ただし<b>場の◎（獲得+1）は乗らず</b>、他の候補は選べません。</div>
+        </div>`;
+      })()}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
@@ -3921,6 +3993,8 @@ function viewMeeting(){
   app.querySelectorAll('.person').forEach(el => el.onclick = () => {
     if (el.dataset.id === undefined) return;
     ui.charId = +el.dataset.id; ui.intro = el.classList.contains('intro');
+    /* 来訪に応じた手は場を持たない。働きかけの縛りも旅疲れも掛からない */
+    if (el.dataset.visit) ui.place = null;
     ui.stance = null; ui.ownF = null; ui.argueF = null;
     ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null; ui.observed = null;
     ui.screen = 'stance'; render();

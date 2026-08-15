@@ -673,6 +673,52 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
     ok(rejected === 3, '旧版のコードと、不正な出自の番号を弾く');
   }
   {
+    /* 来訪。人脈は平均9.5人まで増えるのに5.4人（57%）は一度も何もしていなかった。
+       向こうから訪ねてくる手を足して、眠っている人脈に出番を作る。 */
+    let offered = 0, turns = 0, badGuest = 0, notVouched = 0, games = 0;
+    for (let origin = 0; origin < 3; origin++) for (let i = 0; i < 60; i++){
+      let st = E.createState(3000 + i, origin);
+      while (!st.finished){
+        if (E.pendingInterlude(st)) { st = E.applyInterlude(st, 1); continue; }
+        turns++;
+        const v = E.visitOf(st);
+        if (v){
+          offered++;
+          /* 連れてくるのは未獲得・未決裂で、必ず人脈と縁で繋がっている者 */
+          if (st.contacts.includes(v.guest) || st.banned.includes(v.guest)) badGuest++;
+          if (!st.contacts.includes(v.host)) badGuest++;
+          if (E.vouchOf(st, v.guest) < 0) notVouched++;
+          if (st.turn < E.VISIT_TURN || st.contacts.length < 2) badGuest++;
+        }
+        const ml = E.meetingList(st, 0), id = ml.normal[0], c = E.CHAR_BY_ID.get(id);
+        st = E.resolve(st, { charId:id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+          cards:c.correct, probed:false, asked:1, approach:0, place:0 }).next;
+      }
+      games++;
+    }
+    ok(offered > 0, `来訪が実際に起きる（${games}局で ${offered} 回）`);
+    ok(badGuest === 0, `来訪の相手は必ず未獲得・未決裂で、連れてくるのは人脈本人（違反 ${badGuest} 件）`);
+    ok(notVouched === 0, `来訪で来る相手には必ず縁が立つ（立たない ${notVouched} 件）`);
+    ok(E.VISIT_SAYS.length === 4, '来訪の一言が4系統の調子ぶんある');
+    /* 応じても移動していないので、直前の場は変わらない（連泊の抜け道を作らない） */
+    {
+      let st = E.createState(11, 0);
+      const c0 = E.CHAR_BY_ID.get(E.meetingList(st, 3).normal[0]);
+      st = E.resolve(st, { charId:c0.id, stance:'support', ownF:c0.factions[0], argueF:c0.factions[0],
+        cards:c0.correct, probed:false, asked:1, approach:0, place:3 }).next;
+      const c1 = E.CHAR_BY_ID.get(1);
+      const after = E.resolve(st, { charId:1, stance:'support', ownF:c1.factions[0], argueF:c1.factions[0],
+        cards:c1.correct, probed:false, asked:1, approach:0, place:null }).next;
+      ok(after.lastPlace === 3, '来訪に応じても直前の場は変わらない（連泊の抜け道を作らない）');
+      ok(!E.placesOpen(after).includes(3), '来訪の翌ターンも、昨日の場へは続けて行けない');
+    }
+    ok(html.includes('data-visit="1"') && html.includes('の来訪〕')
+       && html.includes("if (el.dataset.visit) ui.place = null;"),
+       '来訪の札を面会画面に出し、応じると場を持たない手になる');
+    ok(html.includes('＋の数は、その人から繋がる未獲得の人物'),
+       '人脈の一覧に、その人から繋がる未獲得の人数を添える');
+  }
+  {
     /* 面会の入り口。台詞を増やしても、常に同じ順で同じ7ブロックを並べる限り
        展開は一本のままだった。盤面と人物で、並びと有無そのものを変える。 */
     const keys = Object.keys(E.SCENE_ORDER);
