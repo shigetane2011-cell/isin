@@ -116,6 +116,24 @@ ok(html.includes('ui.observed === i || ui.probed || guided')
 ok(html.includes('ui.probed || guidedTurn() || ui.observed === 0'),
    '利益提示を観たら、そこから読める働きかけにも印が出る（奥の手と扱いを揃える）');
 ok(html.includes('所作を観たところ'), '印の文言が、観たのか聞き出したのかを言い分ける');
+{
+  /* スマホでは働きかけの一覧が画面上端から1389px下・縦一列で、論じるが常に先頭、
+     肚を割るは最後だった。押しやすい手に寄るのは当然なので、並びと印を直した。 */
+  const stanceView = html.slice(html.indexOf('function viewStance()'),
+                                html.indexOf('function viewCards()'));
+  ok(/rank: off \? 3 : hitsHim \? 0 : hitsHere \? 1 : 2/.test(stanceView)
+     && /\.sort\(\(x, y\) => x\.rank - y\.rank \|\| x\.i - y\.i\)/.test(stanceView),
+     '働きかけは 響く→場に合う→並→使えない の順に並べ替える');
+  ok(stanceView.includes('◎ この者に響く'),
+     '響く働きかけの印を、折りたたみの中ではなくボタン自身に出す');
+  ok(/data-approach="\$\{i\}"/.test(stanceView),
+     '並べ替えても data-approach は実際の番号のまま（判定に影響しない）');
+  ok(stanceView.includes("document.getElementById('decide')?.scrollIntoView"),
+     '画面内で選ぶたびに、次の選択へ視線を移す');
+  const mobile = html.slice(html.lastIndexOf('@media'));
+  ok(/\.approach-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/.test(mobile),
+     'スマホでも働きかけ四つを横並びにして、一目に入れる');
+}
 /* 踏み切る画面に出ていない減点があると、落ちた理由が後からしか分からない */
 {
   const cardsView = html.slice(html.indexOf('function viewCards()'),

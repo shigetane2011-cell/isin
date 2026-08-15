@@ -161,6 +161,8 @@ button.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:12px
 button .small{color:inherit;opacity:.85}
 button:disabled{opacity:.45}
 button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
+button.choice.hit-him{border-color:var(--kin);box-shadow:inset 0 0 0 1px var(--kin)}
+button.choice.hit-here{border-color:var(--kin)}
 .fate{border-left:3px solid var(--line);padding:8px 12px;margin:8px 0;font-size:.9rem}
 .fate.won{border-left-color:var(--yuhan)}
 .fate.lost{border-left-color:var(--sumi2);opacity:.85}
@@ -401,7 +403,14 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .chart-glance{gap:3px 8px}
   .story-visual.compact-person-visual{height:135px}
   .portrait-stage.compact-person-visual{height:160px}
-  .approach-grid,.card-grid{grid-template-columns:1fr}
+  .card-grid{grid-template-columns:1fr}
+  /* 働きかけは四つを一目に入れる。縦一列だと最後の「肚を割る」が二画面下になる */
+  .approach-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  #decide{scroll-margin-top:8px}
+  .approach-grid .choice{padding:9px 10px;font-size:.86rem}
+  .approach-grid .choice .small{font-size:.72rem;line-height:1.5}
+  .approach-grid .choice .cn,.approach-grid .choice .uibadge{white-space:nowrap}
+  .approach-grid .choice:disabled .small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .interlude-figure{align-items:flex-start}
   .counterpart-reaction{grid-template-columns:66px minmax(0,1fr);gap:10px;padding:9px}
   .reaction-portrait{min-height:88px}
@@ -4007,24 +4016,35 @@ function viewStance(){
           esc(E.CATS[0].motives[knownMotive])}〕</span>。
           筋どおりなら <b>${esc(E.APPROACHES[impliedAp].name)}</b> が響きます
           <span style="opacity:.7">（そう見えて違う者もいます）</span></div>` : ''}
-        <div class="approach-grid">${E.APPROACHES.map((a, i) => {
-          const noGuide = guidedTurn() && i !== 0;
-          const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
-          const noConvert = ui.stance === 'convert' && !E.canConvert(i);
-          const noProbe = i === 2 && left <= 0;
-          const off = noGuide || noPlace || noConvert || noProbe;
-          const why = noGuide ? '（練習では論じるに絞ります）'
-                    : noPlace ? `（${esc(E.PLACES[ui.place].name)}ではできない）`
-                    : noConvert ? '（転向は論じるか肚を割るでしか通らない）'
-                    : noProbe ? '（奥の手を使い切っている）' : '';
-          return `<button class="choice" data-approach="${i}" ${off ? 'disabled' : ''}>
-            <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small">カード${a.cards}枚</span>`}
-            ${ui.place !== null && E.PLACES[ui.place].boost === i && !off
-              ? '<span class="small uibadge">　◎ この場に合う</span>' : ''}
+        ${(() => {
+          /* スマホでは働きかけの一覧が画面上端から1400px下に出ており、しかも縦一列で
+             論じるが常に先頭、肚を割るは最後だった。押しやすい手に寄るのは当然である。
+             ① 響く手・場に合う手を先頭へ ② 使えない手は末尾へ ③ 印はボタン自身に出す。
+             並べ替えても data-approach は実際の番号のままなので、判定には影響しない。 */
+          const rows = E.APPROACHES.map((a, i) => {
+            const noGuide = guidedTurn() && i !== 0;
+            const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
+            const noConvert = ui.stance === 'convert' && !E.canConvert(i);
+            const noProbe = i === 2 && left <= 0;
+            const off = noGuide || noPlace || noConvert || noProbe;
+            const why = noGuide ? '（練習では論じるに絞ります）'
+                      : noPlace ? `（${esc(E.PLACES[ui.place].name)}ではできない）`
+                      : noConvert ? '（転向は論じるか肚を割るでしか通らない）'
+                      : noProbe ? '（奥の手を使い切っている）' : '';
+            const hitsHim = !off && impliedAp === i;
+            const hitsHere = !off && ui.place !== null && E.PLACES[ui.place].boost === i;
+            return { a, i, off, why, hitsHim, hitsHere,
+                     rank: off ? 3 : hitsHim ? 0 : hitsHere ? 1 : 2 };
+          }).sort((x, y) => x.rank - y.rank || x.i - y.i);
+          return `<div class="approach-grid">${rows.map(({ a, i, off, why, hitsHim, hitsHere }) =>
+            `<button class="choice ${hitsHim ? 'hit-him' : hitsHere ? 'hit-here' : ''}" data-approach="${i}" ${off ? 'disabled' : ''}>
+            <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small cn">カード${a.cards}枚</span>`}
+            ${hitsHim ? '<span class="small uibadge">　◎ この者に響く</span>' : ''}
+            ${hitsHere ? '<span class="small uibadge">　◎ この場に合う</span>' : ''}
             ${ui.stance === 'convert' && i >= 2 && !off
               ? '<span class="small" style="color:var(--shu)">　※ 読み違えれば、札が刺さっても転向は通らない</span>' : ''}
-            <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`;
-        }).join('')}</div>
+            <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`).join('')}</div>`;
+        })()}
         <div class="small" style="margin-top:8px;opacity:.7">響けば獲得が1増えます。金品と肚を割るは<b>相手を読み切った前提の賭け</b>なので、外すと逆に一段下がります。</div>`;
     }
   }
@@ -4106,20 +4126,23 @@ function viewStance(){
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       ${order.slice(0, descAt).map(k => BLOCK[k]()).join('')}
       ${guide}<div class="quote">${esc(c.desc)}</div>
-      ${order.slice(descAt).map(k => BLOCK[k]()).join('')}<hr>${body}
+      ${order.slice(descAt).map(k => BLOCK[k]()).join('')}<hr id="decide">${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
   app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
   app.querySelectorAll('[data-see]').forEach(b => b.onclick = () => { ui.observed = +b.dataset.see; render(); });
   const pb0 = document.getElementById('probe');
   if (pb0) pb0.onclick = () => { ui.probed = true; render(); };
-  app.querySelectorAll('[data-own]').forEach(b => b.onclick = () => { ui.ownF = +b.dataset.own; render(); });
+  /* 面会画面は長い。スマホでは働きかけの一覧が画面上端から1400px下に出るので、
+     画面内で選ぶたびに、次の選択へ視線を移してやる。最初の表示では動かさない。 */
+  const toDecision = () => { render(); document.getElementById('decide')?.scrollIntoView({ block:'start' }); };
+  app.querySelectorAll('[data-own]').forEach(b => b.onclick = () => { ui.ownF = +b.dataset.own; toDecision(); });
   app.querySelectorAll('[data-stance]').forEach(b => b.onclick = () => {
     ui.stance = b.dataset.stance;
     if (ui.stance === 'support') ui.argueF = ui.ownF;
-    render();
+    toDecision();
   });
-  app.querySelectorAll('[data-argue]').forEach(b => b.onclick = () => { ui.argueF = +b.dataset.argue; render(); });
+  app.querySelectorAll('[data-argue]').forEach(b => b.onclick = () => { ui.argueF = +b.dataset.argue; toDecision(); });
   app.querySelectorAll('[data-approach]').forEach(b => b.onclick = () => {
     ui.approach = +b.dataset.approach; ui.screen = 'cards'; render();
   });
