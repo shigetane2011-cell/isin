@@ -200,6 +200,16 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .legend .small{margin-top:7px;opacity:.75}
 .opening.sit{color:var(--sumi2);font-size:.95rem;margin:-6px 0 10px}
 .pre{font-size:.86rem;color:var(--sumi2);margin:6px 0 2px;letter-spacing:.02em}
+.observations{margin:10px 0 12px;padding:9px 11px;border:1px solid rgba(var(--tone-a,59,52,44),.3);
+  border-left:4px solid rgb(var(--tone-a,59,52,44));
+  background:linear-gradient(100deg,rgba(var(--tone-a,59,52,44),.075),rgba(255,253,247,.76) 72%)}
+.observations .obs-title{font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--sumi2);margin-bottom:5px}
+.observation{display:grid;grid-template-columns:5.3em 1fr;gap:7px;padding:4px 0;border-top:1px dotted rgba(59,52,44,.2);
+  font-size:.84rem;line-height:1.55}
+.observation:first-of-type{border-top:0}
+.observation .obs-kind{color:var(--sumi2);font-size:.72rem;letter-spacing:.08em;padding-top:1px}
+.observation.scene{color:var(--sumi)}
+.observation.scene .obs-kind{color:rgb(var(--tone-a,59,52,44));font-weight:700}
 /* 人物の絵。勢力の情景は横長の帯だが、本人の絵は縦長で中央に置く */
 .story-visual.portrait-visual .visual-images{max-width:340px;margin:0 auto}
 .story-visual.portrait-visual img{aspect-ratio:3/4;object-fit:cover}
@@ -460,8 +470,9 @@ const eraOfTotal = t => t < 10 ? 0 : t < 25 ? 1 : t < 40 ? 2 : 3;
 
 /* --- 論証カード ----------------------------------------------------------
    カテゴリ: 0=利益提示 / 1=文脈理解 / 2=論理整合
-   動機型(索引 0..5) は全勢力で共通。人物ごとの「刺さる型」は不変で、
-   どの思想の言葉で語るか(勢力)だけが立場によって変わる。
+   動機型(索引 0..5) は全勢力で共通。利益と論理は人物の芯として不変。
+   文脈だけは、同じ人物でも会う場と時代によって変わる。
+   どの思想の言葉で語るか(勢力)も、こちらの立場によって変わる。
    ------------------------------------------------------------------------ */
 const CATS = [
   { name:'利益提示', hint:'この人物が欲しているものは何か',
@@ -979,7 +990,8 @@ function listenerGroup(charId){
 
 /* --- 登場人物 100名 ------------------------------------------------------
    [id, 姓名, 勢力(配列), 二つ名, 情勢描写, 利益型, 文脈型, 論理型]
-   情勢描写は「刺さる型」を読み取るための手がかりを兼ねる。
+   3値は人物本来の型。実際の面会では文脈型だけが場と時代で上書きされ、
+   情勢描写と三つの観察から「いま刺さる型」を読む。
    ------------------------------------------------------------------------ */
 const C = (id,name,f,nick,desc,b,c,l) => ({id,name,factions:f,nick,desc,correct:[b,c,l]});
 const CHARACTERS = [
@@ -1267,7 +1279,7 @@ const ENDINGS = {
 /* --- 対話（チップ式） ----------------------------------------------------
    面会した相手には、踏み込んだ問いを **一つだけ** ぶつけられる。
    通常の返答は「刺さらない型」を一つ否定し、対応するカードを三択から除外する。
-   正解そのものは明かさず、残った二択を人物描写から読む余地を残す。
+   正解そのものは明かさず、残った二択を人物評と三つの観察から読む余地を残す。
    その者の時勢観は、問わずとも情勢描写の下に出る（雰囲気のためのもので、手がかりではない）。
    チュートリアルと一局一度の奥の手だけは、従来どおり正解を明かす。
    ------------------------------------------------------------------------ */
@@ -1449,9 +1461,16 @@ const REPLIES = [
     '時代の流れです。この国が開くのは、もはや時間の問題でした。'],
   ],
 ];
-/* その人物が、その問いに答える言葉 */
-const replyOf = (charId, cat) =>
-  REPLIES[cat][CHAR_BY_ID.get(charId).correct[cat]][voiceOf(charId)];
+/* その人物が、その問いに答える言葉。文脈は場と時代で変わるので、
+   面会時の状態を受け取って「いまの正解」から返す。 */
+function replyOf(st, charId, cat, place){
+  /* 二引数は旧来の呼び出し。場なし＝人物本来の返答として扱う。 */
+  if (typeof st === 'number'){
+    cat = charId; charId = st;
+    return REPLIES[cat][CHAR_BY_ID.get(charId).correct[cat]][voiceOf(charId)];
+  }
+  return REPLIES[cat][effectiveCorrect(st, charId, place)[cat]][voiceOf(charId)];
+}
 
 /* 通常の問いで否定される型。正解以外の5つから seed・ターン・人物・カテゴリで
    一つを決める。同じ局面では必ず同じ返答になり、カード三択にも必ず混ぜる。 */
@@ -1474,14 +1493,14 @@ const DENIAL_ENDS = [
   '。少なくとも、その見立ては外れている。',
   '。その考えは除いてください。',
 ];
-function deniedMotiveOf(st, charId, cat){
-  const correct = CHAR_BY_ID.get(charId).correct[cat];
+function deniedMotiveOf(st, charId, cat, place){
+  const correct = effectiveCorrect(st, charId, place)[cat];
   const wrong = [0,1,2,3,4,5].filter(m => m !== correct);
   const rnd = streamOf(st.seed, st.turn, 810007 + charId * 17 + cat * 101);
   return wrong[Math.floor(rnd() * wrong.length)];
 }
-function denialOf(st, charId, cat){
-  const denied = deniedMotiveOf(st, charId, cat);
+function denialOf(st, charId, cat, place){
+  const denied = deniedMotiveOf(st, charId, cat, place);
   return DENIAL_BASES[cat][denied] + DENIAL_ENDS[voiceOf(charId)];
 }
 const SMALLTALK = [
@@ -1631,11 +1650,17 @@ const PREAMBLE_BY_SIT = {
   hot:       '手短に申す',
   late:      'もう時がない。単刀直入に申す',
 };
-/* いま、この相手に切り出すときの枕。論証全体の頭に一度だけ置く。 */
-function preambleOf(st, charId, place){
+/* 旧版までの切り出し。旧保存コードの文字数と次の面会者を保つためにも残す。 */
+function legacyPreambleOf(st, charId, place){
   for (const s of situationsOf(st, charId, place))
     if (PREAMBLE_BY_SIT[s.key]) return PREAMBLE_BY_SIT[s.key];
   return PREAMBLE_BY_VOICE[voiceOf(charId)];
+}
+/* いま、この相手に切り出すときの枕。人物への呼びかけに、その場の現実を一節重ねる。 */
+function preambleOf(st, charId, place){
+  const lead = legacyPreambleOf(st, charId, place);
+  const scene = contextOf(st, charId, place).pre;
+  return scene ? `${lead}。${scene}` : lead;
 }
 
 /* --- 余話（史実の短評と、関連作品） --------------------------------------
@@ -1815,6 +1840,118 @@ function travelFatigue(lastPlace, nextPlace){
   return from !== to && CITY_AREAS.has(from) && CITY_AREAS.has(to);
 }
 const normalMeetingCount = (st, place) => travelFatigue(st.lastPlace, place) ? 2 : 3;
+
+/* --- いま刺さる文脈 -------------------------------------------------------
+   人物の根本的な欲（利益）と、論を受け入れる筋道（論理）はその人物の芯として残す。
+   「いま何に縛られているか」だけは、同じ人物でも会う場と時代によって変わる。
+
+   151人×6場所×10ターンの個別台詞を持つと、量だけ増えて因果が読めなくなる。
+   そこで各場を前期／後期の二つの圧力に分け、観察文で必ず先に示す。
+   後期は第6ターン以降、または盤面が上級期まで進んだ時点から始まる。 */
+const PLACE_CONTEXTS = [
+  [ /* 祇園の茶屋 */
+    { motive:0, clue:'隣室から家名が聞こえるたび、相手は声を落として周囲をうかがった。',
+      pre:'この座敷で家名を損なわぬ道として' },
+    { motive:2, clue:'米の値と焼け出された町衆の話になると、相手の杯が止まった。',
+      pre:'飢えた洛中の声を聞いたうえで' },
+  ],
+  [ /* 江戸城中 */
+    { motive:1, clue:'相手は上段を一度見やり、主への報告に耐える話かを測っている。',
+      pre:'御上への奉公と両立する策として' },
+    { motive:2, clue:'江戸の町割り図だけは手元から離さず、火除地を指でなぞっている。',
+      pre:'江戸の町を戦火から遠ざけるために' },
+  ],
+  [ /* 長崎の商館 */
+    { motive:3, clue:'沖の異国船が向きを変えるたび、相手は砲門の数を確かめた。',
+      pre:'沖に並ぶ異国船の力を見据えて' },
+    { motive:2, clue:'荷揚げ人足の列と米相場を書き留め、港が止まる日の損失を気にしている。',
+      pre:'港で暮らす者の明日を守るために' },
+  ],
+  [ /* 藩邸の書院 */
+    { motive:0, clue:'床の間の家紋に目をやり、家名に傷がつかぬ答えを探している。',
+      pre:'御家の名を損なわぬ筋として' },
+    { motive:1, clue:'国元から届いた書状を畳まず、主君へどう復命するかを気にしている。',
+      pre:'国元への忠節と両立する道として' },
+  ],
+  [ /* 壬生の屯所 */
+    { motive:1, clue:'命令書の署名を何度も確かめ、誰の命として動くかを譲ろうとしない。',
+      pre:'掲げた旗への忠節を踏まえて' },
+    { motive:4, clue:'空いた刀掛けに目をやるたび、相手は帰らなかった隊士の名を口にした。',
+      pre:'帰らなかった者の名を背負う話として' },
+  ],
+  [ /* 夜の街道 */
+    { motive:5, clue:'関所で身分を問われた話になると、相手は通行手形を強く握り直した。',
+      pre:'名も家も通じぬ道中の者として' },
+    { motive:4, clue:'道端の新しい供養塔の前で足を止め、先に倒れた者へ手を合わせた。',
+      pre:'道半ばで倒れた者を置き去りにせぬために' },
+  ],
+];
+
+/* 場を持たない旧保存コード用。人物本来の文脈を観察文へ直す。 */
+const BASE_CONTEXT_CLUES = [
+  '家名を口にされると、相手は返答より先に周囲の視線を確かめた。',
+  '決断のたびに、主君へどう申し開くかを先に考えている。',
+  '政の話より先に、米の値と町の暮らしを尋ねてきた。',
+  '沖の異国船と列強の動きだけは、細かな数字まで把握している。',
+  '話の途中で、すでに亡い同志の名を何度も挙げた。',
+  '席次や呼び方のわずかな違いにも、相手は敏感に反応した。',
+];
+
+/* 利益と論理にも、選択前に推理できるだけの仕草を一つずつ置く。
+   同じ答えが続いても文面が機械的に重ならぬよう、各型を二通り持つ。 */
+const MOTIVE_OBSERVATIONS = [
+  [
+    ['功名を立てた者の話にだけ、相手は身を乗り出した。','名を後世に残すという一節で、相手の目がわずかに明るくなった。'],
+    ['端に置かれた勘定書へ、相手の視線が何度も戻っている。','大言壮語には無表情だが、費用の話だけは指で数え始めた。'],
+    ['座る前に出口を確かめ、危うい話になると声を落とした。','勝ち負けより、巻き込まれずに済む道を先に尋ねてきた。'],
+    ['己の得になる話より、何を正しいとするのかを問い返してきた。','損を承知で守るべきものの話になると、姿勢を正した。'],
+    ['兵の数と武器の備えを聞くまで、相手は結論を口にしなかった。','庭の稽古音が止むたび、相手は刀の位置を確かめている。'],
+    ['書付の余白まで読み、知らぬ術語だけを繰り返し尋ねた。','地図と書物を前にしたときだけ、相手の警戒が少し解けた。'],
+  ],
+  null,
+  [
+    ['結論より先に、その手段が目指すものを壊さないかと問い返した。','大義とやり方が食い違う箇所を見つけると、相手はそこで話を止めた。'],
+    ['話を一段ずつ戻し、何を先に済ませるのかを確かめている。','一足飛びの提案には答えず、最初の手順から説明するよう求めた。'],
+    ['各陣営の兵と後ろ盾を書き並べ、片寄りが生む反発を数えている。','一方だけが勝つ話より、残る勢力との釣り合いを気にしている。'],
+    ['誰の命で動くのかが曖昧だと、相手は先の話へ進もうとしない。','利の大きさより、その決定を正当と呼べる根拠を求めている。'],
+    ['美しい理屈には頷かず、明日何が残るのかを短く尋ねた。','費やすものと得られるものを並べ、最後に残る実だけを見ている。'],
+    ['届いた報せを年代順に並べ、この流れが戻るかどうかを測っている。','個々の願いより、すでに動き始めた世の向きを読もうとしている。'],
+  ],
+];
+
+const contextPeriodOf = st => (st.turn >= 6 || eraOf(st) >= 2) ? 1 : 0;
+function contextOf(st, charId, place){
+  const base = CHAR_BY_ID.get(charId).correct[1];
+  if (place == null || !PLACE_CONTEXTS[place])
+    return { motive:base, base, changed:false, period:0, clue:BASE_CONTEXT_CLUES[base], pre:'' };
+  const period = contextPeriodOf(st), scene = PLACE_CONTEXTS[place][period];
+  return { motive:scene.motive, base, changed:scene.motive !== base, period,
+           clue:scene.clue, pre:scene.pre };
+}
+function effectiveCorrect(st, charId, place){
+  const answer = CHAR_BY_ID.get(charId).correct.slice();
+  answer[1] = contextOf(st, charId, place).motive;
+  return answer;
+}
+function observationOf(st, charId, cat, place){
+  if (cat === 1) return contextOf(st, charId, place).clue;
+  const motive = effectiveCorrect(st, charId, place)[cat];
+  const lines = MOTIVE_OBSERVATIONS[cat][motive];
+  const rnd = streamOf(st.seed, st.turn, 930001 + charId * 19 + cat * 211);
+  return lines[Math.floor(rnd() * lines.length)];
+}
+function observationsOf(st, charId, place){
+  return [
+    { kind:'仕草', text:observationOf(st, charId, 0, place), scene:false },
+    { kind:'場の気配', text:observationOf(st, charId, 1, place), scene:true },
+    { kind:'話の運び', text:observationOf(st, charId, 2, place), scene:false },
+  ];
+}
+function correctForAction(st, action){
+  return action.contextVersion === 0
+    ? CHAR_BY_ID.get(action.charId).correct.slice()
+    : effectiveCorrect(st, action.charId, action.place ?? null);
+}
 
 /* --- 働きかけ -------------------------------------------------------------
    同じ「3枚当てる」を10ターン繰り返すと単調になる。そこで、相手への
@@ -2500,13 +2637,13 @@ function introPick(st, exclude){
 }
 
 /* 論証カードの提示（各カテゴリ3枚。正解1＋ダミー2、並びも決定論的） */
-function cardOptions(st, charId, faction){
-  const ch = CHAR_BY_ID.get(charId), out = [];
+function cardOptions(st, charId, faction, place){
+  const answer = effectiveCorrect(st, charId, place), out = [];
   for (let cat = 0; cat < 3; cat++){
-    const correct = ch.correct[cat];
+    const correct = answer[cat];
     /* 通常の問いで否定される一枚を必ずダミーに含める。これにより問いを使うと
        画面上でも三択から一枚が消え、残り二択になる。 */
-    const denied = deniedMotiveOf(st, charId, cat);
+    const denied = deniedMotiveOf(st, charId, cat, place);
     const rnd = streamOf(st.seed, st.turn, charId * 13 + faction * 7 + cat);
     const other = pickDistinct(rnd,
       [0,1,2,3,4,5].filter(m => m !== correct && m !== denied), 1)[0];
@@ -2527,7 +2664,10 @@ function composeArgument(argueF, cards, approach, pre, grp){
 }
 /* いまの盤面で、この相手に向けて組み上がる論証 */
 const argumentFor = (st, action) => composeArgument(action.argueF, action.cards, action.approach,
-  preambleOf(st, action.charId, action.place ?? null), listenerGroup(action.charId));
+  action.contextVersion === 0
+    ? legacyPreambleOf(st, action.charId, action.place ?? null)
+    : preambleOf(st, action.charId, action.place ?? null),
+  listenerGroup(action.charId));
 
 /* 提示された論証が何枚刺さるか。警戒による格下げまで含めた実効の点数。 */
 /* 働きかけごとに、そもそも何を当てるのかが違う。
@@ -2536,12 +2676,13 @@ const argumentFor = (st, action) => composeArgument(action.argueF, action.cards,
 /* 判定の内訳。表示と判定が食い違わないよう、下げ幅の理由まで含めてここだけで出す。 */
 function scoreBreakdown(st, action){
   const ch = CHAR_BY_ID.get(action.charId);
+  const correct = correctForAction(st, action);
   const ap = action.approach ?? 0, spec = APPROACHES[ap];
   let raw;
-  if (ap === 0)      raw = [0,1,2].filter(i => action.cards[i] === ch.correct[i]).length;
-  else if (ap === 1) raw = [0,1].filter(i => action.cards[i] === ch.correct[i]).length;
-  else if (ap === 2) raw = ch.correct[0] === 3 ? 0 : 2;   // 大義に生きる者に物を贈るのは侮辱
-  else               raw = action.cards[0] === ch.correct[0] ? 3 : 0;
+  if (ap === 0)      raw = [0,1,2].filter(i => action.cards[i] === correct[i]).length;
+  else if (ap === 1) raw = [0,1].filter(i => action.cards[i] === correct[i]).length;
+  else if (ap === 2) raw = correct[0] === 3 ? 0 : 2;   // 大義に生きる者に物を贈るのは侮辱
+  else               raw = action.cards[0] === correct[0] ? 3 : 0;
   /* 読み違えの罰は「相手を読んだ前提」の働きかけだけに課す。
      論じる・酌み交わすは誰にでも一応通じる（最適ではないだけ）。
      金品と肚を割るは相手を読み切った上での賭けなので、外せば裏目に出る。 */
@@ -2830,6 +2971,7 @@ const REACTION_OVERRIDES = new Map([
 
 function reactionOf(st, action, outcome){
   const ch = CHAR_BY_ID.get(action.charId);
+  const correct = outcome.correct || correctForAction(st, action);
   const approach = action.approach ?? 0;
   const scoreLevel = clamp(outcome.score ?? 0, 0, 3);
   let level = scoreLevel;
@@ -2839,7 +2981,7 @@ function reactionOf(st, action, outcome){
   let cue = REACTION_CUES[approach][scoreLevel].replace('{name}', ch.name);
   const hitCat = (outcome.hits || []).findIndex(Boolean);
   if (scoreLevel === 1 && hitCat >= 0){
-    const motive = CATS[hitCat].motives[ch.correct[hitCat]];
+    const motive = CATS[hitCat].motives[correct[hitCat]];
     cue = `${ch.name}は〔${motive}〕のくだりにだけ、わずかに目を留めた。`;
   }
   let line = REACTION_LINES[approach][scoreLevel][tone];
@@ -2870,6 +3012,10 @@ function reactionOf(st, action, outcome){
    判定そのもの（大成功／成功／失敗／決裂）は変わらない。 */
 function resolve(st, action){
   const ch = CHAR_BY_ID.get(action.charId);
+  const correct = correctForAction(st, action);
+  const context = action.contextVersion === 0
+    ? { motive:correct[1], base:correct[1], changed:false, period:0, clue:'', pre:'' }
+    : contextOf(st, action.charId, action.place ?? null);
   const era = eraOf(st), rank = rankOfId(action.charId);
   const premature = rank > era;                       // 時代整合性チェック
   const effRank = premature ? 0 : rank;               // 時期尚早ならボーナス無効（初級相当）
@@ -2878,7 +3024,7 @@ function resolve(st, action){
   const apSpec = APPROACHES[approach];
   const fits = approachOf(action.charId) === approach;
   const nCards = apSpec.cards;
-  const hits = [0,1,2].map(i => i < nCards && action.cards[i] === ch.correct[i]);
+  const hits = [0,1,2].map(i => i < nCards && action.cards[i] === correct[i]);
   const rawScore = hits.filter(Boolean).length;
   const text  = argumentFor(st, action);
   const len   = chars(text);
@@ -2893,7 +3039,13 @@ function resolve(st, action){
   const probed = !!action.probed && st.probesUsed < PROBE_LIMIT;
   const asked = Number.isInteger(action.asked) && action.asked >= 0 && action.asked < 3
     ? action.asked : null;
-  const deniedMotive = asked === null ? null : deniedMotiveOf(st, action.charId, asked);
+  const deniedMotive = asked === null ? null : action.contextVersion === 0
+    ? (() => {
+        const wrong = [0,1,2,3,4,5].filter(m => m !== correct[asked]);
+        const rnd = streamOf(st.seed, st.turn, 810007 + action.charId * 17 + asked * 101);
+        return wrong[Math.floor(rnd() * wrong.length)];
+      })()
+    : deniedMotiveOf(st, action.charId, asked, action.place ?? null);
 
   /* 転向は「攻撃」。3枚すべて刺さらねば通らない全か無かの賭け。 */
   const allOrNothing = action.stance === 'convert';
@@ -2973,7 +3125,7 @@ function resolve(st, action){
                    && !promises.some(pm => pm.id === action.charId);
   if (promised) promises.push({ id: action.charId, f: action.argueF });
 
-  const reaction = reactionOf(st, action, { score, hits, duel, reconciled });
+  const reaction = reactionOf(st, action, { score, hits, duel, reconciled, correct });
 
   const next = {
     seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned, promises,
@@ -2989,7 +3141,7 @@ function resolve(st, action){
   const standingAfter = playerStanding(next);
 
   return { next, report: {
-    charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
+    charId: action.charId, name: ch.name, score, rawScore, hits, correct, context, premature, rank, effRank,
     gain, gainBeforeProbe, penalty, text, len, probed, asked, deniedMotive, duel, reaction, approach, fits, nCards,
     place: action.place ?? null, placeFits,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
@@ -3098,10 +3250,12 @@ function replay(seed, actions, interludeChoices){
   return { state: st, reports };
 }
 function encodeSave(st){
-  return 'IR4:' + st.seed + ':' + st.actions
+  /* IR5 は末尾に文脈ルール版を持つ。IR3/IR4 を読み込んで続きを遊んだ場合も、
+     旧手番だけは固定正解で、新しい手番は場×時代の正解で再生できる。 */
+  return 'IR5:' + st.seed + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
-               a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
-              + (a.duel != null ? ',' + a.duel : ''))
+               a.probed ? 1 : 0, a.approach ?? 0, a.place ?? '', a.duel ?? '',
+               a.contextVersion === 0 ? 0 : 1].join(','))
     .join(';') + (st.interludes && st.interludes.length
       ? '#' + INTERLUDE_TURNS.map((t, n) => {
           const r = (st.interludes || []).find(x => x.n === n);
@@ -3111,10 +3265,12 @@ function encodeSave(st){
 }
 function decodeSave(code){
   const s = String(code).trim();
-  /* IR3 は幕間の追加より前の版。幕間を「未選択」として扱えばそのまま再現できる。 */
-  if (!/^IR[34]:/.test(s)) throw new Error(/^IR[12]:/.test(s)
+  /* IR3 は幕間の追加より前、IR4 は場による正解変化より前の版。
+     旧手番には contextVersion=0 を付け、当時の固定正解で再現する。 */
+  if (!/^IR[345]:/.test(s)) throw new Error(/^IR[12]:/.test(s)
     ? '旧版の保存コードです。名簿と判定ルールが変わったため再現できません'
     : 'コードの形式が違います');
+  const version = +s[2];
   const parts = s.slice(4).split(':');
   if (!/^\d+$/.test(parts[0])) throw new Error('seed が数値ではありません');
   const seed = parseInt(parts[0], 10) >>> 0;
@@ -3130,15 +3286,17 @@ function decodeSave(code){
       : [null, +choiceText];
   const body = hash >= 0 ? raw.slice(0, hash) : raw;
   const actions = !body ? [] : body.split(';').filter(Boolean).map(chunk => {
-    const [c, s2, o, f, k, h, apr, plc, dl] = chunk.split(',');
+    const [c, s2, o, f, k, h, apr, plc, dl, cv] = chunk.split(',');
     if (apr !== undefined && !/^[0-3]$/.test(apr)) throw new Error('働きかけの番号が不正です');
     if (plc !== undefined && plc !== '' && !/^[0-5]$/.test(plc)) throw new Error('場の番号が不正です');
-    if (dl !== undefined && !/^[0-2]$/.test(dl)) throw new Error('立ち合いの応じ方が不正です');
+    if (dl !== undefined && dl !== '' && !/^[0-2]$/.test(dl)) throw new Error('立ち合いの応じ方が不正です');
+    if (version >= 5 && !/^[01]$/.test(cv || '')) throw new Error('文脈ルールの版が不正です');
     return { charId:+c, stance: +s2 === 0 ? 'support' : 'convert',
              ownF:+o, argueF:+f, cards: Array.from(k).map(Number), probed: +(h || 0) === 1,
              approach: apr === undefined ? 0 : +apr,
              place: plc === undefined || plc === '' ? null : +plc,
-             duel: dl === undefined ? null : +dl };
+             duel: dl === undefined || dl === '' ? null : +dl,
+             contextVersion: version >= 5 ? +cv : 0 };
   });
   return { seed, actions, interludeChoice };
 }
@@ -3154,7 +3312,7 @@ const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_B
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
-  PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, PLACE_CONTEXTS, BASE_CONTEXT_CLUES, MOTIVE_OBSERVATIONS, contextPeriodOf, contextOf, effectiveCorrect, observationOf, observationsOf, correctForAction, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
   playerStanding, playerEpilogue, encodeSave, decodeSave, hashState };
@@ -3200,21 +3358,34 @@ function coachHTML(step, title, body){
   return `<div class="coach"><div class="title"><span class="step">${esc(step)}</span>${esc(title)}</div><p>${body}</p></div>`;
 }
 function tutorialReasonHTML(c, i){
-  const motive = E.CATS[i].motives[c.correct[i]];
-  const reply = E.replyOf(c.id, i);
+  const answer = E.effectiveCorrect(st, c.id, ui.place);
+  const motive = E.CATS[i].motives[answer[i]];
+  const reply = E.replyOf(st, c.id, i, ui.place);
   return `<div class="guide-reason"><b>根拠</b>：練習では「${esc(E.QUESTIONS[i].chip)}」への本心を「${esc(reply)}」まで開示する。
     この返答が〈${esc(motive)}〉を示している。</div>`;
 }
 function dialogueReplyHTML(c, i, revealed){
+  const answer = E.effectiveCorrect(st, c.id, ui.place);
   if (revealed) return `<div class="say"><span class="q">「${esc(E.QUESTIONS[i].chip)}か」</span><br>${
-    esc(E.replyOf(c.id, i))}
+    esc(E.replyOf(st, c.id, i, ui.place))}
     <div class="small" style="margin-top:6px">→ 見抜いた<b>${esc(E.CATS[i].name)}</b>の正解は
-    <span class="uibadge">〔${esc(E.CATS[i].motives[c.correct[i]])}〕</span></div></div>`;
-  const denied = E.deniedMotiveOf(st, c.id, i);
+    <span class="uibadge">〔${esc(E.CATS[i].motives[answer[i]])}〕</span></div></div>`;
+  const denied = E.deniedMotiveOf(st, c.id, i, ui.place);
   return `<div class="say"><span class="q">「${esc(E.QUESTIONS[i].chip)}か」</span><br>${
-    esc(E.denialOf(st, c.id, i))}
+    esc(E.denialOf(st, c.id, i, ui.place))}
     <div class="small" style="margin-top:6px">→ <b>${esc(E.CATS[i].name)}</b>の
     <span class="uibadge">〔${esc(E.CATS[i].motives[denied])}〕</span>は不正解。<b>残り二択</b>になった</div></div>`;
+}
+
+function observationsHTML(c){
+  const obs = E.observationsOf(st, c.id, ui.place);
+  const ctx = E.contextOf(st, c.id, ui.place);
+  return `<div class="observations">
+    <div class="obs-title">目の前から読み取れること
+      <span class="small">— ${ui.place == null ? '人物本来の事情' : `${esc(E.PLACES[ui.place].name)}・${ctx.period ? '後期' : '前期'}`}の見立て</span></div>
+    ${obs.map(o => `<div class="observation ${o.scene ? 'scene' : ''}">
+      <span class="obs-kind">${esc(o.kind)}</span><span>${esc(o.text)}</span></div>`).join('')}
+  </div>`;
 }
 
 function toneStyle(factions){
@@ -3422,7 +3593,8 @@ function viewTitle(){
 
     <details class="detail"><summary>説得の仕組み</summary>
       <p class="small">説得は<b>論証カード</b>で行います。「利益提示・文脈理解・論理整合」の3枚を選び、
-      その人物に本当に刺さる組み合わせを当ててください。手がかりは各人物の【情勢】描写と、対話の返答です。</p>
+      その人物に本当に刺さる組み合わせを当ててください。手がかりは人物評と、面会時の<b>「目の前から読み取れること」</b>、対話の返答です。
+      人物の欲と論理は変わりませんが、<b>いま何に縛られているかは場所と時代で変わります。</b></p>
       <p class="small"><b>支持</b>は一段下でも通ります（さらに一段下なら「手応え」で時勢が1だけ動く）。
       <b>転向</b>は攻撃なので<b>満点でしか通りません</b> ― 一段でも下がれば、札が刺さっていても届きません。</p>
       <p class="small"><b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>
@@ -3446,7 +3618,7 @@ function viewTitle(){
       <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
     </div>` : ''}
     <details class="detail"><summary>保存コードから再開する</summary>
-      <textarea id="code" placeholder="IR4:1868:47,0,2,2,053,0;...#0.1"></textarea>
+      <textarea id="code" placeholder="IR5:1868:47,0,2,2,053,0,0,0,,1;...#0.1"></textarea>
       <div class="row"><button id="load">再開する</button></div>
       <div id="err" class="warn"></div>
       <div class="small" style="margin-top:6px;opacity:.8">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</div>
@@ -3497,7 +3669,7 @@ function approachLegendHTML(mark){
       mark === i ? '◎ ' : '・'}<b>${esc(a.name)}</b> ─ ${
       by[i].map(esc).join('／')} を欲する者に響く</div>`).join('')}
     <div class="small">面会中の問いは<b>不正解を一つ消して二択にする</b>ものです。
-      正解は【情勢】の描写から読むか、一局一度の「さらに聞き出す」で確かめられます。</div></details>`;
+      正解は人物評と<b>三つの観察</b>から読むか、一局一度の「さらに聞き出す」で確かめられます。</div></details>`;
 }
 
 /* 縁の表示。面会の札でも、相手と向き合う画面でも同じものを出す。
@@ -3594,7 +3766,7 @@ function viewMeeting(){
           ／ ここで深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[pl.boost].name)}</span></div>
         ${travelNote}
       </div>
-      ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
+      ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけ、相手がいま背負う事情が変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
       ${m.normal.map(id => card(id, false)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
@@ -3778,6 +3950,7 @@ function viewStance(){
       ${(() => { const sit = E.situationOf(st, ui.charId, ui.place);
         return sit ? `<div class="opening sit">「── ${esc(sit.text)}」</div>` : ''; })()}
       ${guide}<div class="quote">${esc(c.desc)}</div>
+      ${observationsHTML(c)}
       <div class="say worldview">${esc(E.SMALLTALK[0].lines[ui.ownF ?? c.factions[0]][E.TONE_OF_VOICE[E.voiceOf(ui.charId)]])}</div>${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
@@ -3800,7 +3973,8 @@ function viewStance(){
 /* --- 画面: 論証の組み立て ------------------------------------------------- */
 function viewCards(){
   const c = E.CHAR_BY_ID.get(ui.charId);
-  ui.opts = E.cardOptions(st, ui.charId, ui.argueF);
+  const answer = E.effectiveCorrect(st, ui.charId, ui.place);
+  ui.opts = E.cardOptions(st, ui.charId, ui.argueF, ui.place);
   const guided = guidedTurn();
   const nCards = E.APPROACHES[ui.approach].cards;
   const ready = [0,1,2].slice(0, nCards).every(i => ui.picks[i] !== null);
@@ -3810,7 +3984,8 @@ function viewCards(){
   app.innerHTML = headerHTML() +
     `<div class="panel tone-panel" style="${toneStyle([ui.argueF])}"><h2>${esc(c.name)}を${ui.stance === 'support' ? '支持する' : `${fac(ui.argueF).name}へ転向させる`}</h2>
       <div class="quote">${esc(c.desc)}</div>
-      <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは、相手が何を欲しているか</b>で決まります。</div>
+      ${observationsHTML(c)}
+      <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは、人物の芯と、この場で前に出た事情</b>で決まります。</div>
       ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
       ${ui.asked !== null ? dialogueReplyHTML(c, ui.asked, ui.probed || guided) : ''}
       ${ui.stance === 'convert' ? `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
@@ -3833,10 +4008,10 @@ function viewCards(){
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.7">〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。</div>' : ''}
         <div class="card-grid">${ui.opts[i].map(o => {
-          const isCorrect = o.motive === c.correct[i];
+          const isCorrect = o.motive === answer[i];
           const isAns = (ui.probed || guided) && isCorrect;
           const isRuledOut = !ui.probed && !guided && ui.asked === i
-            && o.motive === E.deniedMotiveOf(st, ui.charId, i);
+            && o.motive === E.deniedMotiveOf(st, ui.charId, i, ui.place);
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
           const disabled = (guided && !isCorrect) || isRuledOut;
           return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass} ${isRuledOut?'ruled-out':''}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${disabled ? '-1' : '0'}" aria-disabled="${disabled}" aria-pressed="${ui.picks[i]===o.motive}">${
@@ -3856,15 +4031,15 @@ function viewCards(){
     </div>`;
   app.querySelectorAll('.card').forEach(el => el.onclick = () => {
     const cat = +el.dataset.cat, motive = +el.dataset.m;
-    if (guided && motive !== c.correct[cat]) return;
-    if (!ui.probed && ui.asked === cat && motive === E.deniedMotiveOf(st, ui.charId, cat)) return;
+    if (guided && motive !== answer[cat]) return;
+    if (!ui.probed && ui.asked === cat && motive === E.deniedMotiveOf(st, ui.charId, cat, ui.place)) return;
     ui.picks[cat] = motive; render();
   });
   document.getElementById('back').onclick = () => { ui.approach = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
     const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
                 cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed,
-                asked: ui.asked, approach: ui.approach, place: ui.place };
+                asked: ui.asked, approach: ui.approach, place: ui.place, contextVersion:1 };
     /* 刃が出ても画面は変えない。結果の流れの中で応じ方を訊く。 */
     if (E.duelPending(st, a)){ ui.duelAction = a; ui.report = null; ui.screen = 'result'; render(); return; }
     const r = E.resolve(st, a);
@@ -3900,17 +4075,18 @@ function viewDuelInline(){
 function viewResult(){
   if (ui.duelAction && !ui.report) return viewDuelInline();
   const r = ui.report, c = E.CHAR_BY_ID.get(r.charId);
+  const answer = r.correct || c.correct;
   const guidedResult = !!(ui.guidedTutorial && st.actions.length === 1);
   const marks = r.hits.slice(0, r.nCards).map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
     h ? (r.probed ? '刺さった（奥の手で聞き出した）'
                   : r.asked === i ? '刺さった（二択から見抜いた）' : '刺さった')
-      : `外れ（この人物に効くのは「${E.CATS[i].motives[c.correct[i]]}」）`}</div>`).join('');
+      : `外れ（この場のこの人物に効くのは「${E.CATS[i].motives[answer[i]]}」）`}</div>`).join('');
   const d = r.delta.map((v,i) => v ? `<span class="${fac(i).cls}">[${fac(i).name}] ${v>0?'+':''}${v}</span>` : null)
     .filter(Boolean).join('　') || '変動なし';
   app.innerHTML = headerHTML() +
     `<div class="result ${r.partial ? 'partial' : r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
-      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>一つの問いで不正解を一枚だけ除外</b>できます。残り二択は情勢描写から読むか、「さらに聞き出す」を使うか、賭けてください。') : ''}
+      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>一つの問いで不正解を一枚だけ除外</b>できます。残り二択は人物評と三つの観察から読むか、「さらに聞き出す」を使うか、賭けてください。') : ''}
       ${resultReactionHTML(c, r)}
       ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
@@ -3918,10 +4094,12 @@ function viewResult(){
       <div class="quote">「${esc(r.text)}」</div>
       ${r.asked !== null && !r.probed ? `<div class="small">探り：〔${esc(E.CATS[r.asked].motives[r.deniedMotive])}〕を除外し、残り二択から選んだ</div>` : ''}
       ${marks}
+      ${r.context?.changed ? `<div class="small" style="margin-top:5px"><span class="uibadge">場と時勢</span>
+        この人物が本来抱える〔${esc(E.CATS[1].motives[r.context.base])}〕より、今回は〔${esc(E.CATS[1].motives[r.context.motive])}〕が前に出ていた。</div>` : ''}
       <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
         r.placeFits ? '　<span class="uibadge">◎ 場に合った（獲得+1）</span>' : ''}${
         r.fits ? '　<span class="uibadge">◎ この者に響いた（獲得+1）</span>'
-               : r.approach >= 2 ? `　<span style="color:var(--shu)">読み違え ― この者が欲していたのは〔${esc(E.CATS[0].motives[c.correct[0]])}〕で、${esc(E.APPROACHES[r.approach].name)}は響かなかった（一段下がった）</span>` : ''}</div>
+               : r.approach >= 2 ? `　<span style="color:var(--shu)">読み違え ― この者が欲していたのは〔${esc(E.CATS[0].motives[answer[0]])}〕で、${esc(E.APPROACHES[r.approach].name)}は響かなかった（一段下がった）</span>` : ''}</div>
       ${r.duel ? `<div class="duelresult ${r.duel.survived ? 'won' : 'lost'}">
         <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}
         <div class="small" style="margin-top:6px">${r.duel.survived
@@ -3938,7 +4116,7 @@ function viewResult(){
       ${(() => {
         if (!r.allOrNothing || r.score === 3) return '';
         const why = [];
-        if (r.misfit) why.push(`この者が欲していたのは〔${esc(E.CATS[0].motives[c.correct[0]])}〕で、<b>${esc(E.APPROACHES[r.approach].name)}は響かなかった</b>`);
+        if (r.misfit) why.push(`この者が欲していたのは〔${esc(E.CATS[0].motives[answer[0]])}〕で、<b>${esc(E.APPROACHES[r.approach].name)}は響かなかった</b>`);
         if (r.waryApplied) why.push(`〔${fac(r.waryBy).name}〕への<b>警戒</b>`);
         if (r.grudgeApplied) why.push(`<b>決裂の噂</b>が届いていた`);
         if (r.rawScore < r.nCards)
