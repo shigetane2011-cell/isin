@@ -111,6 +111,20 @@ ok(html.includes('data-see=') && html.includes('相手を調べる')
 ok(html.includes('ui.observed === i || ui.probed || guided')
    && html.includes("ui.observed !== null ? '<span class=\"chip spent\">観る</span>'"),
    '観るは一面会に一度だけで、使うと残りの項目には使えない');
+/* 札を三枚とも当てた転向のうち通るのは50.2%で、最大の落ちる原因は型の読み違え29.9%。
+   利益提示を観れば型は導けるのに、印が奥の手のときしか出ていなかった。 */
+ok(html.includes('ui.probed || guidedTurn() || ui.observed === 0'),
+   '利益提示を観たら、そこから読める働きかけにも印が出る（奥の手と扱いを揃える）');
+ok(html.includes('所作を観たところ'), '印の文言が、観たのか聞き出したのかを言い分ける');
+/* 踏み切る画面に出ていない減点があると、落ちた理由が後からしか分からない */
+{
+  const cardsView = html.slice(html.indexOf('function viewCards()'),
+                               html.indexOf('function viewDuelInline'));
+  ok(/E\.grudgeOf\(st, ui\.charId\)/.test(cardsView) && /E\.waryOf\(st\.currents, ui\.charId\)/.test(cardsView),
+     '札を置く画面で、警戒と決裂の噂の両方を先に知らせる');
+  ok(cardsView.includes('札を${nCards}枚とも当てても転向は通りません'),
+     '減点が効いている相手には、満点でも転向が通らないと踏み切る前に言う');
+}
 ok(!/探り[：:で]/.test(html),
    '一枚の除外を「探り」と呼んでいない（探り＝一局に一度の奥の手）');
 ok(html.includes('resultReactionHTML(c, r)') && html.includes('counterpart-reaction')

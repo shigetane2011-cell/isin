@@ -3981,15 +3981,19 @@ function viewStance(){
           `<button data-argue="${f}">${fac(f).name}（${fac(f).full}）</button>`).join('')}</div>`;
     } else {
       const left = E.PROBE_LIMIT - st.probesUsed;
-      /* 奥の手か練習で欲しているものまで分かっていれば、そこから読める働きかけに印を付ける。
-         印は「完全開示した内容から筋どおりに読むとこれ」であって、働きかけ自体の正解ではない。
-         そう見えて違う者が29名いる（その手掛かりは【情勢】の描写にある）。 */
-      const knownMotive = (ui.probed || guidedTurn()) ? c.correct[0] : null;
+      /* 利益提示を観た（または奥の手・練習で開いた）なら、そこから読める働きかけに印を付ける。
+         印は「分かった型から筋どおりに読むとこれ」であって、働きかけ自体の正解ではない。
+         そう見えて違う者が29名いる（その手掛かりは【情勢】の描写にある）。
+
+         観ただけでは印が出ない作りにしていたため、所作から型を読めた人が
+         それを働きかけに繋げられず、札を全部当てても肚を割るで落ちていた。
+         札を三枚とも当てた転向のうち、型の読み違えで落ちるのが29.9%と最大の原因だった。 */
+      const knownMotive = (ui.probed || guidedTurn() || ui.observed === 0) ? c.correct[0] : null;
       const impliedAp = knownMotive === null ? -1 : E.APPROACH_BY_MOTIVE[knownMotive];
       body = `<p>どう働きかけますか？</p>
         ${approachLegendHTML(impliedAp)}
         ${knownMotive !== null ? `<div class="small" style="margin:8px 0">
-          聞き出したところ、この人物が欲しているのは <span class="uibadge">〔${
+          ${ui.probed || guidedTurn() ? '聞き出したところ' : '所作を観たところ'}、この人物が欲しているのは <span class="uibadge">〔${
           esc(E.CATS[0].motives[knownMotive])}〕</span>。
           筋どおりなら <b>${esc(E.APPROACHES[impliedAp].name)}</b> が響きます
           <span style="opacity:.7">（そう見えて違う者もいます）</span></div>` : ''}
@@ -4128,14 +4132,25 @@ function viewCards(){
       <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは、相手が何を欲しているか</b>で決まります。</div>
       ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
       ${ui.asked !== null ? dialogueReplyHTML(c, ui.asked, ui.probed || guided) : ''}
-      ${ui.stance === 'convert' ? `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
-        ui.approach >= 2 ? `<br>さらに<b>${esc(E.APPROACHES[ui.approach].name)}は相手を読み切った前提の賭け</b>です。
-        <b>この人物が欲しているもの</b>を読み違えていれば一段下がり、
-        置いた札が刺さっていても転向には届きません。` : ''}${
-        E.waryOf(st.currents, ui.charId) >= 0 && E.vouchOf(st, ui.charId) < 0
-          ? '<br>警戒されている相手なので、ここからさらに一段下がります。転向は通りません。' : ''}${
-        ''}</div>` : ''}
-      ${E.waryOf(st.currents, ui.charId) >= 0 ? '<div class="warn">警戒されているため、判定は一段下がります。</div>' : ''}
+      ${(() => {
+        /* 踏み切る前に、いま効いている減点をここに全部並べる。面会画面にしか出ていない
+           ものがあると「札は全部当てたのに落ちた」の理由が後からしか分からない。 */
+        const vouched = E.vouchOf(st, ui.charId) >= 0;
+        const wb = E.waryOf(st.currents, ui.charId), gb = E.grudgeOf(st, ui.charId);
+        const steps = [];
+        if (!vouched && wb >= 0) steps.push(`あなたの掲げる〔${fac(wb).name}〕への<b>警戒</b>`);
+        if (!vouched && gb >= 0) steps.push(`${esc(E.CHAR_BY_ID.get(gb).name)}を決裂させた<b>噂</b>`);
+        const stepHTML = steps.length
+          ? `<div class="warn">${steps.join('と')}で、<b>判定は${steps.length}段下がります</b>${
+              vouched ? '' : ''}。</div>` : '';
+        if (ui.stance !== 'convert') return stepHTML;
+        return `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
+          ui.approach >= 2 ? `<br>さらに<b>${esc(E.APPROACHES[ui.approach].name)}は相手を読み切った前提の賭け</b>です。
+          <b>この人物が欲しているもの</b>を読み違えていれば一段下がり、
+          置いた札が刺さっていても転向には届きません。` : ''}${
+          steps.length ? `<br>いまこの相手には${steps.join('と')}が効いています。
+            <b>札を${nCards}枚とも当てても転向は通りません。</b>支持なら通ります。` : ''}</div>${stepHTML}`;
+      })()}
       <div class="row" style="margin-top:12px">
         ${guided
           ? '<span class="probed">練習中 — 三つとも開示しています</span>'
