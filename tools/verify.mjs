@@ -169,7 +169,7 @@ let saveOk = true;
 for (let s = 1; s <= 60; s++) {
   const { st } = autoPlay(s, E.mulberry32(s * 31337));
   const dec = E.decodeSave(E.encodeSave(st));
-  if (E.hashState(E.replay(dec.seed, dec.actions, dec.interludeChoice).state) !== E.hashState(st)) { saveOk = false; break; }
+  if (E.hashState(E.replay(dec.seed, dec.actions, dec.interludeChoice, dec.origin).state) !== E.hashState(st)) { saveOk = false; break; }
 }
 ok(saveOk, '60局を encode → decode → replay して一致');
 
@@ -521,7 +521,8 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
     const pools = { VOUCH_SAYS: E.VOUCH_SAYS, GRUDGE_SAYS: E.GRUDGE_SAYS,
                     REVISIT_SAYS: E.REVISIT_SAYS,
                     SITUATIONS: E.SITUATIONS.map(x => x.say),
-                    SMALLTALK: E.SMALLTALK[0].lines, GESTURES: E.GESTURES };
+                    SMALLTALK: E.SMALLTALK[0].lines, GESTURES: E.GESTURES,
+                    RECEPTIONS: E.RECEPTIONS };
     const hits = [];
     for (const [name, pool] of Object.entries(pools))
       for (const t of pool.flat(2)) if (MALE.test(t)) hits.push(`${name}:「${t.slice(0, 24)}」`);
@@ -551,8 +552,82 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
        '再訪はどの条件よりも先に立つ');
   }
   /* 枕。相手の身分と盤面で切り出し方が変わる */
-  ok(E.PREAMBLE_BY_VOICE.length === 7 && E.PREAMBLE_BY_VOICE.every(v => typeof v === 'string' && v.length > 3),
-     '枕が7身分ぶんある（口を開くのは一度だけ）');
+  ok(E.PREAMBLE_BY_VOICE.length === 3
+     && E.PREAMBLE_BY_VOICE.every(o => o.length === 7
+        && o.every(v => typeof v === 'string' && v.length > 3)),
+     '枕が3出自 × 7身分ぶんある（口を開くのは一度だけ）');
+  ok(new Set(E.PREAMBLE_BY_VOICE.map(o => o.join('|'))).size === 3,
+     '出自が違えば切り出しの言葉づかいも違う');
+  {
+    /* 主人公の出自。これまで「無名の周旋家」としか書かれておらず、村人か町人か
+       侍かがどこにも定義されていなかった。効くのは三枠目の面会候補・迎えられ方・
+       こちらの切り出しの三つで、判定の計算式には触れていない。 */
+    ok(E.ORIGINS.length === 3 && E.ORIGINS.every(o => o.name && o.short && o.lead
+       && Array.isArray(o.warm) && Array.isArray(o.cold) && o.warm.length && o.cold.length),
+       '出自が3つあり、いずれも名・肩書き・生い立ち・縁を持つ');
+    ok(E.ORIGINS.every(o => o.warm.every(v => !o.cold.includes(v))),
+       '同じ語り口が、ある出自にとって縁かつ煙たがられる、にはならない');
+    ok(new Set(E.ORIGINS.map(o => o.cold.join(','))).size === 3,
+       '3つの出自で、煙たがられる相手が互いに違う');
+    ok(E.RECEPTIONS.length === 3 && E.RECEPTIONS.every(o => o.length === 3
+       && o.every(k => k.length === 4 && k.every(t => typeof t === 'string' && t.length > 6))),
+       '迎えられ方が 3出自 × 温・並・冷 × 4系統の調子 = 36通りある');
+    let miss = 0;
+    for (let o = 0; o < 3; o++) for (const c of E.CHARACTERS) if (!E.receptionOf(o, c.id)) miss++;
+    ok(miss === 0, `どの出自でも151名すべてに迎えの一言がある（欠け ${miss} 件）`);
+    /* 出自ごとに、実際に会う顔ぶれが変わっているか */
+    const rosterOf = origin => {
+      const st = E.createState(4242, origin);
+      return E.placesOpen(st).map(pl => E.meetingList(st, pl).normal.join(',')).join('|');
+    };
+    const rosters = [0,1,2].map(rosterOf);
+    ok(new Set(rosters).size === 3, '同じ seed でも、出自が違えば会える顔ぶれが違う');
+    /* 三枠目は出自の縁の語り口から来る */
+    let slot2 = 0, warmHit = 0;
+    for (let origin = 0; origin < 3; origin++){
+      const warm = new Set(E.ORIGINS[origin].warm);
+      for (let seed = 1; seed <= 40; seed++){
+        const st = E.createState(seed, origin);
+        for (const pl of E.placesOpen(st)){
+          const ids = E.meetingList(st, pl).normal;
+          if (ids.length < 3) continue;
+          slot2++; if (warm.has(E.voiceOf(ids[2]))) warmHit++;
+        }
+      }
+    }
+    ok(slot2 > 0 && warmHit === slot2,
+       `三枠目は必ず出自の縁のある語り口から来る（${warmHit}/${slot2}）`);
+    /* 保存コードの往復と、旧版の拒否 */
+    let rt = true;
+    for (let origin = 0; origin < 3; origin++){
+      let st = E.createState(9000 + origin, origin);
+      for (let t = 0; t < 4 && !st.finished; t++){
+        if (E.pendingInterlude(st)) { st = E.applyInterlude(st, 1); continue; }
+        const id = E.meetingList(st, 0).normal[0], c = E.CHAR_BY_ID.get(id);
+        st = E.resolve(st, { charId:id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+          cards:c.correct, probed:false, asked:2, approach:0, place:0 }).next;
+      }
+      const d = E.decodeSave(E.encodeSave(st));
+      if (d.origin !== origin) rt = false;
+      if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state) !== E.hashState(st)) rt = false;
+    }
+    ok(rt, '出自を含む保存コードが、3出自とも往復で一致する');
+    /* resolve が状態を作り直しているので、項目を足すと落ちやすい。
+       実際 origin を足したとき、一手指した時点で 0 に戻る不具合が出た。 */
+    {
+      const st0 = E.createState(11, 2);
+      const id = E.meetingList(st0, 0).normal[0], c = E.CHAR_BY_ID.get(id);
+      const st1 = E.resolve(st0, { charId:id, stance:'support', ownF:c.factions[0],
+        argueF:c.factions[0], cards:c.correct, probed:false, asked:2, approach:0, place:0 }).next;
+      ok(JSON.stringify(Object.keys(st0).sort()) === JSON.stringify(Object.keys(st1).sort()),
+         '一手指しても状態の項目が欠けない（resolve が作り直すため落ちやすい）');
+      ok(st1.origin === 2, '一手指しても出自が保たれる');
+    }
+    let rejected = 0;
+    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR6:1:3:1,0,0,0,000,0', 'IR6:1:x:1,0,0,0,000,0'])
+      { try { E.decodeSave(bad); } catch { rejected++; } }
+    ok(rejected === 3, '旧版のコードと、不正な出自の番号を弾く');
+  }
   ok(Object.values(E.PREAMBLE_BY_SIT).every(v => typeof v === 'string' && v.length > 3),
      '張り詰めた盤面ぶんの枕もある');
   {
@@ -711,11 +786,11 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
       acts.push(a); st = E.resolve(st, a).next;
     }
     const d = E.decodeSave(E.encodeSave(st));
-    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(st)) rt = false;
+    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state) !== E.hashState(st)) rt = false;
   }
   ok(rt, '立ち合いの応じ方を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR5:1:1,0,0,0,000,0,9', 'IR5:1:1,0,0,0,000,0,x']) {
+  for (const bad of ['IR6:1:0:1,0,0,0,000,0,9', 'IR6:1:0:1,0,0,0,000,0,x']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
@@ -778,11 +853,11 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
       st = E.resolve(st, a).next;
     }
     const d = E.decodeSave(E.encodeSave(st));
-    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(st)) rt = false;
+    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state) !== E.hashState(st)) rt = false;
   }
   ok(rt, '働きかけを含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR5:1:1,0,0,0,000,0,9', 'IR5:1:1,0,0,0,000,0,x,0']) {
+  for (const bad of ['IR6:1:0:1,0,0,0,000,0,9', 'IR6:1:0:1,0,0,0,000,0,x,0']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な働きかけ番号を弾く');
@@ -967,7 +1042,7 @@ head('5f3c. 約束 ― 肚を割って明かした旗');
       stx = E.resolve(stx, a).next;
     }
     const d = E.decodeSave(E.encodeSave(stx));
-    const back = E.replay(d.seed, d.actions, d.interludeChoice).state;
+    const back = E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state;
     if (E.hashState(back) !== E.hashState(stx)) rt = false;
     if (JSON.stringify(back.promises) !== JSON.stringify(stx.promises)) rt = false;
   }
@@ -1172,11 +1247,11 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
       stx = E.resolve(stx, a).next;
     }
     const d = E.decodeSave(E.encodeSave(stx));
-    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(stx)) rt = false;
+    if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state) !== E.hashState(stx)) rt = false;
   }
   ok(rt, '場を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR5:1:1,0,0,0,000,0,0,9', 'IR5:1:1,0,0,0,000,0,0,z']) {
+  for (const bad of ['IR6:1:0:1,0,0,0,000,0,0,9', 'IR6:1:0:1,0,0,0,000,0,0,z']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な場の番号を弾く');
@@ -1256,14 +1331,14 @@ head('5g. 第5・第8ターンの幕間');
     ok(/#\d\.\d$/.test(code), `二度ぶんの幕間が '#a.b' で書かれる（${code.slice(code.indexOf('#'))}）`);
     const d = E.decodeSave(code);
     ok(Array.isArray(d.interludeChoice) && d.interludeChoice.length === 2, '読み戻すと2つに分かれる');
-    ok(E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) === E.hashState(st),
+    ok(E.hashState(E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state) === E.hashState(st),
        '二度の幕間を含む盤面が保存コードの往復で一致する');
     const legacy = E.decodeSave(code.replace(/#\d\./, '#'));
     ok(legacy.interludeChoice[0] === null && legacy.interludeChoice[1] != null,
        '点なしの旧コードは、その一度を後半の幕間として読む');
-    ok(E.decodeSave('IR5:1:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
+    ok(E.decodeSave('IR6:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
     let rejected = 0;
-    for (const bad of ['IR5:1:#9', 'IR5:1:#0.9', 'IR5:1:#a.b'])
+    for (const bad of ['IR6:1:0:#9', 'IR6:1:0:#0.9', 'IR6:1:0:#a.b'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '不正な幕間の選択番号を弾く');
   }
@@ -1305,7 +1380,7 @@ head('5g. 第5・第8ターンの幕間');
   for (let seed = 1; seed <= 100; seed++) {
     for (const ch of [0, 1, 2]) {
       const st = run(seed, ch), d = E.decodeSave(E.encodeSave(st));
-      if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice).state) !== E.hashState(st)) rt = false;
+      if (E.hashState(E.replay(d.seed, d.actions, d.interludeChoice, d.origin).state) !== E.hashState(st)) rt = false;
     }
     const off = run(seed, null);
     if (E.hashState(run(seed, 1)) !== E.hashState(off)) moved++;
@@ -1331,8 +1406,8 @@ head('5g. 第5・第8ターンの幕間');
   for (const bad of [9, -1, 1.5, null, 'a']) { try { E.applyInterlude(st, bad); } catch { threw++; } }
   ok(threw === 5, '幕間の選択番号が不正なら例外を投げる');
   let rejected = 0;
-  for (const code of ['IR5:1:1,0,0,0,000,0#9', 'IR5:1:1,0,0,0,000,0#x',
-                      'IR5:1:1,0,0,0,000,0#-1', 'IR5:abc:1,0,0,0,000,0']) {
+  for (const code of ['IR6:1:0:1,0,0,0,000,0#9', 'IR6:1:0:1,0,0,0,000,0#x',
+                      'IR6:1:0:1,0,0,0,000,0#-1', 'IR6:abc:0:1,0,0,0,000,0']) {
     try { E.decodeSave(code); } catch { rejected++; }
   }
   ok(rejected === 4, '不正な保存コード（幕間番号・seed）をすべて弾く');

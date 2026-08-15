@@ -30,9 +30,15 @@ await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
 
 if (!(await p.$('.player-premise'))) errs.push('タイトルに主人公の出自が出ていない');
 await p.screenshot({ path: shot('01-title.png') });
+/* 出自を選んでから始める（既定は0なので、あえて別の出自で通す） */
+await p.click('.origin[data-origin="2"]');
+const originName = await p.$eval('.origin.sel .oname', e => e.textContent);
 /* 初回は「ガイド付き／通常どおり」の2択、2回目以降は #start が出る */
 if (await p.$('#start-normal')) await p.click('#start-normal');
 else await p.click('#start');
+const whoAmI = await p.$eval('header .meta', e => e.textContent);
+console.log('出自:', originName, '／ヘッダ表示:', whoAmI.includes(originName) ? '一致' : '不一致');
+if (!whoAmI.includes(originName)) errs.push('選んだ出自がヘッダに出ていない');
 const meta = await p.$eval('header .meta', e => e.textContent);
 if (!meta.includes('無所属の周旋家')) errs.push('開始直後のヘッダーに主人公の立場が出ていない');
 if (!meta.includes('奥の手') || !meta.includes('1 / 1')) errs.push('奥の手が1回と表示されていない');

@@ -279,6 +279,15 @@ button.primary .small{color:inherit;opacity:.82}
 .say .q{font-size:.78rem;color:var(--ai);letter-spacing:.06em}
 .gest{border-left:3px solid var(--kin);background:#fffdf6;padding:7px 12px;margin:6px 0;font-size:.88rem}
 .gest .gcat{display:inline-block;min-width:5.2em;font-size:.72rem;letter-spacing:.1em;color:var(--kin);font-weight:600}
+.origin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin:8px 0}
+.origin{border:1px solid var(--line);background:#fff;padding:10px 12px;cursor:pointer}
+.origin:hover{border-color:var(--kin)}
+.origin.sel{border-color:var(--kin);background:#fffdf6;box-shadow:inset 0 0 0 1px var(--kin)}
+.origin .oname{font-weight:600;margin-bottom:4px}
+.origin .olead{font-size:.85rem;color:var(--sumi2)}
+.opening.reception{font-size:.93rem;margin:-6px 0 10px;color:var(--sumi2)}
+.opening.reception.r0{color:var(--sabaku)}
+.opening.reception.r2{color:var(--shu)}
 .slot-gest{font-size:.85rem;color:var(--sumi);background:#fffdf6;border-left:3px solid var(--kin);padding:6px 11px;margin:6px 0 8px}
 .probe{font-size:.72rem;padding:2px 10px;margin-left:8px;vertical-align:1px;border-color:var(--kin);color:var(--kin)}
 .probe:hover{background:var(--kin);color:#fff}
@@ -1711,14 +1720,101 @@ const situationOf = (st, charId, place) => situationsOf(st, charId, place)[0] ||
    ［枕］＋［核］で組むことで、90枚が相手と場面の数だけ違う文になる。
    ------------------------------------------------------------------------ */
 /* 相手の身分ごと（7通り）。三点を述べる前に、一度だけ口を開く言葉。 */
+/* --- 主人公の出自 ---------------------------------------------------------
+   これまで主人公は「無名の周旋家」という肩書きだけで、村人か町人か侍かが
+   どこにも定義されていなかった。無所属であることと、身分が未定義であることを
+   兼ねてしまっていたので、自分が何者か分からず感情移入する先がない。
+
+   出自は新しい能力値ではない。効くのは三つだけ。
+   ① 三枠目の面会候補が、出自の縁のある語り口から選ばれる（誰に会えるかが変わる）
+   ② 相手が、あなたの身分をどう見たかを最初に言う（温・並・冷）
+   ③ こちらの切り出しの言葉づかいが変わる（＝論証の字数が変わり、次の顔ぶれも変わる）
+   判定の計算式には一切触れていない。
+   ------------------------------------------------------------------------ */
+const ORIGINS = [
+  { key:'goshi', name:'郷士の子', short:'郷士あがり',
+    lead:'土佐の郷士の家に生まれた。刀は差せるが、上士の前では膝を折る。',
+    warm:[0,1], cold:[6],
+    warmNote:'志士・浪士／武家・幕臣', coldNote:'異人・通詞' },
+  { key:'tedai', name:'廻船問屋の手代', short:'廻船問屋あがり',
+    lead:'大坂の廻船問屋で番頭に仕えた。銭と船の筋は持つが、刀は差せない。',
+    warm:[3,6], cold:[1],
+    warmNote:'町人・商人／異人・通詞', coldNote:'武家・幕臣' },
+  { key:'nanushi', name:'村方の名主の子', short:'名主あがり',
+    lead:'在方の名主の家に生まれた。村を預かる家の子で、米の値がそのまま暮らしだった。',
+    warm:[4,5], cold:[2],
+    warmNote:'学者・僧／女', coldNote:'公家・宮中' },
+];
+/* 相手が、あなたの身分をどう受け取ったか。3出自 × 温・並・冷 × 4系統の調子。 */
+const RECEPTIONS = [
+  [ ['郷士か。上士どもより、よほど話が早い。',
+     '郷士のお生まれか。ならば話は早うござる。',
+     '郷士のお生まれで。なら、話は早いですね。',
+     '郷士のお生まれですか。ならば、お話は早うございます。'],
+    ['郷士の子か。刀は差しておるのだな。',
+     '郷士のお家柄か。まあ、掛けられよ。',
+     '郷士のお家の方で。まあ、お掛けなさい。',
+     '郷士のお家の方ですか。まあ、お掛けください。'],
+    ['郷士か。刀を差した者の話は、聞き飽きた。',
+     '郷士のお生まれか。……刀の話なら、他所でされよ。',
+     '郷士の方で。刀の話は、ちょっと勘弁してくださいよ。',
+     '刀を差しておいでですね。……その手のお話でしたら、伺えません。'] ],
+  [ ['廻船の手代か。銭と船を握る者の話は、聞く値打ちがある。',
+     '廻船問屋の手代か。船と銭の話なら、聞き申そう。',
+     '廻船問屋のお人で。そりゃ、話が合いますな。',
+     '廻船問屋の方ですか。船と銭のお話なら、伺いましょう。'],
+    ['廻船の手代か。……まあ、座れ。',
+     '廻船問屋の手代か。まあ、掛けられよ。',
+     '廻船問屋のお人で。まあ、お掛けなさい。',
+     '廻船問屋の方ですか。どうぞ、お掛けください。'],
+    ['町人が、国の話をしに来たか。',
+     '商人の使いか。……国の大事を、算盤で計られては困る。',
+     '町方のお人が、お国の話ですか。',
+     '商いの方が、国の大事のお話を。……畏れ入ります。'] ],
+  [ ['名主の子か。村を背負う家の者なら、話は分かる。',
+     '名主のお家の方か。村を預かる家なら、話は通じ申す。',
+     '名主さんのお家の方で。村のことなら、話が分かりますね。',
+     '名主さんのお家の方ですか。村を預かる家なら、お話は通じます。'],
+    ['百姓の出か。……まあ、座れ。',
+     '名主の家の者か。まあ、掛けられよ。',
+     '名主さんとこの方で。まあ、お掛けなさい。',
+     '名主さんのお家の方ですか。どうぞ、お掛けください。'],
+    ['百姓の子が、御所の話をしに来たか。',
+     '名主の家の者が、朝廷の話を。……身の程を弁えられよ。',
+     'お百姓のお家の方が、御所のお話ですか。',
+     '村方の方が、御所のお話を。……畏れながら、筋が違いましょう。'] ],
+];
+/* 0=温かく迎える 1=並 2=冷たくあしらう */
+function receptionKind(origin, charId){
+  const o = ORIGINS[origin] || ORIGINS[0], v = voiceOf(charId);
+  return o.warm.includes(v) ? 0 : o.cold.includes(v) ? 2 : 1;
+}
+const receptionOf = (origin, charId) =>
+  RECEPTIONS[origin ?? 0][receptionKind(origin ?? 0, charId)][TONE_OF_VOICE[voiceOf(charId)]];
+
+/* こちらの切り出し。出自でこちらの言葉づかいが変わる。3出自 × 7語り口。 */
 const PREAMBLE_BY_VOICE = [
-  '腹を割って申す',                 /* 志士・浪士に */
-  '御役目の筋で申し上げる',         /* 武家・幕臣に */
-  '畏れながら申し上げる',           /* 公家・宮中に */
-  '商いの話としてお聞きください',   /* 町人・商人に */
-  '不躾を承知でお願い申します',     /* 女に */
-  '理を立てて申し上げる',           /* 学者・僧に */
-  '率直に申し上げます',             /* 異人・通詞に */
+  [ '腹を割って申す',                 /* 志士・浪士に */
+    '御役目の筋で申し上げる',         /* 武家・幕臣に */
+    '畏れながら申し上げる',           /* 公家・宮中に */
+    '商いの話としてお聞きください',   /* 町人・商人に */
+    '不躾を承知でお願い申します',     /* 女に */
+    '理を立てて申し上げる',           /* 学者・僧に */
+    '率直に申し上げます' ],           /* 異人・通詞に */
+  [ '商人の言葉で恐れ入りますが、申し上げます',
+    '町人の身で、失礼を承知にて申し上げます',
+    '畏れ多いことながら、申し上げます',
+    '商いの話として、率直に申します',
+    '不躾を承知で、お願い申し上げます',
+    '商人の見立てで恐れ入りますが、申し上げます',
+    '商いの言葉で、率直に申します' ],
+  [ '田舎者の言葉だが、腹を割って申す',
+    '在方の者にて、失礼を承知で申し上げます',
+    '畏れながら、村方の者として申し上げます',
+    '在の話としてお聞きください',
+    '不躾を承知で、お願い申します',
+    '学のない身で恐れ入りますが、申し上げます',
+    '田舎の者ですが、率直に申します' ],
 ];
 /* 盤面が張り詰めているときは、身分よりそちらから入る */
 const PREAMBLE_BY_SIT = {
@@ -1734,7 +1830,7 @@ const PREAMBLE_BY_SIT = {
 function preambleOf(st, charId, place){
   for (const s of situationsOf(st, charId, place))
     if (PREAMBLE_BY_SIT[s.key]) return PREAMBLE_BY_SIT[s.key];
-  return PREAMBLE_BY_VOICE[voiceOf(charId)];
+  return PREAMBLE_BY_VOICE[st.origin ?? 0][voiceOf(charId)];
 }
 
 /* --- 余話（史実の短評と、関連作品） --------------------------------------
@@ -2447,8 +2543,9 @@ const INTERLUDE_FIGURES = {
   '2+4':[47,144], '3+4':[142,144],
 };
 
-function createState(seed){
-  return { seed: seed >>> 0, turn: 1, currents:[0,0,0,0,0],
+function createState(seed, origin){
+  return { seed: seed >>> 0, origin: clamp(Number.isInteger(origin) ? origin : 0, 0, ORIGINS.length - 1),
+           turn: 1, currents:[0,0,0,0,0],
            contacts:[], banned:[], promises:[], interludes:[], lastLen:0, probesUsed:0, interlude:null, lastPlace:null,
            actions:[], finished:false };
 }
@@ -2469,7 +2566,8 @@ function playerStanding(st){
   const order = [0,1,2,3,4].sort((a,b) => cur[b] - cur[a] || a - b);
   const a = order[0], b = order[1], av = cur[a], bv = cur[b];
   const alignedContacts = contactIds.filter(id => CHAR_BY_ID.get(id)?.factions.includes(a)).length;
-  const base = { contacts, promises, enemies };
+  const origin = ORIGINS[st.origin ?? 0] || ORIGINS[0];
+  const base = { contacts, promises, enemies, origin };
 
   if (!acted && total === 0 && contacts === 0 && enemies === 0)
     return Object.assign(base, { key:'unseen', short:'無所属の周旋家',
@@ -2529,8 +2627,8 @@ function playerEpilogue(st, ending){
   const consequence = ending.kind === 'chaos'
     ? `世間はあなたを「${standing.title}」と呼んだが、その立場を公の役目へ変える政権は生まれなかった。`
     : `世間が呼ぶ「${standing.title}」という名のまま、新しい世の中へ入る。`;
-  return { title:standing.title, factions:standing.factions,
-    text:`${turns}度の面会を重ねた。${trail}${burdens}${consequence}` };
+  return { title:standing.title, factions:standing.factions, origin:standing.origin,
+    text:`${standing.origin.lead}${turns}度の面会を重ねた。${trail}${burdens}${consequence}` };
 }
 
 /* 基点ID: (直前の論証文の文字数 × ターン数) を名簿数で割った剰余。第1ターンのみ seed から。
@@ -2555,7 +2653,10 @@ function meetingList(st, place){
   const free = id => !taken.has(id) && !st.contacts.includes(id) && !st.banned.includes(id);
   /* 場が縛るのは3枠のうち1枠だけ。強く縛ると「毎ターン目当ての勢力を引ける」
      ようになり、誰と会えるかの制約が消えてしまう。荒事の場はもう1枠を短気な者に充てる。 */
+  const warm = new Set((ORIGINS[st.origin ?? 0] || ORIGINS[0]).warm);
   const suits = (id, slot) => {
+    /* 三枠目は出自の縁で寄ってくる者。旅疲れの日は枠ごと消える（自分の縁を辿る暇がない）。 */
+    if (slot === 2 && !warm.has(voiceOf(id))) return false;
     if (!pl) return true;
     if (pl.minRank != null && rankOfId(id) < pl.minRank) return false;
     if (slot === 0) return CHAR_BY_ID.get(id).factions.some(f => pl.favor.includes(f));
@@ -3075,7 +3176,7 @@ function resolve(st, action){
   const reaction = reactionOf(st, action, { score, hits, duel, reconciled });
 
   const next = {
-    seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned, promises,
+    seed: st.seed, origin: st.origin ?? 0, turn: st.turn + 1, currents: cur, contacts, banned, promises,
     lastLen: len, lastPlace: action.place ?? null,
     /* 立ち合いに敗れると、深追いする余裕を失う（一度きりの奥の手を失う） */
     probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
@@ -3180,8 +3281,8 @@ function evaluateEnding(st){
 }
 
 /* --- リプレイ / セーブ ---------------------------------------------------- */
-function replay(seed, actions, interludeChoices){
-  let st = createState(seed);
+function replay(seed, actions, interludeChoices, origin){
+  let st = createState(seed, origin);
   const picks = Array.isArray(interludeChoices) ? interludeChoices
               : interludeChoices == null ? [] : [null, interludeChoices];
   const reports = [];
@@ -3197,7 +3298,7 @@ function replay(seed, actions, interludeChoices){
   return { state: st, reports };
 }
 function encodeSave(st){
-  return 'IR5:' + st.seed + ':' + st.actions
+  return 'IR6:' + st.seed + ':' + (st.origin ?? 0) + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
                a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
               + (a.duel != null ? ',' + a.duel : ''))
@@ -3210,15 +3311,17 @@ function encodeSave(st){
 }
 function decodeSave(code){
   const s = String(code).trim();
-  /* IR5 で「探る」を1局1回に、通常の問いを不正解の除外に変えた。
-     IR4 以前のコードは同じ手順でも別の結末になるため、黙って読まずに断る。 */
-  if (!/^IR5:/.test(s)) throw new Error(/^IR[1-4]:/.test(s)
-    ? '旧版の保存コードです。聞き出しの規則が変わったため、同じ手順でも結末が変わります'
+  /* IR6 で主人公の出自が入った。出自は面会候補と切り出しの字数を変えるので、
+     同じ seed と同じ手順でも盤面が変わる。旧版は黙って読まずに断る。 */
+  if (!/^IR6:/.test(s)) throw new Error(/^IR[1-5]:/.test(s)
+    ? '旧版の保存コードです。主人公の出自が入ったため、同じ手順でも盤面が変わります'
     : 'コードの形式が違います');
   const parts = s.slice(4).split(':');
   if (!/^\d+$/.test(parts[0])) throw new Error('seed が数値ではありません');
   const seed = parseInt(parts[0], 10) >>> 0;
-  const raw = parts.slice(1).join(':');
+  if (!/^[0-2]$/.test(parts[1] ?? '')) throw new Error('出自の番号が不正です');
+  const origin = +parts[1];
+  const raw = parts.slice(2).join(':');
   const hash = raw.indexOf('#');
   const choiceText = hash >= 0 ? raw.slice(hash + 1) : '';
   if (hash >= 0 && !/^[0-2-](\.[0-2-])*$/.test(choiceText)) throw new Error('幕間の選択番号が不正です');
@@ -3240,10 +3343,10 @@ function decodeSave(code){
              place: plc === undefined || plc === '' ? null : +plc,
              duel: dl === undefined ? null : +dl };
   });
-  return { seed, actions, interludeChoice };
+  return { seed, origin, actions, interludeChoice };
 }
 function hashState(st){
-  const s = JSON.stringify([st.seed, st.turn, st.currents, st.contacts, st.banned,
+  const s = JSON.stringify([st.seed, st.origin ?? 0, st.turn, st.currents, st.contacts, st.banned,
                             st.promises, st.lastLen, st.probesUsed, st.interludes, st.lastPlace, st.finished]);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
@@ -3251,7 +3354,7 @@ function hashState(st){
 }
 
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
-  TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, GESTURES, gestureOf, SAYS, NOTES,
+  TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, GESTURES, gestureOf, ORIGINS, RECEPTIONS, receptionKind, receptionOf, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
   PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
@@ -3271,7 +3374,7 @@ let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
            place:null, picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
            interludeStandingBefore:null, interludeStandingAfter:null,
-           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null };
+           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null, originDraft:0 };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fac = i => E.FACTIONS[i];
@@ -3484,7 +3587,7 @@ function headerHTML(){
     <h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1>
     <div class="meta">
       <span>${turnText}</span>
-      <span>あなた <b>${esc(standing.short)}</b></span>
+      <span>あなた <b>${esc(standing.origin.name)}</b> ― ${esc(standing.short)}</span>
       <span>時代ランク <b>${E.ERAS[E.eraOf(st)]}</b></span>
       <span>奥の手 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
     </div></header>`;
@@ -3499,7 +3602,14 @@ function viewTitle(){
   </section>
   <div class="panel">
     <div class="player-premise"><span class="role">あなた ― 無名の周旋家</span>
-      幕府にも朝廷にも、いずれの藩にも属していません。兵も身分もなく、持つのは人を読み、言葉で人をつなぐ力だけです。</div>
+      幕府にも朝廷にも、いずれの藩にも属していません。兵も官職もなく、持つのは人を読み、言葉で人をつなぐ力だけです。</div>
+    <div class="slot-h">出自を選ぶ <span style="opacity:.7">— 誰があなたに会うか、あなたがどう名乗るかが変わります</span></div>
+    <div class="origin-grid">${E.ORIGINS.map((o, i) => `
+      <div class="origin ${ui.originDraft === i ? 'sel' : ''}" data-origin="${i}" role="button" tabindex="0" aria-pressed="${ui.originDraft === i}">
+        <div class="oname">${esc(o.name)}</div>
+        <div class="olead">${esc(o.lead)}</div>
+        <div class="small" style="margin-top:6px">縁がある：<b>${esc(o.warmNote)}</b>　／　煙たがられる：<b>${esc(o.coldNote)}</b></div>
+      </div>`).join('')}</div>
     <p><b>10ターン以内に理想の日本を創り上げる</b>と同時に、行動の積み重ねによって
     <b>あなた自身が何者として歴史に残るか</b>を決めます。到達できる未来は<b>全16通り</b>。</p>
     ${factionLegendHTML()}
@@ -3546,7 +3656,7 @@ function viewTitle(){
       <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
     </div>` : ''}
     <details class="detail"><summary>保存コードから再開する</summary>
-      <textarea id="code" placeholder="IR5:1868:47,0,2,2,053,0;...#0.1"></textarea>
+      <textarea id="code" placeholder="IR6:1868:0:47,0,2,2,053,0;...#0.1"></textarea>
       <div class="row"><button id="load">再開する</button></div>
       <div id="err" class="warn"></div>
       <div class="small" style="margin-top:6px;opacity:.8">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</div>
@@ -3560,12 +3670,15 @@ function viewTitle(){
   </div>`;
   const startGame = guided => {
     const v = parseInt(document.getElementById('seed').value, 10);
-    st = E.createState(Number.isFinite(v) ? v : 1868);
+    st = E.createState(Number.isFinite(v) ? v : 1868, ui.originDraft);
     ui.seedDraft = st.seed; ui.guidedTutorial = guided; markTutorialSeen();
     ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null; ui.place = null;
     ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
     ui.screen = 'meeting'; render();
   };
+  app.querySelectorAll('[data-origin]').forEach(el => el.onclick = () => {
+    ui.originDraft = +el.dataset.origin; render();
+  });
   const start = document.getElementById('start');
   if (start) start.onclick = () => startGame(false);
   const startGuide = document.getElementById('start-guide');
@@ -3577,9 +3690,9 @@ function viewTitle(){
   };
   document.getElementById('load').onclick = () => {
     try {
-      const { seed, actions, interludeChoice } = E.decodeSave(document.getElementById('code').value);
-      st = E.replay(seed, actions, interludeChoice).state;
-      ui.seedDraft = seed; ui.guidedTutorial = false; markTutorialSeen();
+      const { seed, origin, actions, interludeChoice } = E.decodeSave(document.getElementById('code').value);
+      st = E.replay(seed, actions, interludeChoice, origin).state;
+      ui.seedDraft = seed; ui.originDraft = origin; ui.guidedTutorial = false; markTutorialSeen();
       ui.interludePicked = null; ui.interludeData = null; ui.place = null;
       ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
       ui.screen = st.finished ? 'ending' : 'meeting'; render();
@@ -3880,6 +3993,8 @@ function viewStance(){
            <span class="small">※ 一度決裂した相手。説き伏せれば和解する</span></div>`
         : tieHTML(ui.charId, E.waryOf(st.currents, ui.charId))}
       <div class="opening">「${esc(E.SAYS.get(ui.charId) || '')}」</div>
+      <div class="opening reception r${E.receptionKind(st.origin, ui.charId)}">「${
+        esc(E.receptionOf(st.origin, ui.charId))}」</div>
       ${(() => { const sit = E.situationOf(st, ui.charId, ui.place);
         return sit ? `<div class="opening sit">「── ${esc(sit.text)}」</div>` : ''; })()}
       ${guide}<div class="quote">${esc(c.desc)}</div>
