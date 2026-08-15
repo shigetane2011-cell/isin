@@ -522,7 +522,8 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
                     REVISIT_SAYS: E.REVISIT_SAYS,
                     SITUATIONS: E.SITUATIONS.map(x => x.say),
                     SMALLTALK: E.SMALLTALK[0].lines, GESTURES: E.GESTURES,
-                    RECEPTIONS: E.RECEPTIONS };
+                    RECEPTIONS: E.RECEPTIONS,
+                    SCENE_SAYS: Object.values(E.SCENE_SAYS) };
     const hits = [];
     for (const [name, pool] of Object.entries(pools))
       for (const t of pool.flat(2)) if (MALE.test(t)) hits.push(`${name}:「${t.slice(0, 24)}」`);
@@ -627,6 +628,41 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
     for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR6:1:3:1,0,0,0,000,0', 'IR6:1:x:1,0,0,0,000,0'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '旧版のコードと、不正な出自の番号を弾く');
+  }
+  {
+    /* 面会の入り口。台詞を増やしても、常に同じ順で同じ7ブロックを並べる限り
+       展開は一本のままだった。盤面と人物で、並びと有無そのものを変える。 */
+    const keys = Object.keys(E.SCENE_ORDER);
+    ok(keys.length === 8, `面会の入り口が8通りある（${keys.length}）`);
+    ok(new Set(keys.map(k => E.SCENE_ORDER[k].join('>'))).size === keys.length,
+       '8通りの並びが互いに違う（同じ形が二つない）');
+    ok(keys.every(k => E.SCENE_ORDER[k].includes('gest') && E.SCENE_ORDER[k].includes('chips')),
+       'どの入り口でも、所作と対話だけは必ず出る（手掛かりを落とさない）');
+    /* 画面側の組み立て表に無い名前を並べると、そのブロックが黙って消える */
+    const known = new Set((html.match(/\n    (\w+):\s+\(\) =>/g) || [])
+      .map(x => x.trim().replace(/:.*/, '')));
+    const unknown = keys.flatMap(k => E.SCENE_ORDER[k]).filter(b => !known.has(b));
+    ok(unknown.length === 0, `並びに書いた名前がすべて画面側にある${
+      unknown.length ? '（不明: ' + [...new Set(unknown)].join(',') + '）' : ''}`);
+    ok(keys.every(k => Array.isArray(E.SCENE_SAYS[k]) && E.SCENE_SAYS[k].length === 3),
+       'どの入り口にも情景が3通りある');
+    /* 151名 × 6場 + 場なし で、必ず既知の入り口に落ちる */
+    let bad = 0;
+    const st0 = E.createState(7);
+    for (const c of E.CHARACTERS)
+      for (const pl of [null, 0, 1, 2, 3, 4, 5])
+        if (!E.SCENE_ORDER[E.sceneOf(st0, c.id, pl)]) bad++;
+    ok(bad === 0, `どの人物・どの場でも既知の入り口になる（外れ ${bad} 件）`);
+    /* 並の面会も一種類ではない ―― 同じ相手はいつも同じ迎え方をする */
+    const plainKinds = new Set(E.CHARACTERS.map(c => E.sceneOf(st0, c.id, null)));
+    ok(plainKinds.size >= 3, `場なしでも入り口が分かれる（${[...plainKinds].join('・')}）`);
+    ok(E.CHARACTERS.every(c => E.sceneOf(st0, c.id, null) === E.sceneOf(st0, c.id, null)),
+       '同じ盤面なら同じ入り口になる（決定論）');
+    /* 入り口は場面の組み立てでしかない。判定にも保存コードにも影響しない */
+    const engine = html.slice(html.indexOf('function resolve(st, action)'),
+                              html.indexOf('function topPairKey'));
+    ok(!/sceneOf|SCENE_ORDER|SCENE_SAYS/.test(engine),
+       '判定は入り口を一切参照しない（見え方であって規則ではない）');
   }
   ok(Object.values(E.PREAMBLE_BY_SIT).every(v => typeof v === 'string' && v.length > 3),
      '張り詰めた盤面ぶんの枕もある');

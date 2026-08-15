@@ -30,9 +30,15 @@ await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
 
 if (!(await p.$('.player-premise'))) errs.push('タイトルに主人公の出自が出ていない');
 await p.screenshot({ path: shot('01-title.png') });
+/* 1周目も seed を固定する。タイトルの初期 seed は Web Crypto で毎回変わるため、
+   固定しないと「縁が出たか」のような確認が運任せになり、偽の失敗が出る。 */
+const SEED1 = process.env.SMOKE_SEED || '1868';
+await p.fill('#seed', SEED1);
 /* 出自を選んでから始める（既定は0なので、あえて別の出自で通す） */
 await p.click('.origin[data-origin="2"]');
 const originName = await p.$eval('.origin.sel .oname', e => e.textContent);
+/* 出自を選ぶと画面を描き直すので、打ち込んだ seed が消えないこと */
+if (await p.$eval('#seed', e => e.value) !== SEED1) errs.push('出自を選ぶと seed の入力が消える');
 /* 初回は「ガイド付き／通常どおり」の2択、2回目以降は #start が出る */
 if (await p.$('#start-normal')) await p.click('#start-normal');
 else await p.click('#start');
