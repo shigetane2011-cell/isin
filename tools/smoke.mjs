@@ -68,6 +68,10 @@ await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
 /* 1人目を選ぶ → 支持 → カード3枚 */
 await p.click('.person[data-id]');
 await p.waitForSelector('[data-stance], [data-own]');
+/* 通常の問いは正解を出さず、不正解を一つだけ除外する */
+await p.click('[data-ask]');
+if (!(await p.$$eval('.say', e => e.map(x => x.textContent).join('\n')).then(t => t.includes('残り二択'))))
+  errs.push('通常の問いで「残り二択」と表示されない');
 if (await p.$('[data-own]')) await p.click('[data-own]');
 await p.click('[data-stance="support"]');
 await p.waitForSelector('[data-approach]');
@@ -80,9 +84,18 @@ const pickApproach = async () => {
 };
 await pickApproach();
 await p.waitForSelector('.card, #go');
+if (await p.$$eval('.card.ruled-out', e => e.length) !== 1)
+  errs.push('探りで除外されるカードが一枚ではない');
+if (await p.$$eval('.card[data-cat="0"]:not(.ruled-out)', e => e.length) !== 2)
+  errs.push('探った項目が残り二択になっていない');
+if (await p.$$eval('.card.ans', e => e.length) !== 0)
+  errs.push('通常の問いなのに正解カードが開示されている');
 await p.screenshot({ path: shot('03-cards.png'), fullPage: true });
 for (const el of await p.$$('.card[data-cat="0"], .card[data-cat="1"], .card[data-cat="2"]')) { }
-for (const cat of [0, 1, 2]) { const el = await p.$(`.card[data-cat="${cat}"]`); if (el) await el.click(); }
+for (const cat of [0, 1, 2]) {
+  const el = await p.$(`.card[data-cat="${cat}"]:not(.ruled-out):not(.guide-decoy)`);
+  if (el) await el.click();
+}
 console.log('組み上がった論証:', (await p.$$eval('.quote', els => els[els.length - 1].textContent)).slice(0, 40) + '…');
 await p.click('#go');
 if (await p.$('.duel')) {

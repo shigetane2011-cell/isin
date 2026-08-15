@@ -103,6 +103,8 @@ ok(html.includes('あなたが何者になったか') && html.includes('playerEn
    'エンディングで主人公自身の到達点を総括する');
 ok(html.includes('奥の手 残り') && html.includes('一局に一度の奥の手'),
    '全開示を通常手順ではなく、一度きりの奥の手として示す');
+ok(html.includes('× 探りで除外') && html.includes('ruled-out') && html.includes('残り二択'),
+   '通常の問いは不正解カードを一枚だけ除外して二択にする');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
@@ -391,9 +393,47 @@ head('5d2. 行動から主人公の立場が導かれるか');
 }
 
 /* --- 5e. 対話（チップ式） -------------------------------------------------- */
-head('5e. 対話の返答が動機型と正しく対応しているか');
+head('5e. 通常の問いは正解を明かさず、不正解を一つだけ除外するか');
 ok(E.QUESTIONS.length === 3 && E.QUESTIONS.every((q, i) => q.cat === i),
    '踏み込んだ問いが3カテゴリに1対1で対応している');
+ok(E.DENIAL_BASES.length === 3 && E.DENIAL_BASES.every(x => x.length === 6)
+   && E.DENIAL_ENDS.length === 7,
+   '否定の内容が3カテゴリ×6型、語尾が7つの語り口ぶんある');
+{
+  let neverCorrect = true, alwaysInChoices = true, deterministic = true, allThree = true;
+  for (let seed = 1; seed <= 20; seed++){
+    const st = E.createState(seed);
+    for (const c of E.CHARACTERS){
+      for (let cat = 0; cat < 3; cat++){
+        const denied = E.deniedMotiveOf(st, c.id, cat);
+        if (denied === c.correct[cat]) neverCorrect = false;
+        if (denied !== E.deniedMotiveOf(st, c.id, cat)) deterministic = false;
+        const opts = E.cardOptions(st, c.id, c.factions[0])[cat].map(o => o.motive);
+        if (!opts.includes(denied)) alwaysInChoices = false;
+        if (opts.length !== 3 || new Set(opts).size !== 3 || !opts.includes(c.correct[cat])) allThree = false;
+      }
+    }
+  }
+  ok(neverCorrect, '否定される型は151名×3カテゴリ×20 seedのすべてで不正解');
+  ok(alwaysInChoices, '否定された型は、実際に提示される三択へ必ず含まれる');
+  ok(allThree, '三択は正解1枚・否定される不正解1枚・もう一つの不正解1枚で重複しない');
+  ok(deterministic, '同じ局面の同じ問いなら、除外される型と返答は変わらない');
+
+  const varied = new Set();
+  for (let seed = 1; seed <= 100; seed++) varied.add(E.deniedMotiveOf(E.createState(seed), 47, 0));
+  ok(varied.size >= 3, `seedによって除外される不正解が偏り切らない（実測 ${varied.size} 種）`);
+
+  const c = E.CHAR_BY_ID.get(47), s0 = E.createState(7);
+  const base = { charId:47, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+    cards:c.correct.slice(), probed:false, approach:0, place:null };
+  const plain = E.resolve(s0, base), asked = E.resolve(s0, Object.assign({}, base, {asked:0}));
+  ok(asked.report.gain === plain.report.gain && asked.next.probesUsed === plain.next.probesUsed,
+     '通常の問いは無料で、得点や一度きりの奥の手を消費しない');
+  ok(asked.report.asked === 0 && asked.report.deniedMotive !== c.correct[0],
+     '結果には、どの項目で何を除外したかが残る');
+}
+
+head('5e1. 奥の手とチュートリアル用の完全返答が動機型と対応しているか');
 ok(E.REPLIES.length === 3 && E.REPLIES.every(r => r.length === 6 && r.every(m => m.length === 7)),
    '返答が 3カテゴリ × 6動機 × 7語り口 = 126通り揃っている');
 ok(new Set(E.REPLIES.flat(2)).size === 126, '126の返答すべてが別の文である');

@@ -173,6 +173,10 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .card.guide-answer{border:2px solid var(--kin);background:linear-gradient(100deg,rgba(177,123,36,.13),#fffdf7 68%)}
 .card.guide-decoy{opacity:.48;cursor:not-allowed}
 .card.guide-decoy:hover{border-color:var(--line)}
+.card.ruled-out{opacity:.5;cursor:not-allowed;background:rgba(59,52,44,.07);border-style:dashed}
+.card.ruled-out:hover{border-color:var(--line)}
+.card.ruled-out .mv{text-decoration:line-through;text-decoration-thickness:1px}
+.card .ruled-mark{display:block;color:var(--shu);font-weight:700;font-size:.76rem;margin-bottom:3px}
 .guide-reason{margin-top:6px;padding-top:6px;border-top:1px dotted rgba(177,123,36,.55);color:var(--sumi2);font-size:.76rem;line-height:1.65}
 .guide-reason b{color:#7c551c}
 .person .nm{font-size:1.05rem;font-weight:600;letter-spacing:.06em}
@@ -1240,10 +1244,10 @@ const ENDINGS = {
 
 /* --- 対話（チップ式） ----------------------------------------------------
    面会した相手には、踏み込んだ問いを **一つだけ** ぶつけられる。
-   返答はその人物の「刺さる型」をそのまま語るので、対応するカードが読める。
+   通常の返答は「刺さらない型」を一つ否定し、対応するカードを三択から除外する。
+   正解そのものは明かさず、残った二択を人物描写から読む余地を残す。
    その者の時勢観は、問わずとも情勢描写の下に出る（雰囲気のためのもので、手がかりではない）。
-   一つに絞っているのは実測による。二つ聞けると初心者でも84%通ってしまい、
-   腕前の差が消える。一問なら 名手98% / 上手91% / 普通75% / 初心39% に収まる。
+   チュートリアルと一局一度の奥の手だけは、従来どおり正解を明かす。
    ------------------------------------------------------------------------ */
 /* 語り口。同じ中身でも、身分と育ちで言葉は変わる。
    志士と公家と町人と女と学者と異人が、同じ文で喋っていては臨場感が出ない。
@@ -1426,6 +1430,38 @@ const REPLIES = [
 /* その人物が、その問いに答える言葉 */
 const replyOf = (charId, cat) =>
   REPLIES[cat][CHAR_BY_ID.get(charId).correct[cat]][voiceOf(charId)];
+
+/* 通常の問いで否定される型。正解以外の5つから seed・ターン・人物・カテゴリで
+   一つを決める。同じ局面では必ず同じ返答になり、カード三択にも必ず混ぜる。 */
+const DENIAL_BASES = [
+  ['名誉や武名が目当てではない','銭や利権が目当てではない','身の安全だけが望みではない',
+   '大義や理念のためではない','力や武備を求めているのではない','知識や学問を求めているのではない'],
+  ['家門や血筋に縛られているのではない','主君への義理に縛られているのではない',
+   '民草の暮らしに縛られているのではない','列強の圧力に縛られているのではない',
+   '同志の死に縛られているのではない','出自の低さに縛られているのではない'],
+  ['目的と手段だけを筋と見ているのではない','段取りや順序だけを筋と見ているのではない',
+   '力の均衡だけを筋と見ているのではない','名分だけを筋と見ているのではない',
+   '目先の実利だけを筋と見ているのではない','時勢や必然だけを筋と見ているのではない'],
+];
+const DENIAL_ENDS = [
+  '。そこを読み違えるな。',
+  '。少なくとも、そこは違い申す。',
+  'のう。そこを取り違えてはならぬ。',
+  'んですよ。そこは見当違いでさ。',
+  'のです。そこだけは違います。',
+  '。少なくとも、その見立ては外れている。',
+  '。その考えは除いてください。',
+];
+function deniedMotiveOf(st, charId, cat){
+  const correct = CHAR_BY_ID.get(charId).correct[cat];
+  const wrong = [0,1,2,3,4,5].filter(m => m !== correct);
+  const rnd = streamOf(st.seed, st.turn, 810007 + charId * 17 + cat * 101);
+  return wrong[Math.floor(rnd() * wrong.length)];
+}
+function denialOf(st, charId, cat){
+  const denied = deniedMotiveOf(st, charId, cat);
+  return DENIAL_BASES[cat][denied] + DENIAL_ENDS[voiceOf(charId)];
+}
 const SMALLTALK = [
   { chip:'時勢をどう見ておられる', lines:[
     ['御所と幕府が睦まじくあれば、この国は保つ。それを崩そうとする者らが解せぬ。',
@@ -2446,8 +2482,13 @@ function cardOptions(st, charId, faction){
   const ch = CHAR_BY_ID.get(charId), out = [];
   for (let cat = 0; cat < 3; cat++){
     const correct = ch.correct[cat];
+    /* 通常の問いで否定される一枚を必ずダミーに含める。これにより問いを使うと
+       画面上でも三択から一枚が消え、残り二択になる。 */
+    const denied = deniedMotiveOf(st, charId, cat);
     const rnd = streamOf(st.seed, st.turn, charId * 13 + faction * 7 + cat);
-    const decoys = pickDistinct(rnd, [0,1,2,3,4,5].filter(m => m !== correct), 2);
+    const other = pickDistinct(rnd,
+      [0,1,2,3,4,5].filter(m => m !== correct && m !== denied), 1)[0];
+    const decoys = [denied, other];
     out.push(pickDistinct(rnd, [correct, ...decoys], 3)
       .map(m => ({ motive:m, text: CARDS[faction][cat][m][listenerGroup(charId)] })));
   }
@@ -2612,8 +2653,9 @@ function waryOf(currents, charId){
 }
 
 /* --- 交渉の解決 ---------------------------------------------------------- */
-/* action = { charId, stance, ownF, argueF, cards:[m0,m1,m2], probed:bool }
-   probed は交渉前に相手を「探った」かどうか。探れば3つの正解すべてが分かるが、
+/* action = { charId, stance, ownF, argueF, cards:[m0,m1,m2], probed:bool, asked:?number }
+   asked は通常の問いで不正解を一つ除外したカテゴリ。判定値には影響しない。
+   probed は交渉前に奥の手を使ったかどうか。使えば3つの正解すべてが分かるが、
    手の内を明かした分だけ影響力が落ち、その交渉の獲得が1下がる（最低1）。
    判定そのもの（大成功／成功／失敗／決裂）は変わらない。 */
 function resolve(st, action){
@@ -2639,6 +2681,9 @@ function resolve(st, action){
 
   /* 探れるのは残り回数がある場合のみ。リプレイでも同じ判定になるよう状態から決める。 */
   const probed = !!action.probed && st.probesUsed < PROBE_LIMIT;
+  const asked = Number.isInteger(action.asked) && action.asked >= 0 && action.asked < 3
+    ? action.asked : null;
+  const deniedMotive = asked === null ? null : deniedMotiveOf(st, action.charId, asked);
 
   /* 転向は「攻撃」。3枚すべて刺さらねば通らない全か無かの賭け。 */
   const allOrNothing = action.stance === 'convert';
@@ -2733,7 +2778,7 @@ function resolve(st, action){
 
   return { next, report: {
     charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
-    gain, gainBeforeProbe, penalty, text, len, probed, duel, approach, fits, nCards,
+    gain, gainBeforeProbe, penalty, text, len, probed, asked, deniedMotive, duel, approach, fits, nCards,
     place: action.place ?? null, placeFits,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
@@ -2894,7 +2939,7 @@ function hashState(st){
 }
 
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
-  TIES, TIE_GRAPH, QUESTIONS, REPLIES, VOICES, VOICE_IDS, voiceOf, replyOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
+  TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
@@ -2944,8 +2989,19 @@ function coachHTML(step, title, body){
 function tutorialReasonHTML(c, i){
   const motive = E.CATS[i].motives[c.correct[i]];
   const reply = E.replyOf(c.id, i);
-  return `<div class="guide-reason"><b>根拠</b>：「${esc(E.QUESTIONS[i].chip)}」と問えば、相手は「${esc(reply)}」と答える。
+  return `<div class="guide-reason"><b>根拠</b>：練習では「${esc(E.QUESTIONS[i].chip)}」への本心を「${esc(reply)}」まで開示する。
     この返答が〈${esc(motive)}〉を示している。</div>`;
+}
+function dialogueReplyHTML(c, i, revealed){
+  if (revealed) return `<div class="say"><span class="q">「${esc(E.QUESTIONS[i].chip)}か」</span><br>${
+    esc(E.replyOf(c.id, i))}
+    <div class="small" style="margin-top:6px">→ 見抜いた<b>${esc(E.CATS[i].name)}</b>の正解は
+    <span class="uibadge">〔${esc(E.CATS[i].motives[c.correct[i]])}〕</span></div></div>`;
+  const denied = E.deniedMotiveOf(st, c.id, i);
+  return `<div class="say"><span class="q">「${esc(E.QUESTIONS[i].chip)}か」</span><br>${
+    esc(E.denialOf(st, c.id, i))}
+    <div class="small" style="margin-top:6px">→ <b>${esc(E.CATS[i].name)}</b>の
+    <span class="uibadge">〔${esc(E.CATS[i].motives[denied])}〕</span>は不正解。<b>残り二択</b>になった</div></div>`;
 }
 
 function toneStyle(factions){
@@ -3128,7 +3184,7 @@ function viewTitle(){
       <ol style="padding-left:1.2em;margin:6px 0">
         <li><b>どこへ行き、誰に会うか</b>を決める。場によって集まる者と、できる働きかけが変わります。
           京・江戸・長崎を直行した日は旅疲れで面会候補が1名減り、夜の街道を挟めば減りません。</li>
-        <li><b>対話</b>で相手を読む。踏み込んだ問いは一つだけ。全てを聞き出せる奥の手は一局に一度です。</li>
+        <li><b>対話</b>で相手を読む。踏み込んだ問いを一つ選ぶと、不正解が一つ消えて二択になります。全てを聞き出せる奥の手は一局に一度です。</li>
         <li><b>支持</b>するか、<b>論破して転向</b>させるかを決める。</li>
         <li><b>働きかけ</b>を選び、<b>論証カード</b>を組む。</li>
       </ol>
@@ -3141,7 +3197,7 @@ function viewTitle(){
       <b>転向</b>は攻撃なので<b>満点でしか通りません</b> ― 一段でも下がれば、札が刺さっていても届きません。</p>
       <p class="small"><b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>
       （いずれかの時勢が12以上で、対立勢力の人物は判定が一段下がる）。寄せ切るか、抑えて回るかが最大の判断です。</p>
-      <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答はその者に何が刺さるかを語ります。
+      <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答から、その項目の<b>不正解が一つ消えて二択</b>になります。
       読み切れないときは<b>一局に一度だけの「さらに聞き出す」</b>で3つとも開けられますが、
       <b>その交渉の獲得が1下がります</b>。誰にこの奥の手を切るかも判断です。</p>
       <p class="small"><b>時代のうねり</b>：どの勢力を伸ばしても合計値は高まり、より高位の人物が現れます。
@@ -3210,8 +3266,8 @@ function approachLegendHTML(mark){
     ${E.APPROACHES.map((a, i) => `<div class="${mark === i ? 'hit' : ''}">${
       mark === i ? '◎ ' : '・'}<b>${esc(a.name)}</b> ─ ${
       by[i].map(esc).join('／')} を欲する者に響く</div>`).join('')}
-    <div class="small">欲しているものは、面会中に<b>一つだけ問える</b>ほか、
-      【情勢】の描写からも読めます。「さらに聞き出す」でも分かります。</div></details>`;
+    <div class="small">面会中の問いは<b>不正解を一つ消して二択にする</b>ものです。
+      正解は【情勢】の描写から読むか、一局一度の「さらに聞き出す」で確かめられます。</div></details>`;
 }
 
 /* 縁の表示。面会の札でも、相手と向き合う画面でも同じものを出す。
@@ -3400,10 +3456,10 @@ function viewStance(){
           `<button data-argue="${f}">${fac(f).name}（${fac(f).full}）</button>`).join('')}</div>`;
     } else {
       const left = E.PROBE_LIMIT - st.probesUsed;
-      /* 欲しているものを聞き出していれば、そこから読める働きかけに印を付ける。
-         印は「聞き出した内容から筋どおりに読むとこれ」であって、正解の開示ではない。
+      /* 奥の手か練習で欲しているものまで分かっていれば、そこから読める働きかけに印を付ける。
+         印は「完全開示した内容から筋どおりに読むとこれ」であって、働きかけ自体の正解ではない。
          そう見えて違う者が29名いる（その手掛かりは【情勢】の描写にある）。 */
-      const knownMotive = (ui.asked === 0 || guidedTurn()) ? c.correct[0] : null;
+      const knownMotive = (ui.probed || guidedTurn()) ? c.correct[0] : null;
       const impliedAp = knownMotive === null ? -1 : E.APPROACH_BY_MOTIVE[knownMotive];
       body = `<p>どう働きかけますか？</p>
         ${approachLegendHTML(impliedAp)}
@@ -3421,7 +3477,7 @@ function viewStance(){
           const why = noGuide ? '（練習では論じるに絞ります）'
                     : noPlace ? `（${esc(E.PLACES[ui.place].name)}ではできない）`
                     : noConvert ? '（転向は論じるか肚を割るでしか通らない）'
-                    : noProbe ? '（探りを使い切っている）' : '';
+                    : noProbe ? '（奥の手を使い切っている）' : '';
           return `<button class="choice" data-approach="${i}" ${off ? 'disabled' : ''}>
             <b>${esc(a.name)}</b>${a.cards === 3 ? '' : `　<span class="small">カード${a.cards}枚</span>`}
             ${ui.place !== null && E.PLACES[ui.place].boost === i && !off
@@ -3435,19 +3491,16 @@ function viewStance(){
   }
   const wb0 = E.waryOf(st.currents, ui.charId);
   const said = [];
-  /* 聞き出せた分だけ返answerを出す。一問だけなら1つ、さらに聞き出せば3つとも。 */
-  const heard = new Set();
-  if (ui.asked !== null) heard.add(ui.asked);
-  if (ui.probed || guidedTurn()) { heard.add(0); heard.add(1); heard.add(2); }
-  for (const i of [0,1,2]) if (heard.has(i))
-    said.push(`<div class="say"><span class="q">「${esc(E.QUESTIONS[i].chip)}か」</span><br>${
-      esc(E.replyOf(ui.charId, i))}
-      <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[i].name)}</b>は
-      <span class="uibadge">〔${esc(E.CATS[i].motives[c.correct[i]])}〕</span></div></div>`);
+  /* 通常の一問は不正解を一つ除外するだけ。奥の手と練習だけは三つの正解を開く。 */
+  if (ui.probed || guidedTurn()) {
+    for (const i of [0,1,2]) said.push(dialogueReplyHTML(c, i, true));
+  } else if (ui.asked !== null) {
+    said.push(dialogueReplyHTML(c, ui.asked, false));
+  }
 
   const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
-    <div class="slot-h">対話 <span style="opacity:.7">— 踏み込んだ問いは<b>一つだけ</b>。奥の手は一局に一度</span></div>
+    <div class="slot-h">対話 <span style="opacity:.7">— 問いを一つ選ぶと<b>不正解が一つ消える</b>。奥の手は一局に一度</span></div>
     <div class="row">
       ${E.QUESTIONS.map((q, i) => (ui.probed || guidedTurn())
         ? `<span class="chip used">${esc(q.chip)}</span>`
@@ -3529,10 +3582,7 @@ function viewCards(){
       <div class="quote">${esc(c.desc)}</div>
       <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは、相手が何を欲しているか</b>で決まります。</div>
       ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
-      ${ui.asked !== null ? `<div class="say"><span class="q">「${esc(E.QUESTIONS[ui.asked].chip)}か」</span><br>${
-        esc(E.replyOf(ui.charId, ui.asked))}
-        <div class="small" style="margin-top:6px">→ 読み取れた<b>${esc(E.CATS[ui.asked].name)}</b>は
-        <span class="uibadge">〔${esc(E.CATS[ui.asked].motives[c.correct[ui.asked]])}〕</span></div></div>` : ''}
+      ${ui.asked !== null ? dialogueReplyHTML(c, ui.asked, ui.probed || guided) : ''}
       ${ui.stance === 'convert' ? `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
         ui.approach >= 2 ? `<br>さらに<b>${esc(E.APPROACHES[ui.approach].name)}は相手を読み切った前提の賭け</b>です。
         <b>この人物が欲しているもの</b>を読み違えていれば一段下がり、
@@ -3555,8 +3605,12 @@ function viewCards(){
         <div class="card-grid">${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
           const isAns = (ui.probed || guided) && isCorrect;
+          const isRuledOut = !ui.probed && !guided && ui.asked === i
+            && o.motive === E.deniedMotiveOf(st, ui.charId, i);
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
-          return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${guided && !isCorrect ? '-1' : '0'}" aria-disabled="${guided && !isCorrect}" aria-pressed="${ui.picks[i]===o.motive}">${
+          const disabled = (guided && !isCorrect) || isRuledOut;
+          return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass} ${isRuledOut?'ruled-out':''}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${disabled ? '-1' : '0'}" aria-disabled="${disabled}" aria-pressed="${ui.picks[i]===o.motive}">${
+            isRuledOut ? '<span class="ruled-mark">× 探りで除外</span>' : ''}${
             isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}</span> ` : ''
           }<span class="mv">〔${esc(E.CATS[i].motives[o.motive])}〕</span>${esc(o.text)}${
             guided && isCorrect ? tutorialReasonHTML(c, i) : ''}</div>`;
@@ -3573,13 +3627,14 @@ function viewCards(){
   app.querySelectorAll('.card').forEach(el => el.onclick = () => {
     const cat = +el.dataset.cat, motive = +el.dataset.m;
     if (guided && motive !== c.correct[cat]) return;
+    if (!ui.probed && ui.asked === cat && motive === E.deniedMotiveOf(st, ui.charId, cat)) return;
     ui.picks[cat] = motive; render();
   });
   document.getElementById('back').onclick = () => { ui.approach = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
     const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
                 cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed,
-                approach: ui.approach, place: ui.place };
+                asked: ui.asked, approach: ui.approach, place: ui.place };
     /* 刃が出ても画面は変えない。結果の流れの中で応じ方を訊く。 */
     if (E.duelPending(st, a)){ ui.duelAction = a; ui.report = null; ui.screen = 'result'; render(); return; }
     const r = E.resolve(st, a);
@@ -3617,18 +3672,20 @@ function viewResult(){
   const r = ui.report, c = E.CHAR_BY_ID.get(r.charId);
   const guidedResult = !!(ui.guidedTutorial && st.actions.length === 1);
   const marks = r.hits.slice(0, r.nCards).map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
-    h ? (r.probed ? '刺さった（奥の手で聞き出した）' : '刺さった')
+    h ? (r.probed ? '刺さった（奥の手で聞き出した）'
+                  : r.asked === i ? '刺さった（二択から見抜いた）' : '刺さった')
       : `外れ（この人物に効くのは「${E.CATS[i].motives[c.correct[i]]}」）`}</div>`).join('');
   const d = r.delta.map((v,i) => v ? `<span class="${fac(i).cls}">[${fac(i).name}] ${v>0?'+':''}${v}</span>` : null)
     .filter(Boolean).join('　') || '変動なし';
   app.innerHTML = headerHTML() +
     `<div class="result ${r.partial ? 'partial' : r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
-      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>踏み込んだ問いは一つだけ</b>。残りは情勢描写から読むか、「さらに聞き出す」を使うか、賭けてください。') : ''}
+      ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>一つの問いで不正解を一枚だけ除外</b>できます。残り二択は情勢描写から読むか、「さらに聞き出す」を使うか、賭けてください。') : ''}
       ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
       <div class="quote">「${esc(r.text)}」</div>
+      ${r.asked !== null && !r.probed ? `<div class="small">探り：〔${esc(E.CATS[r.asked].motives[r.deniedMotive])}〕を除外し、残り二択から選んだ</div>` : ''}
       ${marks}
       <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
         r.placeFits ? '　<span class="uibadge">◎ 場に合った（獲得+1）</span>' : ''}${
