@@ -1821,7 +1821,7 @@ const normalMeetingCount = (st, place) => travelFatigue(st.lastPlace, place) ? 2
    当たり方そのものを選べるようにした。4通りで**決定の形が違う**のが肝で、
    カードを3枚組む／2枚だけ／1枚に賭ける／引かない、と手触りが変わる。
 
-   響く働きかけは「利益の型」からほぼ導ける（＝対話や探りで既に学んでいる
+   響く働きかけは「利益の型」からほぼ導ける（＝対話や奥の手で既に学んでいる
    知識がそのまま効く）。そのうえで、型から外れる人物を手で指定してある。
    ------------------------------------------------------------------------ */
 const APPROACHES = [
@@ -2170,7 +2170,7 @@ function fateOf(charId, winners, n){
 /* --- 立ち合い -------------------------------------------------------------
    短気な人物に転向を仕掛けて通らなかったとき、相手は刀に手をかける。
    新しい判定系は足していない。応じ方の正解は、その人物の「利益の型」で決まる。
-   すでに対話や探りで型を掴んでいれば切り抜けられる ―― 既存の読みがそのまま効く。
+   すでに対話や奥の手で型を掴んでいれば切り抜けられる ―― 既存の読みがそのまま効く。
    分岐が増えないのはこのため。文章も3通り×勝敗の6つで、人物ごとには持たない。
    ------------------------------------------------------------------------ */
 /* --- 人物の絵 -------------------------------------------------------------
@@ -3098,7 +3098,7 @@ function replay(seed, actions, interludeChoices){
   return { state: st, reports };
 }
 function encodeSave(st){
-  return 'IR4:' + st.seed + ':' + st.actions
+  return 'IR5:' + st.seed + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
                a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
               + (a.duel != null ? ',' + a.duel : ''))
@@ -3111,9 +3111,10 @@ function encodeSave(st){
 }
 function decodeSave(code){
   const s = String(code).trim();
-  /* IR3 は幕間の追加より前の版。幕間を「未選択」として扱えばそのまま再現できる。 */
-  if (!/^IR[34]:/.test(s)) throw new Error(/^IR[12]:/.test(s)
-    ? '旧版の保存コードです。名簿と判定ルールが変わったため再現できません'
+  /* IR5 で「探る」を1局1回に、通常の問いを不正解の除外に変えた。
+     IR4 以前のコードは同じ手順でも別の結末になるため、黙って読まずに断る。 */
+  if (!/^IR5:/.test(s)) throw new Error(/^IR[1-4]:/.test(s)
+    ? '旧版の保存コードです。聞き出しの規則が変わったため、同じ手順でも結末が変わります'
     : 'コードの形式が違います');
   const parts = s.slice(4).split(':');
   if (!/^\d+$/.test(parts[0])) throw new Error('seed が数値ではありません');
@@ -3446,7 +3447,7 @@ function viewTitle(){
       <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
     </div>` : ''}
     <details class="detail"><summary>保存コードから再開する</summary>
-      <textarea id="code" placeholder="IR4:1868:47,0,2,2,053,0;...#0.1"></textarea>
+      <textarea id="code" placeholder="IR5:1868:47,0,2,2,053,0;...#0.1"></textarea>
       <div class="row"><button id="load">再開する</button></div>
       <div id="err" class="warn"></div>
       <div class="small" style="margin-top:6px;opacity:.8">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</div>
@@ -3840,7 +3841,7 @@ function viewCards(){
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
           const disabled = (guided && !isCorrect) || isRuledOut;
           return `<div class="card ${ui.picks[i]===o.motive?'sel':''} ${isAns?'ans':''} ${guideClass} ${isRuledOut?'ruled-out':''}" data-cat="${i}" data-m="${o.motive}" role="button" tabindex="${disabled ? '-1' : '0'}" aria-disabled="${disabled}" aria-pressed="${ui.picks[i]===o.motive}">${
-            isRuledOut ? '<span class="ruled-mark">× 探りで除外</span>' : ''}${
+            isRuledOut ? '<span class="ruled-mark">× 本人が否定した</span>' : ''}${
             isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}</span> ` : ''
           }<span class="mv">〔${esc(E.CATS[i].motives[o.motive])}〕</span>${esc(o.text)}${
             guided && isCorrect ? tutorialReasonHTML(c, i) : ''}</div>`;
@@ -3916,7 +3917,7 @@ function viewResult(){
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
       <div class="quote">「${esc(r.text)}」</div>
-      ${r.asked !== null && !r.probed ? `<div class="small">探り：〔${esc(E.CATS[r.asked].motives[r.deniedMotive])}〕を除外し、残り二択から選んだ</div>` : ''}
+      ${r.asked !== null && !r.probed ? `<div class="small">問い：本人が〔${esc(E.CATS[r.asked].motives[r.deniedMotive])}〕を否定したので、残り二択から選んだ</div>` : ''}
       ${marks}
       <div class="small" style="margin-top:4px">${r.place != null ? esc(E.PLACES[r.place].name) + '　' : ''}働きかけ：<b>${esc(E.APPROACHES[r.approach].name)}</b>${
         r.placeFits ? '　<span class="uibadge">◎ 場に合った（獲得+1）</span>' : ''}${

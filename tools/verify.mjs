@@ -103,8 +103,10 @@ ok(html.includes('あなたが何者になったか') && html.includes('playerEn
    'エンディングで主人公自身の到達点を総括する');
 ok(html.includes('奥の手 残り') && html.includes('一局に一度の奥の手'),
    '全開示を通常手順ではなく、一度きりの奥の手として示す');
-ok(html.includes('× 探りで除外') && html.includes('ruled-out') && html.includes('残り二択'),
+ok(html.includes('× 本人が否定した') && html.includes('ruled-out') && html.includes('残り二択'),
    '通常の問いは不正解カードを一枚だけ除外して二択にする');
+ok(!/探り[：:で]/.test(html),
+   '一枚の除外を「探り」と呼んでいない（探り＝一局に一度の奥の手）');
 ok(html.includes('resultReactionHTML(c, r)') && html.includes('counterpart-reaction')
    && html.includes('相手の反応'),
    '交渉結果の冒頭に、人物または勢力画つきの相手の反応を表示する');
@@ -685,7 +687,7 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
   }
   ok(rt, '立ち合いの応じ方を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR4:1:1,0,0,0,000,0,9', 'IR4:1:1,0,0,0,000,0,x']) {
+  for (const bad of ['IR5:1:1,0,0,0,000,0,9', 'IR5:1:1,0,0,0,000,0,x']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
@@ -752,7 +754,7 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
   }
   ok(rt, '働きかけを含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR4:1:1,0,0,0,000,0,9', 'IR4:1:1,0,0,0,000,0,x,0']) {
+  for (const bad of ['IR5:1:1,0,0,0,000,0,9', 'IR5:1:1,0,0,0,000,0,x,0']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な働きかけ番号を弾く');
@@ -1146,7 +1148,7 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   }
   ok(rt, '場を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR4:1:1,0,0,0,000,0,0,9', 'IR4:1:1,0,0,0,000,0,0,z']) {
+  for (const bad of ['IR5:1:1,0,0,0,000,0,0,9', 'IR5:1:1,0,0,0,000,0,0,z']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な場の番号を弾く');
@@ -1231,9 +1233,9 @@ head('5g. 第5・第8ターンの幕間');
     const legacy = E.decodeSave(code.replace(/#\d\./, '#'));
     ok(legacy.interludeChoice[0] === null && legacy.interludeChoice[1] != null,
        '点なしの旧コードは、その一度を後半の幕間として読む');
-    ok(E.decodeSave('IR4:1:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
+    ok(E.decodeSave('IR5:1:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
     let rejected = 0;
-    for (const bad of ['IR4:1:#9', 'IR4:1:#0.9', 'IR4:1:#a.b'])
+    for (const bad of ['IR5:1:#9', 'IR5:1:#0.9', 'IR5:1:#a.b'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '不正な幕間の選択番号を弾く');
   }
@@ -1279,11 +1281,15 @@ head('5g. 第5・第8ターンの幕間');
     }
     const off = run(seed, null);
     if (E.hashState(run(seed, 1)) !== E.hashState(off)) moved++;
-    const d3 = E.decodeSave('IR3:' + E.encodeSave(off).slice(4));
-    if (E.hashState(E.replay(d3.seed, d3.actions, d3.interludeChoice).state) !== E.hashState(off)) compat = false;
+    /* IR5 で聞き出しの規則が変わった。旧版のコードは同じ手順でも別の結末になるので、
+       黙って読まずに断ること。読めてしまうほうが害が大きい。 */
+    for (const old of ['IR3:', 'IR4:']){
+      try { E.decodeSave(old + E.encodeSave(off).slice(4)); compat = false; }
+      catch (e) { if (!/旧版/.test(e.message)) compat = false; }
+    }
   }
   ok(rt, '幕間の選択を含む保存コードが往復で一致する（100局×3選択）');
-  ok(compat, '旧版(IR3)の保存コードが、幕間なしのまま完全に再現される');
+  ok(compat, '旧版(IR3・IR4)の保存コードは、理由を示して断られる');
   ok(moved === 100, '幕間の選択は必ず盤面を動かす（飾りになっていない）');
 }
 
@@ -1297,8 +1303,8 @@ head('5g. 第5・第8ターンの幕間');
   for (const bad of [9, -1, 1.5, null, 'a']) { try { E.applyInterlude(st, bad); } catch { threw++; } }
   ok(threw === 5, '幕間の選択番号が不正なら例外を投げる');
   let rejected = 0;
-  for (const code of ['IR4:1:1,0,0,0,000,0#9', 'IR4:1:1,0,0,0,000,0#x',
-                      'IR4:1:1,0,0,0,000,0#-1', 'IR4:abc:1,0,0,0,000,0']) {
+  for (const code of ['IR5:1:1,0,0,0,000,0#9', 'IR5:1:1,0,0,0,000,0#x',
+                      'IR5:1:1,0,0,0,000,0#-1', 'IR5:abc:1,0,0,0,000,0']) {
     try { E.decodeSave(code); } catch { rejected++; }
   }
   ok(rejected === 4, '不正な保存コード（幕間番号・seed）をすべて弾く');
