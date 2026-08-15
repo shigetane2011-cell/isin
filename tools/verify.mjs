@@ -108,6 +108,11 @@ ok(html.includes('× 探りで除外') && html.includes('ruled-out') && html.inc
 ok(html.includes('resultReactionHTML(c, r)') && html.includes('counterpart-reaction')
    && html.includes('相手の反応'),
    '交渉結果の冒頭に、人物または勢力画つきの相手の反応を表示する');
+ok(html.includes('observationsHTML(c)') && html.includes('目の前から読み取れること')
+   && html.includes('仕草') && html.includes('場の気配') && html.includes('話の運び'),
+   'カードを選ぶ前に、三つの自然な観察を表示する');
+ok(html.includes('場と時勢') && html.includes('人物が本来抱える'),
+   '結果画面で、人物本来の事情と今回前に出た事情の違いを説明する');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
@@ -127,7 +132,9 @@ function autoPlay(seed, rnd) {
       interludeChoice[iv.n] = Math.floor(rnd() * 3);
       st = E.applyInterlude(st, interludeChoice[iv.n]);
     }
-    const m = E.meetingList(st);
+    const open = E.placesOpen(st);
+    const place = open[Math.floor(rnd() * open.length)];
+    const m = E.meetingList(st, place);
     const slots = m.intro ? [...m.normal, m.intro] : m.normal;
     const charId = slots[Math.floor(rnd() * slots.length)];
     const c = E.CHAR_BY_ID.get(charId);
@@ -135,9 +142,11 @@ function autoPlay(seed, rnd) {
     const stance = rnd() < 0.6 ? 'support' : 'convert';
     const others = [0, 1, 2, 3, 4].filter(f => f !== ownF);
     const argueF = stance === 'support' ? ownF : others[Math.floor(rnd() * others.length)];
-    const opts = E.cardOptions(st, charId, argueF);
-    const cards = opts.map((o, k) => rnd() < 0.55 ? c.correct[k] : o[Math.floor(rnd() * o.length)].motive);
-    const a = { charId, stance, ownF, argueF, cards, probed: rnd() < 0.4 };
+    const correct = E.effectiveCorrect(st, charId, place);
+    const opts = E.cardOptions(st, charId, argueF, place);
+    const cards = opts.map((o, k) => rnd() < 0.55 ? correct[k] : o[Math.floor(rnd() * o.length)].motive);
+    const a = { charId, stance, ownF, argueF, cards, probed: rnd() < 0.4,
+                place, contextVersion:1 };
     actions.push(a);
     st = E.resolve(st, a).next;
   }
@@ -543,8 +552,79 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
   }
 }
 
+/* --- 5e2. 場と時代で変わる文脈 -------------------------------------------- */
+head('5e2. 同じ人物でも、場と時代で刺さる文脈が変わるか');
+{
+  const early = E.createState(1868);
+  const late = Object.assign({}, early, { turn:6 });
+  let valid = true, coreStable = true, deterministic = true, cluesComplete = true;
+  let cluesIndirect = true, cardsAgree = true, probesAgree = true;
+  for (const stx of [early, late]) for (const c of E.CHARACTERS) for (let pl = 0; pl < E.PLACES.length; pl++){
+    const a = E.effectiveCorrect(stx, c.id, pl);
+    const again = E.effectiveCorrect(stx, c.id, pl);
+    const ctx = E.contextOf(stx, c.id, pl);
+    const obs = E.observationsOf(stx, c.id, pl);
+    if (a.some(v => v < 0 || v > 5) || ctx.motive !== a[1]) valid = false;
+    if (a[0] !== c.correct[0] || a[2] !== c.correct[2]) coreStable = false;
+    if (a.join(',') !== again.join(',') || ctx.clue !== E.contextOf(stx, c.id, pl).clue) deterministic = false;
+    if (obs.length !== 3 || obs.some(o => !o.text || !o.kind) || obs.filter(o => o.scene).length !== 1)
+      cluesComplete = false;
+    if (obs.some((o, i) => o.text.includes(E.CATS[i].motives[a[i]]))) cluesIndirect = false;
+    const opts = E.cardOptions(stx, c.id, c.factions[0], pl);
+    for (let cat = 0; cat < 3; cat++){
+      if (opts[cat].filter(o => o.motive === a[cat]).length !== 1) cardsAgree = false;
+      if (E.deniedMotiveOf(stx, c.id, cat, pl) === a[cat]) probesAgree = false;
+    }
+  }
+  ok(E.PLACE_CONTEXTS.length === 6 && E.PLACE_CONTEXTS.every(p => p.length === 2),
+     '6つの場に前期／後期の文脈がある');
+  ok(E.PLACE_CONTEXTS.every(p => p[0].motive !== p[1].motive),
+     '同じ場でも前期と後期で、前に出る事情が変わる');
+  ok(new Set(E.PLACE_CONTEXTS.map(p => p[0].motive)).size >= 4
+     && new Set(E.PLACE_CONTEXTS.map(p => p[1].motive)).size >= 3,
+     '場所によっても文脈が一色にならない');
+  ok(valid, '151名×6場所×前後期の文脈が、すべて0〜5の正解へ収まる');
+  ok(coreStable, '変わるのは文脈理解だけで、利益提示と論理整合は人物の芯として残る');
+  ok(deterministic, '同じseed・手番・人物・場所なら、正解と観察文が変わらない');
+  ok(cluesComplete, '全局面に「仕草・場の気配・話の運び」の三つの観察がある');
+  ok(cluesIndirect, '観察文は正解ラベルをそのまま表示しない');
+  ok(cardsAgree, '提示される各三択に、その場と時代の正解がちょうど一枚入る');
+  ok(probesAgree, '通常の問いは、その場と時代の正解を誤って除外しない');
+
+  const katsu = E.CHAR_BY_ID.get(95);
+  const nagasakiEarly = E.effectiveCorrect(early, katsu.id, 2);
+  const edoLate = E.effectiveCorrect(late, katsu.id, 1);
+  ok(nagasakiEarly[0] === edoLate[0] && nagasakiEarly[2] === edoLate[2]
+     && nagasakiEarly[1] !== edoLate[1],
+     '勝海舟も、人物の芯は同じまま長崎前期と江戸後期で刺さる文脈が変わる');
+  ok(E.preambleOf(early, katsu.id, 2) !== E.preambleOf(late, katsu.id, 1),
+     '実際に組み上がる論証の切り出しも、場と時代に合わせて変わる');
+  const dynamic = { charId:katsu.id, stance:'support', ownF:katsu.factions[0], argueF:katsu.factions[0],
+    cards:edoLate.slice(), probed:false, approach:0, place:1, contextVersion:1 };
+  const oldReading = Object.assign({}, dynamic, { cards:katsu.correct.slice() });
+  ok(E.resolve(late, dynamic).report.rawScore === 3 && E.resolve(late, oldReading).report.rawScore === 2,
+     '現在の文脈を読めば3枚刺さり、人物本来の固定値だけでは文脈の1枚を外す');
+  ok(E.replyOf(late, katsu.id, 1, 1) === E.REPLIES[1][edoLate[1]][E.voiceOf(katsu.id)],
+     '完全開示の返答も、現在の文脈と一致する');
+
+  /* IR4以前は当時の固定正解と旧い枕で再生し、IR5から新しい文脈判定を使う。 */
+  const oldSave = E.decodeSave('IR4:7:2,0,0,0,124,0,0,0');
+  const oldReport = E.resolve(E.createState(7), oldSave.actions[0]).report;
+  ok(oldSave.actions[0].contextVersion === 0 && oldReport.rawScore === 3,
+     'IR4の手番は、旧版当時の固定正解で再生できる');
+  const oldRound = E.decodeSave(E.encodeSave(E.replay(oldSave.seed, oldSave.actions).state));
+  ok(oldRound.actions[0].contextVersion === 0,
+     '旧保存を読み込んでIR5へ保存し直しても、旧手番のルール版が残る');
+  const newState = E.resolve(early, { charId:2, stance:'support', ownF:0, argueF:0,
+    cards:E.effectiveCorrect(early, 2, 0), probed:false, approach:0, place:0, contextVersion:1 }).next;
+  const newCode = E.encodeSave(newState), newRound = E.decodeSave(newCode);
+  ok(newCode.startsWith('IR5:') && newRound.actions[0].contextVersion === 1
+     && E.hashState(E.replay(newRound.seed, newRound.actions, newRound.interludeChoice).state) === E.hashState(newState),
+     'IR5は新しい文脈判定を記録し、保存→復元して同じ盤面になる');
+}
+
 /* --- 5e2. 同梱画像 --------------------------------------------------------- */
-head('5e2. 同梱画像が、エンジンの出しうる名前と一致しているか');
+head('5e3. 同梱画像が、エンジンの出しうる名前と一致しているか');
 {
   /* エンディング画像の名前は勢力キーと組合せから組み立てられる。
      勢力キーを変えると16枚が黙って404になるので、名前の対応をここで固定する。 */
@@ -962,8 +1042,9 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
 
   /* 判定は一段重く、紹介では消えない */
   const target = E.CHAR_BY_ID.get(25), f = target.factions[0];
+  const answer = E.effectiveCorrect(base, target.id, hot[0]);
   const act = { charId: 25, stance:'support', ownF:f, argueF:f,
-                cards: target.correct.slice(), probed:false, approach:0, place: hot[0] };
+                cards: answer.slice(), probed:false, approach:0, place: hot[0], contextVersion:1 };
   const clean = Object.assign({}, base, { banned: [] });
   ok(E.scoreOf(clean, act) === 3, '決裂していない相手なら3枚一致は大成功');
   ok(E.scoreOf(bad, act) === 3, '再訪でも判定は普通どおり（規則を減らした）');
@@ -978,10 +1059,10 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
      `和解しても獲得は通常どおり（再訪 ${rHit.report.gain} / 通常 ${rBase.report.gain}）`);
   ok(rHit.report.verdict === rBase.report.verdict, '判定の呼び名も通常と同じ');
   {
-    const two = Object.assign({}, act, { cards: [target.correct[0], target.correct[1], (target.correct[2]+1)%6] });
+    const two = Object.assign({}, act, { cards: [answer[0], answer[1], (answer[2]+1)%6] });
     ok(E.scoreOf(bad, two) === 2 && E.resolve(bad, two).report.reconciled,
        '再訪も2枚一致で通り、和解する（通常の交渉と同じ条件）');
-    const one = Object.assign({}, act, { cards: [target.correct[0], (target.correct[1]+1)%6, (target.correct[2]+1)%6] });
+    const one = Object.assign({}, act, { cards: [answer[0], (answer[1]+1)%6, (answer[2]+1)%6] });
     ok(E.resolve(bad, one).report.partial && !E.resolve(bad, one).report.reconciled,
        '手応えどまりでは出現停止は解けない');
   }
@@ -992,7 +1073,7 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
   ok(E.revisitOf(rHit.next, hot[0]) === 10, '和解すると、次の決裂者が待つようになる');
 
   /* 外せば何も変わらない */
-  const missAct = Object.assign({}, act, { cards: [(target.correct[0]+1)%6, (target.correct[1]+1)%6, (target.correct[2]+1)%6] });
+  const missAct = Object.assign({}, act, { cards: [(answer[0]+1)%6, (answer[1]+1)%6, (answer[2]+1)%6] });
   const rMiss = E.resolve(bad, missAct);
   ok(rMiss.report.reconciled === false && rMiss.next.banned.includes(25),
      '説き伏せられなければ、出現停止は解けないまま');
