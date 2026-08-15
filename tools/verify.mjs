@@ -105,6 +105,9 @@ ok(html.includes('奥の手 残り') && html.includes('一局に一度の奥の�
    '全開示を通常手順ではなく、一度きりの奥の手として示す');
 ok(html.includes('× 探りで除外') && html.includes('ruled-out') && html.includes('残り二択'),
    '通常の問いは不正解カードを一枚だけ除外して二択にする');
+ok(html.includes('resultReactionHTML(c, r)') && html.includes('counterpart-reaction')
+   && html.includes('相手の反応'),
+   '交渉結果の冒頭に、人物または勢力画つきの相手の反応を表示する');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
@@ -753,6 +756,66 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な働きかけ番号を弾く');
+}
+
+/* --- 5f3a. 交渉直後の相手の反応 ------------------------------------------- */
+head('5f3a. 相手の反応が結果・働きかけ・語り口に応じて変わるか');
+ok(E.REACTION_CUES.length === 4 && E.REACTION_CUES.every(a => a.length === 4),
+   '4つの働きかけ × 4段階の身振りが揃っている');
+ok(E.REACTION_LINES.length === 4
+   && E.REACTION_LINES.every(a => a.length === 4 && a.every(level => level.length === 4)),
+   '4つの働きかけ × 4段階 × 4系統の反応台詞が揃っている');
+{
+  const st = E.createState(11);
+  let complete = true, deterministic = true;
+  for (const c of E.CHARACTERS){
+    for (let approach = 0; approach < 4; approach++){
+      for (let score = 0; score < 4; score++){
+        const action = { charId:c.id, stance:'support', approach };
+        const outcome = { score, hits:[score === 1, false, false], duel:null, reconciled:false };
+        const a = E.reactionOf(st, action, outcome);
+        const b = E.reactionOf(st, action, outcome);
+        if (a.score !== score || ![a.label, a.cue, a.line].every(x => typeof x === 'string' && x.length >= 4)) complete = false;
+        if (JSON.stringify(a) !== JSON.stringify(b)) deterministic = false;
+      }
+    }
+  }
+  ok(complete, '151名全員に、全働きかけ・全段階の反応が欠けずに出る');
+  ok(deterministic, '同じ人物・手・結果なら反応は完全に同じ');
+
+  const common = { charId:27, stance:'support' };
+  const rejected = [0,1,2,3].map(approach =>
+    E.reactionOf(st, Object.assign({}, common, { approach }),
+      { score:0, hits:[false,false,false], duel:null, reconciled:false }).line);
+  ok(new Set(rejected).size === 4, '論じる・酒・金品・肚を割るで拒絶の仕方が異なる');
+
+  const support = E.reactionOf(st, { charId:27, stance:'support', approach:0 },
+    { score:2, hits:[true,true,false], duel:null, reconciled:false });
+  const convert = E.reactionOf(st, { charId:27, stance:'convert', approach:0 },
+    { score:2, hits:[true,true,false], duel:null, reconciled:false });
+  ok(support.line !== convert.line && convert.label.includes('動かない'),
+     '二枚一致でも、支持は協力し、転向は旗を替えない反応になる');
+
+  const duel = E.reactionOf(st, { charId:47, stance:'support', approach:0 },
+    { score:0, hits:[false,false,false], duel:{ survived:true }, reconciled:false });
+  ok(duel.level > 0 && duel.label.includes('刃') && duel.line.includes('認め'),
+     '立ち合いを切り抜けた場合は、決裂台詞と矛盾せず胆力を認める');
+  const reconciled = E.reactionOf(st, { charId:47, stance:'support', approach:0 },
+    { score:2, hits:[true,true,false], duel:null, reconciled:true });
+  ok(reconciled.label.includes('遺恨') && reconciled.line.includes('水に流'),
+     '再訪で和解した場合は、通常の成功台詞ではなく遺恨を解く');
+
+  const major = [...E.REACTION_OVERRIDES.keys()].sort((a,b) => a-b);
+  const portraits = [...E.PORTRAITS.keys()].sort((a,b) => a-b);
+  ok(JSON.stringify(major) === JSON.stringify(portraits)
+     && major.every(id => E.REACTION_OVERRIDES.get(id)[0] && E.REACTION_OVERRIDES.get(id)[3]),
+     '肖像を持つ主要人物8名は、拒絶と心を決めた場合に固有台詞を持つ');
+
+  const c = E.CHAR_BY_ID.get(27);
+  const report = E.resolve(st, { charId:27, stance:'support', ownF:c.factions[0],
+    argueF:c.factions[0], cards:c.correct.slice(), probed:false, approach:0, place:null }).report;
+  ok(report.reaction && report.reaction.score === report.score && report.reaction.line,
+     '実際の交渉報告に、判定と一致する相手の反応が残る');
 }
 
 /* --- 5f3b. 縁 -------------------------------------------------------------- */

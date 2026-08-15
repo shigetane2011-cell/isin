@@ -105,6 +105,17 @@ if (await p.$('.duel')) {
 }
 await p.waitForSelector('.result');
 if (!(await p.$('.result .standing-change'))) errs.push('交渉結果に主人公の立場が出ていない');
+if (!(await p.$('.result .counterpart-reaction'))) errs.push('交渉結果に相手の反応が出ていない');
+else {
+  const reaction = await p.$eval('.counterpart-reaction', e => ({
+    label:e.querySelector('.reaction-label')?.textContent.trim(),
+    cue:e.querySelector('.reaction-cue')?.textContent.trim(),
+    line:e.querySelector('.reaction-line')?.textContent.trim(),
+    image:e.querySelector('.reaction-portrait img')?.getAttribute('src'),
+  }));
+  if (!reaction.label || !reaction.cue || !reaction.line || !reaction.image)
+    errs.push('相手の反応に見出し・身振り・台詞・人物／勢力画が揃っていない');
+}
 vowSeen += await p.$$eval('.vowline', e => e.length);
 console.log('判定:', await p.$eval('.verdict', e => e.textContent));
 await p.screenshot({ path: shot('04b-result.png'), fullPage: true });

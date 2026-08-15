@@ -291,6 +291,24 @@ button.primary .small{color:inherit;opacity:.82}
 .result .verdict{display:inline-block;font-size:1.2rem;letter-spacing:.2em;font-weight:600;padding:2px 10px;
   background:rgba(var(--tone-a,59,52,44),.1);border-bottom:2px solid rgba(var(--tone-a,59,52,44),.5)}
 .v3{color:var(--kin)}.v2{color:var(--ai)}.v1{color:var(--sumi2)}.v0{color:#000;background:var(--sumi);color:var(--washi);padding:2px 10px}
+.counterpart-reaction{display:grid;grid-template-columns:82px minmax(0,1fr);gap:13px;align-items:stretch;
+  margin:12px 0;padding:10px 12px;border:1px solid rgba(var(--tone-a,59,52,44),.42);
+  border-left:5px solid rgb(var(--tone-a,59,52,44));
+  background:linear-gradient(105deg,rgba(var(--tone-a,59,52,44),.16),rgba(var(--tone-b,59,52,44),.07) 65%,rgba(255,253,247,.88));
+  box-shadow:inset 0 0 0 1px rgba(255,253,247,.7)}
+.reaction-portrait{position:relative;overflow:hidden;min-height:102px;padding:3px;
+  background:linear-gradient(180deg,rgb(var(--tone-a,59,52,44)),rgb(var(--tone-b,59,52,44)));
+  box-shadow:0 0 0 1px rgba(27,24,21,.44),0 3px 8px rgba(27,24,21,.16)}
+.reaction-portrait img{display:block;width:100%;height:100%;min-height:96px;object-fit:cover;object-position:center 18%;
+  border:1px solid rgba(255,253,247,.72);background:var(--washi)}
+.reaction-portrait.faction img{filter:saturate(.82) contrast(.94)}
+.reaction-copy{min-width:0;align-self:center}
+.reaction-label{font-size:.68rem;font-weight:700;letter-spacing:.14em;color:rgb(var(--tone-a,59,52,44));margin-bottom:3px}
+.reaction-cue{font-size:.78rem;line-height:1.55;color:var(--sumi2);margin-bottom:4px}
+.reaction-line{font-size:.94rem;line-height:1.75;color:var(--sumi);font-weight:500}
+.counterpart-reaction[data-level="0"]{border-left-color:var(--shu);background:linear-gradient(105deg,rgba(167,55,50,.13),rgba(27,24,21,.06) 66%,rgba(255,253,247,.9))}
+.counterpart-reaction[data-level="0"] .reaction-label{color:var(--shu)}
+.counterpart-reaction[data-level="3"] .reaction-label{color:var(--kin)}
 .delta{font-family:monospace;font-size:.9rem;margin-top:8px}
 .quote{border-left:3px solid var(--kin);padding-left:12px;margin:10px 0;font-size:.92rem;color:var(--sumi2)}
 .ending h3{border-bottom:1px solid var(--line);padding-bottom:4px;font-size:.9rem;letter-spacing:.2em;margin:18px 0 6px}
@@ -367,6 +385,10 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .portrait-stage.compact-person-visual{height:160px}
   .approach-grid,.card-grid{grid-template-columns:1fr}
   .interlude-figure{align-items:flex-start}
+  .counterpart-reaction{grid-template-columns:66px minmax(0,1fr);gap:10px;padding:9px}
+  .reaction-portrait{min-height:88px}
+  .reaction-portrait img{min-height:82px}
+  .reaction-line{font-size:.88rem;line-height:1.68}
 }
 </style>
 </head>
@@ -2652,6 +2674,194 @@ function waryOf(currents, charId){
   return -1;
 }
 
+/* --- 相手の反応 -----------------------------------------------------------
+   点数を説明するだけでは、こちらの言葉が人に届いた手触りが残らない。
+   結果の四段階と働きかけ、相手の語り口から、交渉直後の身振りと一言を返す。
+   主要人物は両極（心を決めた／拒絶した）に固有台詞を持つ。
+   すべて盤面から導く派生表示なので、状態や保存コードは増やさない。 */
+const REACTION_CUES = [
+  [ /* 論じる */
+    '{name}は最後まで表情を変えず、こちらの言葉が切れるのを待った。',
+    '{name}はある一節でわずかに目を動かしたが、すぐに表情を戻した。',
+    '{name}は何度か頷き、最後まで口を挟まずに聞いた。',
+    '{name}は身を乗り出し、こちらの言葉を一つずつ確かめた。',
+  ],
+  [ /* 酌み交わす */
+    '{name}は杯を伏せ、それ以上は口をつけなかった。',
+    '{name}は杯だけを空け、話には返事をしなかった。',
+    '{name}は杯を置くと、先ほどまでより近い声で応じた。',
+    '{name}は新しい杯をこちらへ寄せ、自分から酌をした。',
+  ],
+  [ /* 金品を贈る */
+    '{name}は包みをこちらへ押し戻した。',
+    '{name}は包みに手をかけたが、引き寄せはしなかった。',
+    '{name}は包みの重さを確かめ、静かに懐へ収めた。',
+    '{name}は包みを収めると、人払いを命じた。',
+  ],
+  [ /* 肚を割る */
+    '{name}は言葉の途中で目をそらし、立ち上がった。',
+    '{name}はこちらの腹の内を量るように、しばらく黙って見つめた。',
+    '{name}は長い沈黙のあと、こちらへ向き直った。',
+    '{name}は周囲を見回してから、自分の本心も明かした。',
+  ],
+];
+
+/* REACTION_LINES[働きかけ][実効点][語り口の調子]
+   調子は 0=荒い / 1=硬い / 2=くだけた / 3=丁寧。 */
+const REACTION_LINES = [
+  [ /* 論じる */
+    ['言葉は多いが、こっちを見ちゃいねえ。帰れ。',
+     '言を重ねても、それがしの心には届かぬ。お引き取り願おう。',
+     '話は立派ですが、こちらを見ちゃおりませんな。今日はお帰りを。',
+     'お話は分かりました。ですが、わたくしに向けた言葉とは思えません。'],
+    ['一つだけは腑に落ちた。だが、人を動かすには足りねえ。',
+     '一節だけは胸に残った。されど身を動かすには足りませぬ。',
+     '一つだけは分かりましたよ。ですが、まだ動くほどじゃありません。',
+     '一つだけ、心に残りました。ただ、立場を変えるには足りません。'],
+    ['全部じゃねえが、筋は通った。できるところまでは力を貸そう。',
+     'すべてには同じかねるが、筋は通っておる。できる限り力を貸そう。',
+     '全部とは言いませんが、筋は通ってます。できるところまでは動きましょう。',
+     'すべてに同意はできませんが、筋は通っています。できる範囲で力をお貸しします。'],
+    ['そこまでこっちを見て話したなら、異を唱える理由はねえ。こちらも動こう。',
+     'こちらをよく見て申された。異論はござらぬ。それがしも動き申そう。',
+     'そこまでこちらを見て話されたら、断る筋はありませんな。手前も動きますよ。',
+     'そこまで見てお話しくださったのなら、異論はありません。わたくしも動きます。'],
+  ],
+  [ /* 酌み交わす */
+    ['杯は飲めても、その話までは飲めねえ。',
+     '杯は受けても、その御論まで受けた覚えはござらぬ。',
+     '酒は頂きましたが、その話まで飲んだ覚えはありませんで。',
+     '杯は頂きました。ですが、お話まで受け入れたわけではありません。'],
+    ['酒は悪くねえ。だが、話まで呑んだ覚えはない。',
+     '酒はよきもの。されど御論まで呑み込んだわけではござらぬ。',
+     '酒は悪くありませんな。ですが、話はまだ別でございますよ。',
+     'よいお席でした。ただ、お話についてはまだ決めかねます。'],
+    ['杯も話も受けた。できるところまでは手を貸そう。',
+     '杯も御論も受け申した。力を貸せるところはござろう。',
+     '杯も話も頂きました。できるところまでは手を貸しましょう。',
+     '杯もお話も頂きました。できる範囲でお力になります。'],
+    ['次の杯は、同じ側で飲もうじゃねえか。',
+     '次の杯は、同じ志のもとで酌み交わそう。',
+     '次は同じ側で、ゆっくり飲みましょうや。',
+     '次の杯は、同じ道を進む者として頂きましょう。'],
+  ],
+  [ /* 金品を贈る */
+    ['それを持って帰れ。おれを銭で量ったか。',
+     'お持ち帰り願おう。それがしを金で量られたか。',
+     '持ってお帰りを。手前を銭だけで量られちゃ困ります。',
+     'どうぞお持ち帰りください。わたくしを金で量られたのですね。'],
+    ['品は預かる。だが、それで心まで買ったと思うな。',
+     '品は預かろう。されど心まで買えたとは思われぬことだ。',
+     '品は預かりますが、これで心まで買ったとは思わんでくださいよ。',
+     'お品はお預かりします。ただ、心まで買えたとはお考えになりませんよう。'],
+    ['品は受け取る。こちらも相応の働きはしよう。',
+     '品は受け取った。それがしも相応の働きで返そう。',
+     '確かに受け取りました。こちらも相応に働きましょう。',
+     '確かに頂きました。こちらも相応の形でお応えします。'],
+    ['話は分かった。この品以上の働きで返してやる。',
+     '委細承知した。この品を上回る働きで返し申そう。',
+     '話は分かりましたよ。この品以上の働きで返しましょう。',
+     '承知しました。このお品以上の働きでお返しいたします。'],
+  ],
+  [ /* 肚を割る */
+    ['何者かは分かった。だからこそ、もう話すことはねえ。',
+     '貴殿が何者かは分かった。ゆえに、もはや話すことはござらぬ。',
+     'お前さんが何者かは分かりました。だから、もう話すことはありませんで。',
+     'あなたが何者かは分かりました。だからこそ、もうお話しすることはありません。'],
+    ['腹の内は見えた。見えたからこそ、まだ組めねえ。',
+     '腹の内は見え申した。見えたればこそ、まだ組むには至らぬ。',
+     '腹の内は分かりましたよ。ですが、今すぐ組む話じゃありませんな。',
+     'お気持ちは分かりました。ただ、今すぐ同じ道を選ぶことはできません。'],
+    ['本気は分かった。まずは一度、同じ側で動いてみよう。',
+     '御覚悟は分かり申した。まずは一度、同じ側で動こう。',
+     '本気なのは分かりました。まずは一度、一緒に動いてみましょうや。',
+     'ご覚悟は分かりました。まずは一度、同じ側で動いてみましょう。'],
+    ['旗色まで明かしたか。なら、おれも隠すまい。同じ道を行こう。',
+     '旗色まで明かされたか。ならば、それがしも隠すまい。同じ道を参ろう。',
+     'そこまで腹を見せられちゃ、手前も隠せませんな。同じ道を行きましょう。',
+     'そこまでお明かしくださったのなら、わたくしも隠しません。同じ道を参ります。'],
+  ],
+];
+
+const REACTION_CONVERT_SCORE2 = [
+  '言い分は認める。だが、旗を替える気はねえ。',
+  '御論は認めよう。されど旗を替えるには至りませぬ。',
+  '話は分かりましたが、看板を掛け替える気はありませんよ。',
+  'お話は理解しました。ですが、立場を変えるには足りません。',
+];
+const REACTION_DUEL = {
+  won: [
+    '言葉は気に入らねえ。だが、その胆だけは認めてやる。',
+    '御論は受けかねる。されど、その胆力は認め申そう。',
+    '話は別として、その度胸だけは認めにゃなりませんな。',
+    'お話には同意できません。ただ、その覚悟は認めます。',
+  ],
+  lost: [
+    '言葉も腕も届かなかったな。次はない。',
+    '言も刃も届かなんだ。二度と参られぬことだ。',
+    '話も腕も届きませんでしたな。次はございませんよ。',
+    'お話も覚悟も届きませんでした。もうお会いすることはありません。',
+  ],
+};
+const REACTION_RECONCILED = [
+  '前のことは水に流す。今度こそ、言葉どおりに動け。',
+  '先の遺恨は水に流そう。今度こそ、言に違われぬことだ。',
+  '前のことは水に流しましょう。今度は言葉どおりに頼みますよ。',
+  '以前のことは水に流します。今度こそ、お言葉を信じます。',
+];
+const REACTION_OVERRIDES = new Map([
+  [33,  { 3:'ふふ、そこまで先が見えておるなら、麿も駒を進めよう。',
+          0:'策とは相手を読むものじゃ。そなたはまだ、盤を見ておらぬ。' }],
+  [47,  { 3:'筋は通った。ならば誠の旗に懸けて、こちらも応えよう。',
+          0:'拙者を値踏みするような言葉は要らぬ。二度と来るな。' }],
+  [95,  { 3:'面白え。そこまで腹が据わってるなら、ひとつ乗ってやろうじゃねえか。',
+          0:'天下を語る前に、人を見る目を養いな。今日は帰んな。' }],
+  [103, { 3:'そこまで人の心を見ておられるなら、こちらも腹を決め申そう。',
+          0:'言葉は立派でも、人の心から遠ければ届き申さん。今日はお引き取りくだされ。' }],
+  [140, { 3:'そこまで筋を通して申すなら、余も決断を避けるわけにはゆくまい。',
+          0:'余の立場を量らずして天下を説くか。これ以上は聞くに及ばぬ。' }],
+  [142, { 3:'危うさはある。だが、今はその危うさに賭ける時だろう。',
+          0:'熱だけでは藩も国も動かない。もう一度、道筋を考えてこられよ。' }],
+  [144, { 3:'志だけではない、行う道まで見えている。ならば共に進みましょう。',
+          0:'君の言葉には志がある。しかし至誠がない。今は共に行けません。' }],
+  [145, { 3:'そいつは面白い。そこまで見えちゅうなら、わしも船を出そう。',
+          0:'世の中を変える話は、人を見んと始まらんぜよ。出直してきいや。' }],
+]);
+
+function reactionOf(st, action, outcome){
+  const ch = CHAR_BY_ID.get(action.charId);
+  const approach = action.approach ?? 0;
+  const scoreLevel = clamp(outcome.score ?? 0, 0, 3);
+  let level = scoreLevel;
+  const tone = TONE_OF_VOICE[voiceOf(action.charId)];
+  let label = ['拒絶した','一言だけ残った',
+    action.stance === 'convert' ? '認めたが動かない' : '警戒がほどけた','心を決めた'][scoreLevel];
+  let cue = REACTION_CUES[approach][scoreLevel].replace('{name}', ch.name);
+  const hitCat = (outcome.hits || []).findIndex(Boolean);
+  if (scoreLevel === 1 && hitCat >= 0){
+    const motive = CATS[hitCat].motives[ch.correct[hitCat]];
+    cue = `${ch.name}は〔${motive}〕のくだりにだけ、わずかに目を留めた。`;
+  }
+  let line = REACTION_LINES[approach][scoreLevel][tone];
+  if (action.stance === 'convert' && scoreLevel === 2) line = REACTION_CONVERT_SCORE2[tone];
+  const custom = REACTION_OVERRIDES.get(action.charId)?.[scoreLevel];
+  if (custom) line = custom;
+  if (outcome.reconciled){
+    label = '遺恨がほどけた';
+    cue = `${ch.name}はしばらくこちらを見たあと、構えを解いた。`;
+    line = REACTION_RECONCILED[tone];
+  }
+  if (outcome.duel){
+    level = outcome.duel.survived ? 2 : 0;
+    label = outcome.duel.survived ? '刃のあとに認めた' : '刃とともに拒んだ';
+    cue = outcome.duel.survived
+      ? `${ch.name}は刀を納め、こちらを初めて対等な相手として見た。`
+      : `${ch.name}は刀を払うと、倒れたこちらに背を向けた。`;
+    line = REACTION_DUEL[outcome.duel.survived ? 'won' : 'lost'][tone];
+  }
+  return { level, score:scoreLevel, label, cue, line };
+}
+
 /* --- 交渉の解決 ---------------------------------------------------------- */
 /* action = { charId, stance, ownF, argueF, cards:[m0,m1,m2], probed:bool, asked:?number }
    asked は通常の問いで不正解を一つ除外したカテゴリ。判定値には影響しない。
@@ -2763,6 +2973,8 @@ function resolve(st, action){
                    && !promises.some(pm => pm.id === action.charId);
   if (promised) promises.push({ id: action.charId, f: action.argueF });
 
+  const reaction = reactionOf(st, action, { score, hits, duel, reconciled });
+
   const next = {
     seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned, promises,
     lastLen: len, lastPlace: action.place ?? null,
@@ -2778,7 +2990,7 @@ function resolve(st, action){
 
   return { next, report: {
     charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
-    gain, gainBeforeProbe, penalty, text, len, probed, asked, deniedMotive, duel, approach, fits, nCards,
+    gain, gainBeforeProbe, penalty, text, len, probed, asked, deniedMotive, duel, reaction, approach, fits, nCards,
     place: action.place ?? null, placeFits,
     probesLeft: PROBE_LIMIT - (st.probesUsed + (probed ? 1 : 0)),
     stance: action.stance, ownF: action.ownF, argueF: action.argueF, waryBy, allOrNothing,
@@ -2941,6 +3153,7 @@ function hashState(st){
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
+  REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
   PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
@@ -3080,6 +3293,23 @@ function interludeFigureHTML(iv){
 function portraitThumbHTML(id){
   const portrait = E.PORTRAITS.get(id);
   return portrait ? `<span class="person-thumb" aria-hidden="true"><img src="${portrait.src}" alt="" loading="lazy" decoding="async"></span>` : '';
+}
+function resultReactionHTML(c, r){
+  const reaction = r.reaction;
+  if (!reaction) return '';
+  const portrait = E.portraitOf(c.id);
+  const image = portrait || `assets/factions/${fac(c.factions[0]).key}.webp`;
+  return `<section class="counterpart-reaction" data-level="${reaction.level}" style="${toneStyle(c.factions)}"
+    aria-label="${esc(c.name)}の反応：${esc(reaction.label)}">
+    <div class="reaction-portrait${portrait ? '' : ' faction'}" aria-hidden="true">
+      <img src="${image}" alt="" loading="eager" decoding="async">
+    </div>
+    <div class="reaction-copy">
+      <div class="reaction-label">相手の反応 ｜ ${esc(reaction.label)}</div>
+      <div class="reaction-cue">${esc(reaction.cue)}</div>
+      <div class="reaction-line">「${esc(reaction.line)}」</div>
+    </div>
+  </section>`;
 }
 function endingVisualHTML(e){
   const fs = E.winningFactions(e);
@@ -3681,6 +3911,7 @@ function viewResult(){
     `<div class="result ${r.partial ? 'partial' : r.gain > 0 ? 'succeeded' : 'failed'}" style="${toneStyle([r.argueF])}">
       <div class="verdict v${r.score}">${r.verdict}</div>
       ${guidedResult ? coachHTML('完', '一手のチュートリアル完了', '三つの返答から刺さる三枚を読み、論証を組む流れは以上です。次のターンからは<b>一つの問いで不正解を一枚だけ除外</b>できます。残り二択は情勢描写から読むか、「さらに聞き出す」を使うか、賭けてください。') : ''}
+      ${resultReactionHTML(c, r)}
       ${factionLegendHTML([r.argueF])}
       <div class="small" style="margin-top:4px">${esc(c.name)}（${E.RANKS[r.rank]}）に${
         r.stance==='support'?'賛意を示した':`${fac(r.argueF).name}への転向を迫った`}</div>
