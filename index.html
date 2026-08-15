@@ -277,6 +277,9 @@ button.primary .small{color:inherit;opacity:.82}
 .chip.spent{display:inline-block;border:1px solid var(--line);color:var(--line)}
 .say{border-left:3px solid var(--ai);background:#fff;padding:9px 13px;margin:9px 0;font-size:.9rem}
 .say .q{font-size:.78rem;color:var(--ai);letter-spacing:.06em}
+.gest{border-left:3px solid var(--kin);background:#fffdf6;padding:7px 12px;margin:6px 0;font-size:.88rem}
+.gest .gcat{display:inline-block;min-width:5.2em;font-size:.72rem;letter-spacing:.1em;color:var(--kin);font-weight:600}
+.slot-gest{font-size:.85rem;color:var(--sumi);background:#fffdf6;border-left:3px solid var(--kin);padding:6px 11px;margin:6px 0 8px}
 .probe{font-size:.72rem;padding:2px 10px;margin-left:8px;vertical-align:1px;border-color:var(--kin);color:var(--kin)}
 .probe:hover{background:var(--kin);color:#fff}
 .probed{font-size:.72rem;margin-left:8px;color:var(--kin);letter-spacing:.1em}
@@ -1521,6 +1524,102 @@ const SMALLTALK = [
    ここを女と町人でまとめてしまうと、お龍が「忘れておらんぞ」と言い出す。 */
 const TONES = ['荒い','硬い','くだけた','丁寧'];
 const TONE_OF_VOICE = [0, 1, 1, 2, 3, 1, 3];
+
+/* --- 所作（相手の振る舞い） -----------------------------------------------
+   最大の理不尽はここにあった。転向は3枠すべて正解でしか通らないのに、
+   名簿から7人おきに20名を手で読むと、紹介文だけで3つとも読み切れるのは4名しかない。
+   とくに「論理整合（どの筋道なら退けられないか）」は、紹介文が触れていない人物が
+   半数近くいた。「名分を重んじる」と書いてある人は当たり、書いていない人は当てようがなく、
+   しかもプレイヤーにはその区別がつかない ―― これが「わかるわけがない」の正体。
+
+   そこで、面会の場で相手が必ず3つとも「振る舞いで」見せるようにした。
+   札の文言は名指ししない。仕草と一言から、どの札に繋がるかを読む仕事は残す。
+   運で決まる部分を消し、読み違えだけが残るようにするための層。
+   3カテゴリ × 6型 × 4系統の調子 = 72通り。人物ごとの文は持たない。
+   ------------------------------------------------------------------------ */
+const GESTURES = [
+  [ /* 利益提示 ―― 何を欲しているか */
+    ['名のある者の話になると、身を乗り出す。「その者、いま誰に名を知られておる」',
+     '名のある者の話になると、居住まいを正す。「して、その者の名は世に聞こえておりまするか」',
+     '名の通った人の話になると、目の色が変わる。「その方、名は売れてなさるんで」',
+     '名のある方の話になると、姿勢が変わります。「その方のお名前は、世に届いておりますか」'],
+    ['銭の話になると、初めてこちらを正面から見た。「で、いくらの話だ」',
+     '銭の話になると、初めて筆を置いた。「して、いかほどの話にござるか」',
+     '銭の話になると、算盤の手が止まる。「で、いくらの話でございましょうね」',
+     '銭の話になると、初めて目を合わせます。「それは、いかほどのお話でしょう」'],
+    ['表の物音に、何度も目をやる。「……いまの、聞こえたか」',
+     '障子の外へ、幾度も目をやる。「……いまの物音、聞こえ申したか」',
+     '表の物音に、いちいち首を回す。「……今の、聞こえましたよね」',
+     '外の物音に、何度も目をやります。「……いまの音、聞こえましたでしょうか」'],
+    ['損得の話には返事もしない。「銭の話か。ならば帰れ」',
+     '損得の話になると、口を閉ざす。「利の話にござるか。それは他へ持って行かれよ」',
+     '損得の話をすると、急に黙る。「金の話ですか。それはよそでどうぞ」',
+     '損得の話になると、口を閉ざします。「利のお話ですか。それは他所へ」'],
+    ['話の途中で、刀の柄に手が伸びる。「で、兵はいくつ動く」',
+     '話の途中で、兵の数を数え始める。「して、動かせる兵は幾らにござるか」',
+     '話の途中で、数を指で数え出す。「で、鉄砲は何挺そろいますんで」',
+     '話の途中で、動かせる数をお確かめになる。「兵は幾らになりましょう」'],
+    ['こちらの言葉尻より、出典を訊いてくる。「それはどの書に載っておる」',
+     '話の中身より、典拠を問うてくる。「それはいずれの書に拠っておられるか」',
+     '話より先に、どこで読んだのかを訊く。「それ、どの本に書いてありました」',
+     '話の中身より、どこで読まれたかを問われます。「それは、いずれの書にございましょう」'],
+  ],
+  [ /* 文脈理解 ―― いまどこに立たされているか */
+    ['話の合間に、家の名が何度も出る。「我が家は、代々そうしてきた」',
+     '話の合間に、幾度も家の名が出る。「我が家は代々、さように仕えてまいり申した」',
+     '話の合間に、家の名が何度も出てくる。「うちは代々、こうでしてね」',
+     '話の合間に、幾度も家の名が出ます。「我が家は代々、そうしてまいりました」'],
+    ['何を訊いても、まず主家の名を出す。「殿がなんと仰るかだ。それが先だ」',
+     '何を問うても、まず主家の名が出る。「殿の御意向が先にござる」',
+     '何を訊いても、まず旦那の名が出る。「旦那様が何と仰るか、それが先で」',
+     '何をお訊きしても、まず主家の名が出ます。「殿のお考えが先にございます」'],
+    ['話が国の大事に及ぶと、米の値に引き戻す。「その間、百姓は何を食う」',
+     '話が国事に及ぶと、必ず米価へ戻す。「その間、民は何を食うのでござるか」',
+     '大きな話になると、米の値に引き戻す。「その間、みんな何を食うんです」',
+     '話が国の大事に及ぶと、米の値に戻されます。「その間、民は何を食べるのでしょう」'],
+    ['港と艦の話になると、口調が速くなる。「あれを見て、まだ攘夷と言えるか」',
+     '港と艦の話になると、語勢が増す。「あれを目にして、なお攘夷と申されるか」',
+     '港と黒船の話になると、早口になる。「あれを見て、まだ攘夷と言えますか」',
+     '港と艦のお話になると、口調が速くなります。「あれを見て、まだ攘夷と仰いますか」'],
+    ['ある名を口にしかけて、飲み込んだ。「……あいつがいれば、こうはならなんだ」',
+     'ある名を口にしかけ、飲み込まれる。「……あの者が在れば、かようにはなり申さぬ」',
+     '誰かの名を言いかけて、やめた。「……あの人がいたら、こうはならなかった」',
+     'ある名を口にしかけて、飲み込まれます。「……あの方がいれば、こうはなりませんでした」'],
+    ['こちらの身なりを、上から下まで検める。「……で、お前はどこの生まれだ」',
+     'こちらの出自を、真っ先に検められる。「……して、貴殿はいずこの生まれにござるか」',
+     'こっちの身なりを、上から下まで見る。「……で、あんたはどこの生まれで」',
+     'こちらの生まれを、真っ先に問われます。「……あなたは、どちらのお生まれですか」'],
+  ],
+  [ /* 論理整合 ―― どの筋道なら退けられないか */
+    ['何を言っても、まず何のためかを訊く。「それは、何のためにやる」',
+     '何を申しても、まず目的を問われる。「それは何のための手にござるか」',
+     '何を言っても、まず何のためかを訊く。「それ、何のためにやるんです」',
+     '何を申しても、まず目的を問われます。「それは、何のためになさるのですか」'],
+    ['話を先へ飛ばすと、遮って戻す。「順を追え。二つ先の話は聞かん」',
+     '話が先へ飛ぶと、必ず遮って戻す。「順を追われよ。二つ先の話は聞き申さぬ」',
+     '話を飛ばすと、いちいち戻される。「順番にお願いしますよ。先の話は分かりません」',
+     '話が先へ飛ぶと、必ず戻されます。「順を追ってくださいまし。二つ先の話は分かりません」'],
+    ['話の途中で、両手を秤のように動かす。「で、どちらが重い」',
+     '話の途中で、両の手を秤のごとく構える。「して、いずれが重うござるか」',
+     '話の途中で、両手を天秤みたいに動かす。「で、どっちが重いんです」',
+     '話の途中で、両手を秤のようになさいます。「それで、どちらが重いのでしょう」'],
+    ['中身より先に、誰の許しかを訊く。「それは、誰の名において言うておる」',
+     '中身より先に、拠り所を問われる。「それは何人の名において申されるか」',
+     '中身より先に、どなたの話かを訊く。「それ、どなたの名前で言ってなさるんで」',
+     '中身より先に、拠り所を問われます。「それは、どなたのお名前において」'],
+    ['大義を説くと、話を遮って一言。「それで、何が残る」',
+     '大義を説くと、遮って問われる。「して、それで何が残り申すか」',
+     '立派な話をすると、すぐ遮る。「で、それで何が残るんです」',
+     '大義を説くと、遮って問われます。「それで、何が残るのでしょう」'],
+    ['こちらの理屈を、途中で笑って払う。「理屈ではない。もう、そういう時だ」',
+     'こちらの理屈を、途中で払われる。「理ではござらぬ。既に、さような時にござる」',
+     'こっちの理屈を、途中で笑って流す。「理屈じゃないんですよ。もう、そういう時で」',
+     'こちらの理屈を、途中で払われます。「理屈ではありません。もう、そういう時です」'],
+  ],
+];
+/* 人物と項目から所作を引く。正解の型から導くので、人物ごとの文は持たない。 */
+const gestureOf = (charId, cat) =>
+  GESTURES[cat][CHAR_BY_ID.get(charId).correct[cat]][TONE_OF_VOICE[voiceOf(charId)]];
 const SITUATIONS = [
   { key:'revisit', say:[
     'この前の話の続きか。今度は聞き流さんぞ。',
@@ -3152,7 +3251,7 @@ function hashState(st){
 }
 
 const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_BY_ID, CARDS, CATS,
-  TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, SAYS, NOTES,
+  TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, GESTURES, gestureOf, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
   PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
@@ -3729,6 +3828,11 @@ function viewStance(){
     said.push(dialogueReplyHTML(c, ui.asked, false));
   }
 
+  const gestures = `
+    <div class="slot-h">所作 <span style="opacity:.7">— 相手の振る舞いが、そのまま三枚の手掛かりになる</span></div>
+    ${E.CATS.map((cat, i) => `<div class="gest"><span class="gcat">${esc(cat.name)}</span>${
+      esc(E.gestureOf(ui.charId, i))}</div>`).join('')}`;
+
   const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
     <div class="slot-h">対話 <span style="opacity:.7">— 問いを一つ選ぶと<b>不正解が一つ消える</b>。奥の手は一局に一度</span></div>
@@ -3779,7 +3883,7 @@ function viewStance(){
       ${(() => { const sit = E.situationOf(st, ui.charId, ui.place);
         return sit ? `<div class="opening sit">「── ${esc(sit.text)}」</div>` : ''; })()}
       ${guide}<div class="quote">${esc(c.desc)}</div>
-      <div class="say worldview">${esc(E.SMALLTALK[0].lines[ui.ownF ?? c.factions[0]][E.TONE_OF_VOICE[E.voiceOf(ui.charId)]])}</div>${chips}<hr>${body}
+      <div class="say worldview">${esc(E.SMALLTALK[0].lines[ui.ownF ?? c.factions[0]][E.TONE_OF_VOICE[E.voiceOf(ui.charId)]])}</div>${gestures}${chips}<hr>${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
   app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
@@ -3833,6 +3937,7 @@ function viewCards(){
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.7">〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。</div>' : ''}
+        <div class="slot-gest">${esc(E.gestureOf(ui.charId, i))}</div>
         <div class="card-grid">${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
           const isAns = (ui.probed || guided) && isCorrect;

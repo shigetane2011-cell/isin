@@ -105,6 +105,9 @@ ok(html.includes('奥の手 残り') && html.includes('一局に一度の奥の�
    '全開示を通常手順ではなく、一度きりの奥の手として示す');
 ok(html.includes('× 本人が否定した') && html.includes('ruled-out') && html.includes('残り二択'),
    '通常の問いは不正解カードを一枚だけ除外して二択にする');
+ok(html.includes('<div class="slot-h">所作') && html.includes('slot-gest')
+   && (html.match(/E\.gestureOf\(ui\.charId, i\)/g) || []).length === 2,
+   '所作を面会画面と札の画面の両方に出す（手掛かりと選択肢を隣り合わせる）');
 ok(!/探り[：:で]/.test(html),
    '一枚の除外を「探り」と呼んでいない（探り＝一局に一度の奥の手）');
 ok(html.includes('resultReactionHTML(c, r)') && html.includes('counterpart-reaction')
@@ -486,6 +489,31 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
      && E.REVISIT_SAYS.every(x => x.length === 4) && E.SMALLTALK[0].lines.every(x => x.length === 4),
      '縁・再訪・世間話も4系統ぶん書き分けてある');
   {
+    /* 所作 ―― 転向は3枠すべて正解で通るのに、紹介文だけでは3つとも読めない人物が
+       大半だった（20名を手で読んで、3つとも読めるのは4名）。全員が3項目とも
+       振る舞いで見せることで、「情報が存在しない」状態を無くす。 */
+    ok(E.GESTURES.length === 3 && E.GESTURES.every(cat => cat.length === 6
+       && cat.every(mv => mv.length === 4 && mv.every(t => typeof t === 'string' && t.length > 10))),
+       '所作が 3項目 × 6型 × 4系統の調子 = 72通りある');
+    let missing = 0, naming = 0;
+    for (const c of E.CHARACTERS) for (let cat = 0; cat < 3; cat++){
+      const g = E.gestureOf(c.id, cat);
+      if (!g) { missing++; continue; }
+      /* 答えの言い換えでは謎解きが消える。型の名前そのものは書かないこと。 */
+      if (g.includes(E.CATS[cat].motives[c.correct[cat]])) naming++;
+    }
+    ok(missing === 0, `151名すべてが3項目とも所作を持つ（欠け ${missing} 件）`);
+    ok(naming === 0, `所作が型の名前をそのまま言っていない（言っている ${naming} 件）`);
+    for (let cat = 0; cat < 3; cat++){
+      const seen = new Set(E.GESTURES[cat].map(mv => mv[0]));
+      ok(seen.size === 6, `${E.CATS[cat].name}の6型が、荒い調子で互いに違う所作になっている`);
+    }
+    /* 調子3は女と異人。武家の言葉づかいが混じっていないこと。 */
+    const stiff = E.GESTURES.flat().map(mv => mv[3]).filter(t => /ござる|拙者|申さぬ|おる。|なり申す/.test(t));
+    ok(stiff.length === 0, `丁寧の調子に武家の言葉づかいが混じっていない${
+      stiff.length ? '（検出: ' + stiff[0].slice(0, 20) + '）' : ''}`);
+  }
+  {
     /* 性別を決めつける語の検査。
        紹介者・決裂相手・再訪してくる者には女が入りうる（お龍・和宮・篤姫・芸妓・元女中）。
        実際、お龍の紹介で「あの男が寄越したのなら」と言う不具合があった。 */
@@ -493,7 +521,7 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
     const pools = { VOUCH_SAYS: E.VOUCH_SAYS, GRUDGE_SAYS: E.GRUDGE_SAYS,
                     REVISIT_SAYS: E.REVISIT_SAYS,
                     SITUATIONS: E.SITUATIONS.map(x => x.say),
-                    SMALLTALK: E.SMALLTALK[0].lines };
+                    SMALLTALK: E.SMALLTALK[0].lines, GESTURES: E.GESTURES };
     const hits = [];
     for (const [name, pool] of Object.entries(pools))
       for (const t of pool.flat(2)) if (MALE.test(t)) hits.push(`${name}:「${t.slice(0, 24)}」`);
