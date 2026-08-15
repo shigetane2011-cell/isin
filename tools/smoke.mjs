@@ -28,10 +28,14 @@ p.on('pageerror', e => errs.push('pageerror: ' + e.message));
 p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
 await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
 
+if (!(await p.$('.player-premise'))) errs.push('タイトルに主人公の出自が出ていない');
 await p.screenshot({ path: shot('01-title.png') });
 /* 初回は「ガイド付き／通常どおり」の2択、2回目以降は #start が出る */
 if (await p.$('#start-normal')) await p.click('#start-normal');
 else await p.click('#start');
+const meta = await p.$eval('header .meta', e => e.textContent);
+if (!meta.includes('無所属の周旋家')) errs.push('開始直後のヘッダーに主人公の立場が出ていない');
+if (!meta.includes('奥の手') || !meta.includes('1 / 1')) errs.push('奥の手が1回と表示されていない');
 /* 毎ターン必ず行き先選択を通る。前ターンの場が候補に残っていたら連泊できてしまう */
 const visited = [];
 const pickPlace = async shotName => {
@@ -87,6 +91,7 @@ if (await p.$('.duel')) {
   await p.click('[data-duel="0"]');
 }
 await p.waitForSelector('.result');
+if (!(await p.$('.result .standing-change'))) errs.push('交渉結果に主人公の立場が出ていない');
 vowSeen += await p.$$eval('.vowline', e => e.length);
 console.log('判定:', await p.$eval('.verdict', e => e.textContent));
 await p.screenshot({ path: shot('04b-result.png'), fullPage: true });
@@ -101,6 +106,7 @@ for (let i = 0; i < 12; i++) {
     console.log('幕間:', await p.$eval('.interlude .title', e => e.textContent));
     await p.screenshot({ path: shot('05-interlude.png'), fullPage: true });
     await p.click('[data-pick="0"]');
+    if (!(await p.$('.interlude .standing-change'))) errs.push('幕間の結果に主人公の立場が出ていない');
     await p.click('#ilnext');
     if (await p.$('.ending')) break;
   }
@@ -124,6 +130,8 @@ await p.waitForSelector('.ending');
 console.log('エンディング:', await p.$eval('.ending .title', e => e.textContent));
 const heads = await p.$$eval('.ending h3', e => e.map(x => x.textContent));
 console.log('見出し:', heads.join(' / '));
+if (!heads.includes('あなたが何者になったか') || !(await p.$('.final-standing')))
+  errs.push('エンディングに主人公自身の到達点が出ていない');
 if (vowSeen && !heads.includes('交わした約束'))
   errs.push('約束を残したのに、エンディングに「交わした約束」が出ていない');
 if (!vowSeen) errs.push('肚を割る働きかけを優先したのに、約束が一度も残らなかった');

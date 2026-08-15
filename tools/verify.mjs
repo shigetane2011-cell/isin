@@ -91,6 +91,19 @@ ok(html.includes('選択中の行き先') && html.includes('人物を選ぶま�
 ok(html.includes('--kin:#7d5c20') && html.includes('--yuhan:#8d5f17'),
    '金色系の小さい文字を和紙上でも読める濃さにする');
 
+head('1f. 主人公の出自と立場が画面に出るか');
+ok(html.includes('あなた ― 無名の周旋家') && html.includes('あなた自身が何者として歴史に残るか'),
+   '開始時に主人公の出自と目的を明示する');
+ok(html.includes('standingChangeHTML(r.standingBefore, r.standingAfter)')
+   && html.includes('あなたの立場'),
+   '交渉結果に行動前→行動後の立場を表示する');
+ok(html.includes('interludeStandingBefore') && html.includes('interludeStandingAfter'),
+   '幕間の選択でも立場の変化を表示する');
+ok(html.includes('あなたが何者になったか') && html.includes('playerEndingHTML(e)'),
+   'エンディングで主人公自身の到達点を総括する');
+ok(html.includes('奥の手 残り') && html.includes('一局に一度の奥の手'),
+   '全開示を通常手順ではなく、一度きりの奥の手として示す');
+
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));
 const E = globalThis.ENGINE;
@@ -299,8 +312,8 @@ head('5c. 決裂した人物の縁筋が紹介枠から外れるか');
   ok([...a].some(id => blocked.includes(id)), '決裂していなければ、その縁者は紹介枠に出る');
 }
 
-/* --- 5d. 探る（正解の開示と、その代償） ---------------------------------- */
-head('5d. 探ると正解は分かるが影響力が落ちるか');
+/* --- 5d. 奥の手（正解の開示と、その代償） -------------------------------- */
+head('5d. 一度きりの奥の手で正解は分かるが影響力が落ちるか');
 {
   const probe = (st, id, stance = 'support') => {
     const c = E.CHAR_BY_ID.get(id);
@@ -313,9 +326,10 @@ head('5d. 探ると正解は分かるが影響力が落ちるか');
                            argueF: c.factions[0], cards: c.correct.slice(), probed: false });
   };
   const s0 = E.createState(1);
+  ok(E.PROBE_LIMIT === 1, '奥の手は一局に一度だけ');
   ok(plain(s0, 1).report.gain === 4 && probe(s0, 1).report.gain === 3,
      '初級で3枚一致：探らねば+4、探れば+3');
-  ok(probe(s0, 1).report.verdict === '大成功', '探っても判定そのものは大成功のまま');
+  ok(probe(s0, 1).report.verdict === '大成功', '奥の手を使っても判定そのものは大成功のまま');
   ok(probe(s0, 1).next.probesUsed === 1 && plain(s0, 1).next.probesUsed === 0,
      '探った回数が状態に記録される');
 
@@ -326,7 +340,7 @@ head('5d. 探ると正解は分かるが影響力が落ちるか');
   };
   const [n1, p1] = at(0, 1), [n4, p4] = at(40, 136);
   ok(p1 / n1 < p4 / n4,
-     `探る代償は大物ほど軽い（初級 ${n1}→${p1} = ${Math.round(p1/n1*100)}% / 伝説 ${n4}→${p4} = ${Math.round(p4/n4*100)}%）`);
+     `奥の手の代償は大物ほど軽い（初級 ${n1}→${p1} = ${Math.round(p1/n1*100)}% / 伝説 ${n4}→${p4} = ${Math.round(p4/n4*100)}%）`);
 
   /* 回数制限 */
   let st = E.createState(1);
@@ -336,6 +350,44 @@ head('5d. 探ると正解は分かるが影響力が落ちるか');
   ok(over.probed === false && over.gain === 4,
      '上限を超えて探ろうとしても無効になり、代償も課されない');
   ok(probe(st, 1).next.probesUsed === E.PROBE_LIMIT, '上限を超えて回数が増えない');
+}
+
+/* --- 5d2. 主人公の立場 --------------------------------------------------- */
+head('5d2. 行動から主人公の立場が導かれるか');
+{
+  const state = currents => Object.assign(E.createState(1), { currents, actions:[{}] });
+  const unseen = E.playerStanding(E.createState(1));
+  const lean = E.playerStanding(state([0,3,0,0,0]));
+  const connected = E.playerStanding(state([0,6,0,0,0]));
+  const vanguard = E.playerStanding(state([0,12,0,0,0]));
+  const bridge = E.playerStanding(state([0,8,0,7,0]));
+  const flag = E.playerStanding(state([0,30,0,0,0]));
+  ok(unseen.key === 'unseen' && unseen.title.includes('無名の周旋家'),
+     '開始時はどこにも属さない無名の周旋家');
+  ok(lean.key === 'lean-1' && lean.title.includes('開国寄り'),
+     '一勢力を動かすと、その勢力寄りと見られ始める');
+  ok(connected.key === 'connected-1' && connected.title.includes('顔の利く'),
+     '一勢力が育つと、その勢力に顔の利く周旋家になる');
+  ok(vanguard.key === 'vanguard-1' && vanguard.title.includes('急先鋒'),
+     '警戒線まで旗色が濃くなると急先鋒になる');
+  ok(bridge.key === 'bridge-1-3' && bridge.title.includes('仲介人'),
+     '二勢力を育てると、その二つをつなぐ仲介人になる');
+  ok(flag.key === 'flag-1' && flag.title.includes('旗頭'),
+     '単独覇権ラインに達すると、その勢力の旗頭になる');
+
+  const c = E.CHAR_BY_ID.get(1);
+  const first = E.resolve(E.createState(1), { charId:1, stance:'support', ownF:c.factions[0],
+    argueF:c.factions[0], cards:c.correct.slice(), probed:false, approach:0, place:null });
+  ok(first.report.standingBefore.key === 'unseen'
+     && first.report.standingAfter.key !== first.report.standingBefore.key,
+     '交渉報告に行動前と行動後の立場が残る');
+
+  const endState = Object.assign(E.createState(1), { currents:[0,18,0,14,0],
+    contacts:[145,103], promises:[{id:145,f:1}], banned:[47], actions:Array(10).fill({}) });
+  const ep = E.playerEpilogue(endState, E.evaluateEnding(endState));
+  ok(ep.title.includes('仲介人') && ep.text.includes('2人')
+     && ep.text.includes('1本の約束') && ep.text.includes('1人との決裂'),
+     '終局の主人公総括に立場・人脈・約束・決裂が入る');
 }
 
 /* --- 5e. 対話（チップ式） -------------------------------------------------- */
@@ -564,7 +616,7 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
      '通じる応じ方なら切り抜け、その人物が人脈に加わる');
   ok(!lost.report.duel.survived && lost.next.banned.includes(47)
      && !lost.next.contacts.includes(47) && lost.next.probesUsed === 1,
-     '誤れば手傷を負い、出現停止になり、探りを1回失う');
+     '誤れば手傷を負い、出現停止になり、奥の手を失う');
   ok(lost.next.currents[4] < won.next.currents[4], '敗れると主張していた勢力が削られる');
   ok(E.resolve(st, conv).report.duel === null,
      '応じ方が記録されていない古い保存コードでは、立ち合いは起きなかったものとして扱う');
@@ -633,7 +685,7 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
      '杯を交わした相手は、短気でも刃を抜かない');
   ok(E.resolve(st, { charId:47, stance:'support', ownF:2, argueF:2,
                      cards:E.CHAR_BY_ID.get(47).correct.slice(), probed:false, approach:2 }).next.probesUsed === 1,
-     '金品を贈ると探りを1回使う');
+     '金品を贈ると一度きりの奥の手を使う');
 }
 {
   /* 保存コードの往復と旧版互換 */

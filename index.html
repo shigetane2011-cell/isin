@@ -59,6 +59,20 @@ h1 .sub{display:block;font-size:.72rem;letter-spacing:.3em;color:var(--sumi2);ma
 .title-hero h1 .sub{font-size:.78rem;letter-spacing:.34em;color:var(--sumi2);margin-top:8px}
 .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.82rem;color:var(--sumi2);margin-top:10px}
 .meta b{font-weight:600;color:var(--sumi)}
+.player-premise{margin:2px 0 12px;padding:10px 13px;border:1px solid var(--line);border-left:5px solid var(--sumi2);
+  background:linear-gradient(100deg,rgba(59,52,44,.10),rgba(246,240,225,.76));font-size:.9rem}
+.player-premise .role{display:block;font-size:.7rem;letter-spacing:.18em;color:var(--sumi2);margin-bottom:2px}
+.standing-change{position:relative;margin:12px 0 4px;padding:10px 13px 11px;border:1px solid rgba(var(--tone-a,59,52,44),.42);
+  border-left:5px solid rgb(var(--tone-a,59,52,44));background:linear-gradient(100deg,rgba(var(--tone-a,59,52,44),.13),
+  rgba(var(--tone-b,59,52,44),.06) 64%,rgba(255,253,247,.86))}
+.standing-change .lbl{font-size:.68rem;letter-spacing:.18em;color:var(--sumi2)}
+.standing-change .name{font-size:1rem;font-weight:700;letter-spacing:.05em;margin:2px 0}
+.standing-change .before{font-weight:400;color:var(--sumi2)}
+.standing-change .arrow{display:inline-block;margin:0 7px;color:rgb(var(--tone-a,59,52,44));font-weight:700}
+.standing-change .ledger{margin-top:5px;font-size:.72rem;color:var(--sumi2)}
+.final-standing{margin:8px 0 12px;padding:11px 14px;border-left:5px solid rgb(var(--tone-a,59,52,44));
+  background:linear-gradient(100deg,rgba(var(--tone-a,59,52,44),.14),rgba(var(--tone-b,59,52,44),.06),transparent)}
+.final-standing .name{font-size:1.08rem;font-weight:700;letter-spacing:.08em}
 .panel{background:var(--washi2);border:1px solid var(--line);border-radius:2px;padding:14px 16px;margin:14px 0;
   box-shadow:0 1px 0 rgba(0,0,0,.05)}
 .panel h2{font-size:.9rem;margin:0 0 10px;letter-spacing:.18em;color:var(--sumi2);
@@ -1755,7 +1769,7 @@ const normalMeetingCount = (st, place) => travelFatigue(st.lastPlace, place) ? 2
 const APPROACHES = [
   { name:'論じる',     cards:3, cap:3, desc:'利益・文脈・論理の3枚を組む。最も高く積めるが、読みが要る' },
   { name:'酌み交わす', cards:2, cap:2, desc:'利益と文脈の2枚だけ。論理は問わない。杯を交わした相手は刃を抜かない' },
-  { name:'金品を贈る', cards:0, cap:2, desc:'言葉を尽くさず物で通す。探りを1回使う。大義に生きる者には侮辱になる' },
+  { name:'金品を贈る', cards:0, cap:2, desc:'言葉を尽くさず物で通す。一局に一度の奥の手を使う。大義に生きる者には侮辱になる' },
   { name:'肚を割る',   cards:1, cap:3, desc:'利益の一点に賭け、こちらの旗色も明かす。当たれば大きいが、外せば決裂。通れば約束が残る' },
 ];
 /* 利益の型 → 既定で響く働きかけ */
@@ -2261,9 +2275,9 @@ const INTERLUDES = {
 /* --- 状態 ---------------------------------------------------------------- */
 const MAX_TURN = 10, GOAL = 30, COMBO_GOAL = 28, CAP = 40, COMBO_MIN = 10;
 /* 「さらに聞き出す」と3つの正解がすべて分かるが、手の内を明かした分だけ影響力が落ち、
-   その交渉の獲得が1下がる。使えるのは1局に PROBE_LIMIT 回まで。
-   回数を切らないと、探り続けるだけで勝ててしまい賭けが消える。 */
-const PROBE_LIMIT = 4;
+   その交渉の獲得が1下がる。これは一局に一度だけの奥の手。
+   何度も使える通常手順ではなく、誰に切るかを決める選択にする。 */
+const PROBE_LIMIT = 1;
 /* 幕間「政変」が起きるターン。この時点の上位2勢力の組合せで事件が決まる。 */
 const INTERLUDE_TURNS = [5, 8];
 const INTERLUDE_SETS = [INTERLUDES_EARLY, INTERLUDES];
@@ -2283,6 +2297,84 @@ function createState(seed){
 }
 const totalOf = st => st.currents.reduce((a,b)=>a+b,0);
 const eraOf   = st => eraOfTotal(totalOf(st));
+
+/* 主人公には新しい能力値を持たせない。すでに盤面にある時勢・人脈・約束・決裂から、
+   周囲にどう見られているかを導く。国の結末だけでなく、行動によって「自分が何者に
+   なったか」を毎手返すための、純粋な派生状態である。 */
+function playerStanding(st){
+  const cur = (st.currents || [0,0,0,0,0]).slice();
+  const contactIds = st.contacts || [];
+  const contacts = contactIds.length;
+  const promises = (st.promises || []).length;
+  const enemies = (st.banned || []).length;
+  const acted = (st.actions || []).length;
+  const total = cur.reduce((sum, v) => sum + v, 0);
+  const order = [0,1,2,3,4].sort((a,b) => cur[b] - cur[a] || a - b);
+  const a = order[0], b = order[1], av = cur[a], bv = cur[b];
+  const alignedContacts = contactIds.filter(id => CHAR_BY_ID.get(id)?.factions.includes(a)).length;
+  const base = { contacts, promises, enemies };
+
+  if (!acted && total === 0 && contacts === 0 && enemies === 0)
+    return Object.assign(base, { key:'unseen', short:'無所属の周旋家',
+      title:'どこにも属さない無名の周旋家', factions:[],
+      text:'幕府にも朝廷にも、いずれの藩にも籍はない。まだ誰も、あなたの旗色も名も知らない。' });
+
+  if (av === 0){
+    if (contacts > 0)
+      return Object.assign(base, { key:'unbound-known', short:'名を知られた無所属の周旋家',
+        title:'旗を持たず、名だけを知られた周旋家', factions:[],
+        text:'まだどの旗にも与していないが、あなたの名を引き受ける者はできた。' });
+    return Object.assign(base, { key:'unbound-enmity', short:'敵を作った無所属の周旋家',
+      title:'旗を持たず、敵だけを作った周旋家', factions:[],
+      text:'どの陣営にも足場を築けないまま、拒まれたという噂だけが先に歩いている。' });
+  }
+
+  if (av >= GOAL)
+    return Object.assign(base, { key:`flag-${a}`, short:`${FACTIONS[a].name}の旗頭`,
+      title:`${FACTIONS[a].full}の旗頭`, factions:[a],
+      text:`${FACTIONS[a].full}の勝利と、あなた自身の名を切り離せないところまで来た。味方にも敵にも、旗を掲げた者として知られている。` });
+
+  const bridges = bv >= COMBO_MIN || (bv >= 3 && av - bv <= 5);
+  if (bridges)
+    return Object.assign(base, { key:`bridge-${[a,b].sort((x,y)=>x-y).join('-')}`,
+      short:`${FACTIONS[a].name}×${FACTIONS[b].name}の仲介人`,
+      title:`${FACTIONS[a].name}と${FACTIONS[b].name}をつなぐ仲介人`, factions:[a,b],
+      text:`${FACTIONS[a].full}と${FACTIONS[b].full}、二つの陣営を往来する立場になった。どちらにも完全には属さないからこそ、通せる話がある。` });
+
+  if (av >= WARY_LINE)
+    return Object.assign(base, { key:`vanguard-${a}`, short:`${FACTIONS[a].name}派の急先鋒`,
+      title:`${FACTIONS[a].full}の急先鋒`, factions:[a],
+      text:`あなたの言葉は${FACTIONS[a].full}の旗と見分けがつかなくなった。味方は頼り、対立する者は会う前から警戒する。` });
+
+  if (av >= 5 || alignedContacts >= 2)
+    return Object.assign(base, { key:`connected-${a}`, short:`${FACTIONS[a].name}派の周旋家`,
+      title:`${FACTIONS[a].name}派に顔の利く周旋家`, factions:[a],
+      text:`${FACTIONS[a].full}の人物が、あなたの名を取り次ぐようになった。無名ではあるが、もはや無関係な者ではない。` });
+
+  return Object.assign(base, { key:`lean-${a}`, short:`${FACTIONS[a].name}寄りの周旋家`,
+    title:`${FACTIONS[a].name}寄りと見られ始めた周旋家`, factions:[a],
+    text:`まだ旗を掲げたわけではない。それでも世間は、あなたが${FACTIONS[a].full}へ肩入れしていると見始めた。` });
+}
+
+function playerEpilogue(st, ending){
+  const standing = playerStanding(st);
+  const contacts = (st.contacts || []).slice().sort((a,b) => rankOfId(b) - rankOfId(a) || a - b);
+  const promises = st.promises || [], enemies = st.banned || [];
+  const turns = (st.actions || []).length;
+  const notable = contacts.slice(0, 2).map(id => CHAR_BY_ID.get(id).name);
+  const trail = contacts.length
+    ? `${contacts.length}人があなたの名を通す。${notable.length ? `とりわけ${notable.join('と')}は、あなたが何者だったかを覚えている。` : ''}`
+    : '最後まで、あなたの名を引き受ける人脈は築けなかった。';
+  const burdens = promises.length || enemies.length
+    ? `${promises.length ? `${promises.length}本の約束を背負い` : '約束は残さず'}、${
+      enemies.length ? `${enemies.length}人との決裂を抱えて` : '決裂した相手もなく'}終局を迎えた。`
+    : '約束も決裂も残さず、終局を迎えた。';
+  const consequence = ending.kind === 'chaos'
+    ? `世間はあなたを「${standing.title}」と呼んだが、その立場を公の役目へ変える政権は生まれなかった。`
+    : `世間が呼ぶ「${standing.title}」という名のまま、新しい世の中へ入る。`;
+  return { title:standing.title, factions:standing.factions,
+    text:`${turns}度の面会を重ねた。${trail}${burdens}${consequence}` };
+}
 
 /* 基点ID: (直前の論証文の文字数 × ターン数) を名簿数で割った剰余。第1ターンのみ seed から。
    原作は100名なので「下2桁」＝ %100 だった。名簿を広げたため法だけを合わせてある。
@@ -2629,13 +2721,15 @@ function resolve(st, action){
   const next = {
     seed: st.seed, turn: st.turn + 1, currents: cur, contacts, banned, promises,
     lastLen: len, lastPlace: action.place ?? null,
-    /* 立ち合いに敗れると、深追いする余裕を失う（探りを1回失う） */
+    /* 立ち合いに敗れると、深追いする余裕を失う（一度きりの奥の手を失う） */
     probesUsed: Math.min(PROBE_LIMIT, st.probesUsed + (probed ? 1 : 0)
       + (approach === 2 ? 1 : 0) + (duel && !duel.survived ? 1 : 0)),
     interlude: st.interlude, interludes: st.interludes || [],
     actions: st.actions.concat([action]), finished: false,
   };
   next.finished = next.turn > MAX_TURN || cur.some(v => v >= CAP);
+  const standingBefore = playerStanding(st);
+  const standingAfter = playerStanding(next);
 
   return { next, report: {
     charId: action.charId, name: ch.name, score, rawScore, hits, premature, rank, effRank,
@@ -2654,6 +2748,7 @@ function resolve(st, action){
     promised, promisedF: promised ? action.argueF : -1,
     contactAdded: contacts.includes(action.charId) && !st.contacts.includes(action.charId),
     bannedNow: banned.includes(action.charId) && !st.banned.includes(action.charId),
+    standingBefore, standingAfter,
   }};
 }
 
@@ -2804,7 +2899,7 @@ const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_B
   PLACES, placeAllows, placesOpen, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
-  encodeSave, decodeSave, hashState };
+  playerStanding, playerEpilogue, encodeSave, decodeSave, hashState };
 if (typeof globalThis !== 'undefined') globalThis.ENGINE = ENGINE;
 /* ==ENGINE END== */
 
@@ -2817,6 +2912,7 @@ let st = null;
 let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
            place:null, picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
+           interludeStandingBefore:null, interludeStandingAfter:null,
            opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -2863,6 +2959,22 @@ function factionLegendHTML(factions){
   return `<div class="faction-legend">${fs.map(f =>
     `<span class="${fac(f).cls}"><i aria-hidden="true"></i>${fac(f).name} <small>${fac(f).full}</small></span>`
   ).join('')}</div>`;
+}
+function standingChangeHTML(before, after){
+  if (!before || !after) return '';
+  const changed = before.key !== after.key;
+  const counts = [];
+  if (before.contacts !== after.contacts) counts.push(`人脈 ${before.contacts} → ${after.contacts}`);
+  if (before.promises !== after.promises) counts.push(`約束 ${before.promises} → ${after.promises}`);
+  if (before.enemies !== after.enemies) counts.push(`決裂 ${before.enemies} → ${after.enemies}`);
+  return `<div class="standing-change" style="${toneStyle(after.factions)}">
+    <div class="lbl">あなたの立場</div>
+    <div class="name">${changed
+      ? `<span class="before">${esc(before.title)}</span><span class="arrow">→</span>${esc(after.title)}`
+      : `${esc(after.title)} <span class="small">（変わらず）</span>`}</div>
+    <div class="small">${esc(after.text)}</div>
+    ${counts.length ? `<div class="ledger">${counts.join('　')}</div>` : ''}
+  </div>`;
 }
 function storyVisualHTML(srcs, factions, alt, extraClass, eager){
   const fs = factions || [];
@@ -2975,6 +3087,7 @@ function chartHTML(compact){
 }
 
 function headerHTML(){
+  const standing = E.playerStanding(st);
   const resultTurn = ui.screen === 'result' && ui.report ? st.actions.length : null;
   const turnText = resultTurn !== null
     ? `第 <b>${resultTurn}</b> ターンの結果${st.finished ? ' / 終局' : ` / 次は第 <b>${st.turn}</b> ターン`}`
@@ -2985,8 +3098,9 @@ function headerHTML(){
     <h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1>
     <div class="meta">
       <span>${turnText}</span>
+      <span>あなた <b>${esc(standing.short)}</b></span>
       <span>時代ランク <b>${E.ERAS[E.eraOf(st)]}</b></span>
-      <span>聞き出し 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
+      <span>奥の手 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
     </div></header>`;
 }
 
@@ -2998,8 +3112,10 @@ function viewTitle(){
     <div class="hero-copy"><h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1></div>
   </section>
   <div class="panel">
-    <p>本作は、<b>10ターン以内に理想の日本を創り上げる</b>シミュレーションです。
-    人物を読み、言葉で説き伏せて、時勢を動かします。到達できる未来は<b>全16通り</b>。</p>
+    <div class="player-premise"><span class="role">あなた ― 無名の周旋家</span>
+      幕府にも朝廷にも、いずれの藩にも属していません。兵も身分もなく、持つのは人を読み、言葉で人をつなぐ力だけです。</div>
+    <p><b>10ターン以内に理想の日本を創り上げる</b>と同時に、行動の積み重ねによって
+    <b>あなた自身が何者として歴史に残るか</b>を決めます。到達できる未来は<b>全16通り</b>。</p>
     ${factionLegendHTML()}
     <div class="small" style="margin:6px 0 2px">
       <b>複合革命</b>（通常）上位2つの合計28以上・両方10以上 ― 10通り　／
@@ -3012,7 +3128,7 @@ function viewTitle(){
       <ol style="padding-left:1.2em;margin:6px 0">
         <li><b>どこへ行き、誰に会うか</b>を決める。場によって集まる者と、できる働きかけが変わります。
           京・江戸・長崎を直行した日は旅疲れで面会候補が1名減り、夜の街道を挟めば減りません。</li>
-        <li><b>対話</b>で相手を読む。踏み込んだ問いは一つだけ。足りなければ代償つきで聞き出せます。</li>
+        <li><b>対話</b>で相手を読む。踏み込んだ問いは一つだけ。全てを聞き出せる奥の手は一局に一度です。</li>
         <li><b>支持</b>するか、<b>論破して転向</b>させるかを決める。</li>
         <li><b>働きかけ</b>を選び、<b>論証カード</b>を組む。</li>
       </ol>
@@ -3026,9 +3142,8 @@ function viewTitle(){
       <p class="small"><b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>
       （いずれかの時勢が12以上で、対立勢力の人物は判定が一段下がる）。寄せ切るか、抑えて回るかが最大の判断です。</p>
       <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答はその者に何が刺さるかを語ります。
-      読み切れないときは<b>「さらに聞き出す」</b>で3つとも開けられますが、
-      <b>その交渉の獲得が1下がり</b>、使えるのは<b>1局に4回まで</b>。
-      元の獲得が大きい大物ほど代償は軽いので、大物と、失敗できない転向に取っておくのが得です。</p>
+      読み切れないときは<b>一局に一度だけの「さらに聞き出す」</b>で3つとも開けられますが、
+      <b>その交渉の獲得が1下がります</b>。誰にこの奥の手を切るかも判断です。</p>
       <p class="small"><b>時代のうねり</b>：どの勢力を伸ばしても合計値は高まり、より高位の人物が現れます。
       『人脈』を使えばまだ時代に出てこない大物を呼べますが、時代が追いついていなければ効果は制限されます。</p>
     </details>
@@ -3062,6 +3177,7 @@ function viewTitle(){
     st = E.createState(Number.isFinite(v) ? v : 1868);
     ui.seedDraft = st.seed; ui.guidedTutorial = guided; markTutorialSeen();
     ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null; ui.place = null;
+    ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
     ui.screen = 'meeting'; render();
   };
   const start = document.getElementById('start');
@@ -3079,6 +3195,7 @@ function viewTitle(){
       st = E.replay(seed, actions, interludeChoice).state;
       ui.seedDraft = seed; ui.guidedTutorial = false; markTutorialSeen();
       ui.interludePicked = null; ui.interludeData = null; ui.place = null;
+      ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
       ui.screen = st.finished ? 'ending' : 'meeting'; render();
     } catch (e){ document.getElementById('err').textContent = '読み込めません: ' + e.message; }
   };
@@ -3223,6 +3340,7 @@ function viewInterlude(){
        <div class="small" style="margin-top:10px;opacity:.7">正解はありません。どれを選ぶかが、あなたの立場です。</div>`
     : `<div class="say" style="border-left-color:var(--shu)"><span class="q">「${esc(iv.opts[picked].label)}」</span><br>${
         esc(iv.opts[picked].res)}</div>
+       ${standingChangeHTML(ui.interludeStandingBefore, ui.interludeStandingAfter)}
        <div class="row"><button class="primary" id="ilnext">続ける</button></div>`;
   app.innerHTML = headerHTML() +
     `<div class="panel interlude tone-panel" style="${toneStyle(iv.key.split('+').map(Number))}">
@@ -3236,11 +3354,15 @@ function viewInterlude(){
     </div>` + (picked === null ? '' : chartHTML(true));
   app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
     const i = +b.dataset.pick;
-    st = E.applyInterlude(st, i); ui.interludePicked = i; render();
+    ui.interludeStandingBefore = E.playerStanding(st);
+    st = E.applyInterlude(st, i);
+    ui.interludeStandingAfter = E.playerStanding(st);
+    ui.interludePicked = i; render();
   });
   const nx = document.getElementById('ilnext');
   if (nx) nx.onclick = () => {
     ui.interludePicked = null; ui.interludeData = null; ui.place = null;
+    ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
     ui.screen = st.finished ? 'ending' : 'meeting'; render();
   };
 }
@@ -3325,7 +3447,7 @@ function viewStance(){
 
   const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
-    <div class="slot-h">対話 <span style="opacity:.7">— 踏み込んだ問いは<b>一つだけ</b>。それ以上は代償が要る</span></div>
+    <div class="slot-h">対話 <span style="opacity:.7">— 踏み込んだ問いは<b>一つだけ</b>。奥の手は一局に一度</span></div>
     <div class="row">
       ${E.QUESTIONS.map((q, i) => (ui.probed || guidedTurn())
         ? `<span class="chip used">${esc(q.chip)}</span>`
@@ -3339,10 +3461,10 @@ function viewStance(){
       ${guidedTurn()
         ? '<span class="probed">練習中 — 三つとも開示しています（回数は消費しません）</span>'
         : ui.probed
-        ? '<span class="probed">◎ 残らず聞き出した — この交渉の獲得は 1 下がる</span>'
+        ? '<span class="probed">◎ 奥の手で残らず聞き出した — この交渉の獲得は 1 下がる</span>'
         : probeLeft > 0
-          ? `<button class="probe" id="probe">さらに聞き出す<span class="small">（残り ${probeLeft} 回・この交渉の獲得 −1）</span></button>`
-          : `<span class="probed" style="opacity:.6">これ以上は聞き出せない（1局 ${E.PROBE_LIMIT} 回まで）</span>`}
+          ? `<button class="probe" id="probe">さらに聞き出す<span class="small">（一局に一度の奥の手・この交渉の獲得 −1）</span></button>`
+          : '<span class="probed" style="opacity:.6">この一局の奥の手は、すでに使った</span>'}
     </div>
     ${said.join('')}
     ${(() => {
@@ -3423,8 +3545,8 @@ function viewCards(){
         ${guided
           ? '<span class="probed">練習中 — 三つとも開示しています</span>'
           : ui.probed
-          ? '<span class="probed">◎ 残らず聞き出した — この交渉の獲得は 1 下がる</span>'
-          : `<span class="probed" style="opacity:.6">読み切れないときは、<b>戻る</b>と「さらに聞き出す」が使えます（残り ${left} 回）</span>`}
+          ? '<span class="probed">◎ 奥の手で残らず聞き出した — この交渉の獲得は 1 下がる</span>'
+          : `<span class="probed" style="opacity:.6">読み切れないときは、<b>戻る</b>と一局に一度の「さらに聞き出す」が使えます（残り ${left} 回）</span>`}
       </div>
       <div class="pre">切り出し：「${esc(E.preambleOf(st, ui.charId, ui.place))} ──」</div>
       ${E.CATS.slice(0, nCards).map((cat, i) => `
@@ -3495,7 +3617,7 @@ function viewResult(){
   const r = ui.report, c = E.CHAR_BY_ID.get(r.charId);
   const guidedResult = !!(ui.guidedTutorial && st.actions.length === 1);
   const marks = r.hits.slice(0, r.nCards).map((h,i) => `<div class="small">${h?'☑':'☐'} ${E.CATS[i].name}：${
-    h ? (r.probed ? '刺さった（探って得た）' : '刺さった')
+    h ? (r.probed ? '刺さった（奥の手で聞き出した）' : '刺さった')
       : `外れ（この人物に効くのは「${E.CATS[i].motives[c.correct[i]]}」）`}</div>`).join('');
   const d = r.delta.map((v,i) => v ? `<span class="${fac(i).cls}">[${fac(i).name}] ${v>0?'+':''}${v}</span>` : null)
     .filter(Boolean).join('　') || '変動なし';
@@ -3516,9 +3638,9 @@ function viewResult(){
         <b>${esc(E.DUELS[r.duel.choice].label)}</b><br>${esc(r.duel.text)}
         <div class="small" style="margin-top:6px">${r.duel.survived
           ? '腕を認められ、この者は【人脈】に加わった。'
-          : `手傷を負った。〔${fac(r.argueF).name}〕−3、探りを1回失い、この者は二度と現れない。`}</div>
+          : `手傷を負った。〔${fac(r.argueF).name}〕−3、一度きりの奥の手を失い、この者は二度と現れない。`}</div>
       </div>` : ''}
-      ${r.probed && r.gain > 0 ? `<div class="warn">※ 探りを入れたため、獲得が ${r.gainBeforeProbe} から ${r.gain} に下がりました（探り残り ${r.probesLeft} 回）</div>` : ''}
+      ${r.probed && r.gain > 0 ? `<div class="warn">※ 奥の手で聞き出したため、獲得が ${r.gainBeforeProbe} から ${r.gain} に下がりました（奥の手は使用済み）</div>` : ''}
       ${r.waryApplied ? `<div class="warn">※ あなたの掲げる〔${fac(r.waryBy).name}〕への警戒により、${r.rawScore}枚一致が一段下げられました</div>` : ''}
       ${r.vouchedBy >= 0 ? `<div class="small"><span class="uibadge">※ ${esc(E.CHAR_BY_ID.get(r.vouchedBy).name)}の紹介が効いた。</span>${
         r.waryBy >= 0 ? `〔${fac(r.waryBy).name}〕への警戒を受けずに済んだ` : 'この相手は端からあなたを門前払いしなかった'}</div>` : ''}
@@ -3542,6 +3664,7 @@ function viewResult(){
       ${r.premature ? `<div class="warn">※ 時期尚早のため、${E.RANKS[r.rank]}級ですが影響力は限定的です（ランク補正を無効化）</div>` : ''}
       ${r.penalty ? `<div class="warn">※ ${E.RANKS[r.rank]}級との交渉に失敗し時勢 -${r.penalty}</div>` : ''}
       <div class="delta">${d}</div>
+      ${standingChangeHTML(r.standingBefore, r.standingAfter)}
       ${r.partial ? `<div class="warn" style="color:var(--sumi2)">※ 刺さったのは1枚だけ。相手は動きませんでしたが、
         言葉は残りました（〔${fac(r.argueF).name}〕+1）。<b>人脈には加わりません</b>${
         r.penalty ? `。${E.RANKS[r.rank]}級を動かせなかった代償は、そのまま払います` : ''}</div>` : ''}
@@ -3563,17 +3686,29 @@ function viewResult(){
 }
 
 /* --- 画面: エンディング --------------------------------------------------- */
+function playerEndingHTML(ending){
+  const p = E.playerEpilogue(st, ending);
+  const fs = p.factions.length ? p.factions : E.winningFactions(ending);
+  return `<div class="final-standing" style="${toneStyle(fs)}">
+    <div class="small">終局時のあなた</div>
+    <div class="name">${esc(p.title)}</div>
+    <div class="small" style="margin-top:5px">${esc(p.text)}</div>
+  </div>`;
+}
 function viewEnding(){
   const e = E.evaluateEnding(st);
   const endingFs = E.winningFactions(e);
-  const heads = ['国内政治','国際関係','あなたのその後'];
+  const heads = ['国内政治','国際関係'];
   app.innerHTML = headerHTML() + chartHTML() +
     `<div class="panel ending tone-panel" style="${toneStyle(endingFs)}">
       <div class="kind">${e.kind==='solo'?'単独覇権エンド':e.kind==='combo'?'複合革命エンド':'混沌エンド'}</div>
       <div class="title">『${esc(e.t)}』</div>
       <div class="kind" style="color:var(--sumi2)">${esc(e.s)}</div>
       ${endingVisualHTML(e)}
-      ${e.p.map((para,i) => `<h3>${heads[i]}</h3><p>${esc(para)}</p>`).join('')}
+      ${e.p.slice(0,2).map((para,i) => `<h3>${heads[i]}</h3><p>${esc(para)}</p>`).join('')}
+      <h3>あなたが何者になったか</h3>
+      ${playerEndingHTML(e)}
+      <p>${esc(e.p[2])}</p>
       ${st.interlude ? `<h3>あの夜の選択</h3><p>『${esc(st.interlude.title)}』において、あなたは<b>${
         esc(st.interlude.tag)}</b>。<br>${esc(st.interlude.after || '')}</p>` : ''}
       ${promisesHTML(e)}
@@ -3581,7 +3716,8 @@ function viewEnding(){
     </div>` + saveBoxHTML() +
     `<div class="row"><button class="primary" id="again">最初から</button></div>`;
   document.getElementById('again').onclick = () => {
-    st = null; ui.screen = 'title'; ui.guidedTutorial = false; ui.seedDraft = freshSeed(); render();
+    st = null; ui.screen = 'title'; ui.guidedTutorial = false; ui.seedDraft = freshSeed();
+    ui.interludeStandingBefore = null; ui.interludeStandingAfter = null; render();
   };
 }
 
