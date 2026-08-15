@@ -2078,7 +2078,7 @@ const PLACES = [
     favor:[3,2], allow:[0,3], boost:3 },
   { name:'壬生の屯所', where:'京',
     desc:'稽古の音と血の匂いが同居している。気の短い者ばかりだ。',
-    favor:[2,4], allow:[0,1,3], boost:3, hot:true },
+    favor:[2,0], allow:[0,1,3], boost:3, hot:true },
   { name:'夜の街道', where:'街道',
     desc:'提灯ひとつの闇。名も知れぬ者と、名を捨てた者が行き交う。',
     favor:[4,3], allow:[0,1,3], boost:1, hot:true },
@@ -2753,9 +2753,22 @@ function meetingList(st, place){
   [b, b + 37, b + 73].slice(0, normalMeetingCount(st, place)).forEach((raw, slot) => {
     const r = raw > ROSTER ? raw - ROSTER : raw;
     let id = rankOfId(r) > era ? (r % 30) + 1 : r;   // ランク補正（強制変換）
-    let guard = 0;
-    while (guard++ < 400 && !(free(id) && suits(id, slot))) id = (id % maxId) + 1;
-    if (!free(id)) { id = r; while (!free(id)) id = (id % maxId) + 1; }  // 条件を満たす者がいなければ場を無視
+    /* 条件を満たす者を全部集めてから、基点IDで選ぶ。
+       以前は基点から +1 ずつ前へ探して最初の一人で止めていたが、名簿が勢力ごとの
+       連番（1-6公武 / 7-12開国 / 13-18佐幕 / 19-24雄藩 / 25-30抗戦）なので、
+       「長い空白のあとに来るブロック」が候補を吸い込んでいた。祇園（公武・抗戦）なら
+       基点が7〜24のとき必ず25番の抗戦に先に当たる ―― 抗戦80%対公武20%である。
+       実測でも初級期の公武は10%、佐幕は29%まで偏っていた（名簿は各20%ちょうど）。 */
+    const pool = [], any = [];
+    for (let k = 1; k <= maxId; k++){
+      if (!free(k)) continue;
+      any.push(k);
+      if (suits(k, slot)) pool.push(k);
+    }
+    const from = pool.length ? pool : any;          // 条件を満たす者がいなければ場を無視
+    /* 基点は剰余ではなく比例で割り当てる。名簿30人・候補12人のような割り切れない
+       組み合わせだと、剰余は先頭側に多く配ってしまう（祇園で公武61%対抗戦39%になった）。 */
+    if (from.length) id = from[Math.floor((id - 1) * from.length / maxId)];
     taken.add(id); normal.push(id);
   });
   return { base: b, normal, intro: introPick(st, taken), revisit: revisitOf(st, place) };
@@ -3434,7 +3447,7 @@ function replay(seed, actions, interludeChoices, origin){
   return { state: st, reports };
 }
 function encodeSave(st){
-  return 'IR6:' + st.seed + ':' + (st.origin ?? 0) + ':' + st.actions
+  return 'IR7:' + st.seed + ':' + (st.origin ?? 0) + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
                a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
               + (a.duel != null ? ',' + a.duel : ''))
@@ -3447,10 +3460,10 @@ function encodeSave(st){
 }
 function decodeSave(code){
   const s = String(code).trim();
-  /* IR6 で主人公の出自が入った。出自は面会候補と切り出しの字数を変えるので、
-     同じ seed と同じ手順でも盤面が変わる。旧版は黙って読まずに断る。 */
-  if (!/^IR6:/.test(s)) throw new Error(/^IR[1-5]:/.test(s)
-    ? '旧版の保存コードです。主人公の出自が入ったため、同じ手順でも盤面が変わります'
+  /* IR7 で面会候補の選び方を直した（勢力の偏りを取った）。同じ seed と同じ手順でも
+     出てくる顔ぶれが変わるので、旧版は黙って読まずに断る。 */
+  if (!/^IR7:/.test(s)) throw new Error(/^IR[1-6]:/.test(s)
+    ? '旧版の保存コードです。面会候補の選び方が変わったため、同じ手順でも顔ぶれが変わります'
     : 'コードの形式が違います');
   const parts = s.slice(4).split(':');
   if (!/^\d+$/.test(parts[0])) throw new Error('seed が数値ではありません');
@@ -3805,7 +3818,7 @@ function viewTitle(){
       <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
     </div>` : ''}
     <details class="detail"><summary>保存コードから再開する</summary>
-      <textarea id="code" placeholder="IR6:1868:0:47,0,2,2,053,0;...#0.1"></textarea>
+      <textarea id="code" placeholder="IR7:1868:0:47,0,2,2,053,0;...#0.1"></textarea>
       <div class="row"><button id="load">再開する</button></div>
       <div id="err" class="warn"></div>
       <div class="small" style="margin-top:6px;opacity:.8">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</div>
@@ -3984,7 +3997,7 @@ function viewMeeting(){
       ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
         <div class="small">前ターンに組み上げた論証文の<b>${st.lastLen}字</b>×<b>${st.turn}</b>ターン、その剰余から基点ID <b>${m.base}</b> が決まり、
-        そこから${m.normal.length}名が選ばれています。${fatigue ? '遠路を直行した旅疲れで、通常枠が1名減っています。' : ''}時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
+        いま会える者を並べたうえでその基点から${m.normal.length}名が選ばれています。${fatigue ? '遠路を直行した旅疲れで、通常枠が1名減っています。' : ''}時代が進むまでは高位の人物が初級へ丸められます。あなたが選んだ言葉が、次に会う人を変えています。</div>
       </details>
     </div>`;
   app.querySelectorAll('[data-place]').forEach(el => el.onclick = () => {

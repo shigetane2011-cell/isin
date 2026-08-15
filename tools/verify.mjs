@@ -668,7 +668,7 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
       ok(st1.origin === 2, '一手指しても出自が保たれる');
     }
     let rejected = 0;
-    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR6:1:3:1,0,0,0,000,0', 'IR6:1:x:1,0,0,0,000,0'])
+    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR7:1:3:1,0,0,0,000,0', 'IR7:1:x:1,0,0,0,000,0'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '旧版のコードと、不正な出自の番号を弾く');
   }
@@ -915,7 +915,7 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
   }
   ok(rt, '立ち合いの応じ方を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR6:1:0:1,0,0,0,000,0,9', 'IR6:1:0:1,0,0,0,000,0,x']) {
+  for (const bad of ['IR7:1:0:1,0,0,0,000,0,9', 'IR7:1:0:1,0,0,0,000,0,x']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
@@ -982,7 +982,7 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
   }
   ok(rt, '働きかけを含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR6:1:0:1,0,0,0,000,0,9', 'IR6:1:0:1,0,0,0,000,0,x,0']) {
+  for (const bad of ['IR7:1:0:1,0,0,0,000,0,9', 'IR7:1:0:1,0,0,0,000,0,x,0']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な働きかけ番号を弾く');
@@ -1329,11 +1329,49 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   };
   const flat = share(null), gion = share(0), nagasaki = share(2);
   ok(Math.max(...flat) < 0.30, `場を指定しなければ勢力は偏らない（最大 ${(Math.max(...flat)*100).toFixed(0)}%）`);
-  /* 縛るのは3枠中1枠なので、偏りは「無指定の1.5倍以上」を目安にする */
-  ok(gion[4] > flat[4] * 1.5,
-     `祇園の茶屋には抗戦の者が集まる（${(gion[4]*100).toFixed(0)}% / 無指定 ${(flat[4]*100).toFixed(0)}%）`);
+  /* 縛るのは3枠中1枠。好む勢力が二つある場は、その二つで枠を分け合う。
+     以前は前へ一人ずつ探していたため、二つのうち片方（抗戦80%対公武20%）が
+     枠を独占していた。いまは候補を集めてから選ぶので、両方が等しく上がる。 */
+  ok(gion[0] > flat[0] * 1.15 && gion[4] > flat[4] * 1.15,
+     `祇園の茶屋には公武と抗戦の両方が集まる（公武 ${(gion[0]*100).toFixed(0)}% / 抗戦 ${
+       (gion[4]*100).toFixed(0)}% / 無指定 ${(flat[0]*100).toFixed(0)}%・${(flat[4]*100).toFixed(0)}%）`);
+  {
+    /* 場が縛るのは1枠目だけなので、そこだけを見る。3枠を混ぜると
+       荒事枠（短気な者）と出自枠（縁のある語り口）が混ざって判定にならない。 */
+    const slot0 = pl => {
+      const cnt = [0,0,0,0,0]; let tot = 0;
+      for (let seed = 1; seed <= 300; seed++){
+        E.CHAR_BY_ID.get(E.meetingList(E.createState(seed), pl).normal[0])
+          .factions.forEach(f => cnt[f]++);
+        tot++;
+      }
+      return cnt.map(n => n / tot);
+    };
+    const g0 = slot0(0);
+    ok(Math.abs(g0[0] - g0[4]) < 0.10,
+       `祇園の1枠目が、好む二つの勢力に等しく割れる（公武 ${(g0[0]*100).toFixed(0)}% / 抗戦 ${
+         (g0[4]*100).toFixed(0)}%）── 直す前は片方が枠を独占していた`);
+    ok(g0[0] + g0[4] > 0.85,
+       `祇園の1枠目は、ほぼ必ず公武か抗戦になる（${((g0[0]+g0[4])*100).toFixed(0)}%）`);
+  }
   ok(nagasaki[1] > flat[1] * 1.5,
      `長崎の商館には開国の者が集まる（${(nagasaki[1]*100).toFixed(0)}% / 無指定 ${(flat[1]*100).toFixed(0)}%）`);
+  {
+    /* 初級期はランク補正で全員が ID 1-30 に丸められる。名簿はそこも各20%ちょうどなのに、
+       前へ一人ずつ探す実装では公武10%・佐幕29%まで偏っていた。 */
+    const cnt = [0,0,0,0,0]; let tot = 0;
+    for (let seed = 1; seed <= 400; seed++){
+      const st = E.createState(seed, seed % 3);
+      for (const pl of E.placesOpen(st))
+        for (const id of E.meetingList(st, pl).normal){
+          E.CHAR_BY_ID.get(id).factions.forEach(f => cnt[f]++); tot++;
+        }
+    }
+    const pct = cnt.map(n => Math.round(n / tot * 100));
+    const spread = Math.max(...pct) - Math.min(...pct);
+    ok(spread <= 8, `初級期に出る顔が勢力で偏らない（最大差 ${spread}pt、直す前は19pt）── ${
+      E.FACTIONS.map((f,i) => f.name + ' ' + pct[i] + '%').join(' ')}`);
+  }
 }
 {
   /* 場に合った働きかけは深く刺さる。場を渡しても盤面の決定論は保たれる */
@@ -1376,7 +1414,7 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   }
   ok(rt, '場を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR6:1:0:1,0,0,0,000,0,0,9', 'IR6:1:0:1,0,0,0,000,0,0,z']) {
+  for (const bad of ['IR7:1:0:1,0,0,0,000,0,0,9', 'IR7:1:0:1,0,0,0,000,0,0,z']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な場の番号を弾く');
@@ -1461,9 +1499,9 @@ head('5g. 第5・第8ターンの幕間');
     const legacy = E.decodeSave(code.replace(/#\d\./, '#'));
     ok(legacy.interludeChoice[0] === null && legacy.interludeChoice[1] != null,
        '点なしの旧コードは、その一度を後半の幕間として読む');
-    ok(E.decodeSave('IR6:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
+    ok(E.decodeSave('IR7:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
     let rejected = 0;
-    for (const bad of ['IR6:1:0:#9', 'IR6:1:0:#0.9', 'IR6:1:0:#a.b'])
+    for (const bad of ['IR7:1:0:#9', 'IR7:1:0:#0.9', 'IR7:1:0:#a.b'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '不正な幕間の選択番号を弾く');
   }
@@ -1511,13 +1549,13 @@ head('5g. 第5・第8ターンの幕間');
     if (E.hashState(run(seed, 1)) !== E.hashState(off)) moved++;
     /* IR5 で聞き出しの規則が変わった。旧版のコードは同じ手順でも別の結末になるので、
        黙って読まずに断ること。読めてしまうほうが害が大きい。 */
-    for (const old of ['IR3:', 'IR4:']){
+    for (const old of ['IR3:', 'IR4:', 'IR6:']){
       try { E.decodeSave(old + E.encodeSave(off).slice(4)); compat = false; }
       catch (e) { if (!/旧版/.test(e.message)) compat = false; }
     }
   }
   ok(rt, '幕間の選択を含む保存コードが往復で一致する（100局×3選択）');
-  ok(compat, '旧版(IR3・IR4)の保存コードは、理由を示して断られる');
+  ok(compat, '旧版(IR3〜IR6)の保存コードは、理由を示して断られる');
   ok(moved === 100, '幕間の選択は必ず盤面を動かす（飾りになっていない）');
 }
 
@@ -1531,8 +1569,8 @@ head('5g. 第5・第8ターンの幕間');
   for (const bad of [9, -1, 1.5, null, 'a']) { try { E.applyInterlude(st, bad); } catch { threw++; } }
   ok(threw === 5, '幕間の選択番号が不正なら例外を投げる');
   let rejected = 0;
-  for (const code of ['IR6:1:0:1,0,0,0,000,0#9', 'IR6:1:0:1,0,0,0,000,0#x',
-                      'IR6:1:0:1,0,0,0,000,0#-1', 'IR6:abc:0:1,0,0,0,000,0']) {
+  for (const code of ['IR7:1:0:1,0,0,0,000,0#9', 'IR7:1:0:1,0,0,0,000,0#x',
+                      'IR7:1:0:1,0,0,0,000,0#-1', 'IR7:abc:0:1,0,0,0,000,0']) {
     try { E.decodeSave(code); } catch { rejected++; }
   }
   ok(rejected === 4, '不正な保存コード（幕間番号・seed）をすべて弾く');

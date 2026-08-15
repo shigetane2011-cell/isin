@@ -78,7 +78,7 @@ await noteTies();
 await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
 
 /* 1人目を選ぶ → 支持 → カード3枚 */
-await p.click('.person[data-id]');
+await p.click('.person[data-id]:not(.visit)');
 await p.waitForSelector('[data-stance], [data-own]');
 /* 相手を調べる: 観る（一項目が読める）と訊く（一項目が二択になる）を一度ずつ */
 await p.click('[data-see]');
@@ -154,7 +154,7 @@ for (let i = 0; i < 12; i++) {
   await pickPlace();
   await p.waitForSelector('.person[data-id]');
   await noteTies();
-  await p.click('.person[data-id]');
+  await p.click('.person[data-id]:not(.visit)');
   if (await p.$('[data-own]')) await p.click('[data-own]');
   await p.click('[data-stance="support"]');
   await p.waitForSelector('[data-approach]');
@@ -193,6 +193,45 @@ const restored = await p.$eval('.ending .title', e => e.textContent);
 console.log('復元後のエンディング:', restored);
 
 console.log('滞在した場:', visited.join(' → '));
+/* 来訪は移動しない手なので、通しプレイでは応じずに来た。ここで別に確かめる。
+   seed 2 は第4ターンに清河八郎が国学者の卵を連れてくる（固定資産）。 */
+{
+  await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
+  await p.$eval('details:has(#code)', e => e.open = true);
+  await p.fill('#code', 'IR7:2:0:25,0,4,4,354,0,0,0;7,0,1,1,552,0,0,2;26,0,4,4,124,0,0,0');
+  await p.click('#load');
+  await p.waitForSelector('.person.visit', { timeout: 5000 }).catch(() =>
+    errs.push('seed 2 の第4ターンに来訪の札が出ない'));
+  if (await p.$('.person.visit')){
+    const host = await p.$eval('.person.visit .tie .who', e => e.textContent);
+    const guest = await p.$eval('.person.visit .nm', e => e.textContent);
+    const before = await p.$$eval('[data-place] .nm', e => e.map(x => x.textContent.trim()));
+    await p.click('.person.visit');
+    await p.waitForSelector('[data-stance]');
+    await p.click('[data-stance="support"]');
+    await p.waitForSelector('[data-approach]');
+    const usable = await p.$$eval('[data-approach]', els => els.filter(e => !e.disabled).length);
+    console.log(`来訪: ${host} → ${guest}／使える働きかけ ${usable}/4`);
+    if (usable !== 4) errs.push('来訪に応じても働きかけが4つ使えない（場の縛りが外れていない）');
+    /* 応じても移動していないので、次のターンに開く場は変わらない */
+    await pickApproach();
+    await p.waitForSelector('.card, #go');
+    for (const i of [0,1,2]) { const c = await p.$(`.card[data-cat="${i}"]`); if (c) await c.click(); }
+    await p.click('#go');
+    await p.waitForSelector('#next, #ilnext, .ending');
+    const nx = await p.$('#next') || await p.$('#ilnext');
+    if (nx){
+      await nx.click();
+      /* 来訪に応じると第5ターンに入るので、幕間を挟むことがある */
+      if (await p.$('.interlude')) { await p.click('[data-pick="0"]'); await p.click('#ilnext'); }
+      await p.waitForSelector('[data-place]');
+      const after = await p.$$eval('[data-place] .nm', e => e.map(x => x.textContent.trim()));
+      if (JSON.stringify(before) !== JSON.stringify(after))
+        errs.push(`来訪に応じたのに開く場が変わった（${before.join('・')} → ${after.join('・')}）`);
+      else console.log('来訪の翌ターン: 開く場は変わらない（移動していないため）');
+    }
+  }
+}
 console.log('縁の表示:', tieSeen ? `${tieSeen}件（例: ${tieSample}）` : 'なし');
 console.log('残した約束:', vowSeen + '件');
 if (!tieSeen) errs.push('縁（紹介・悪評）の表示が通しプレイで一度も出なかった');
@@ -216,7 +255,7 @@ for (let t = 0; t < 11; t++){
   await p.waitForSelector('.person[data-id]');
   const rv = await p.$('.person.revisit');
   if (rv){ revisitSeen++; await rv.click(); revisitTaken++; }
-  else await p.click('.person[data-id]');
+  else await p.click('.person[data-id]:not(.visit)');
   if (revisitTaken && rv && !(await p.$('.tie.bad')))
     errs.push('再訪の相手を選んだのに、向き合う画面に〔再訪〕が出ていない');
   if (await p.$('[data-own]')) await p.click('[data-own]');
