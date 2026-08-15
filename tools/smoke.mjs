@@ -68,6 +68,13 @@ await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
 /* 1人目を選ぶ → 支持 → カード3枚 */
 await p.click('.person[data-id]');
 await p.waitForSelector('[data-stance], [data-own]');
+if (await p.$$eval('.observations .observation', e => e.length) !== 3)
+  errs.push('面会画面に「仕草・場の気配・話の運び」の三つの観察が出ていない');
+else {
+  const kinds = await p.$$eval('.observations .obs-kind', e => e.map(x => x.textContent.trim()));
+  if (kinds.join('・') !== '仕草・場の気配・話の運び')
+    errs.push('三つの観察の見出しが想定と違う: ' + kinds.join('・'));
+}
 /* 通常の問いは正解を出さず、不正解を一つだけ除外する */
 await p.click('[data-ask]');
 if (!(await p.$$eval('.say', e => e.map(x => x.textContent).join('\n')).then(t => t.includes('残り二択'))))
@@ -84,6 +91,8 @@ const pickApproach = async () => {
 };
 await pickApproach();
 await p.waitForSelector('.card, #go');
+if (await p.$$eval('.observations .observation', e => e.length) !== 3)
+  errs.push('論証カード画面で三つの観察を読み返せない');
 if (await p.$$eval('.card.ruled-out', e => e.length) !== 1)
   errs.push('探りで除外されるカードが一枚ではない');
 if (await p.$$eval('.card[data-cat="0"]:not(.ruled-out)', e => e.length) !== 2)
