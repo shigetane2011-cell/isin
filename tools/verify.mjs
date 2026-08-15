@@ -79,7 +79,7 @@ ok(html.includes('遠路・候補 −1') && html.includes('class="travel-note')
    '行き先の札に人数と旅疲れを、現在地にも旅疲れを表示する');
 
 head('1e. 一手の画面を縦に伸ばしすぎないか');
-ok(html.includes('chartHTML(true)') && html.includes('棒グラフ・人脈・約束を見る'),
+ok(html.includes('chartHTML(true)') && html.includes('棒グラフ・混沌・人脈・約束を見る'),
    '勝ち筋は残し、棒グラフと人脈を必要時だけ開く');
 ok(html.includes('class="approach-grid"') && html.includes('class="card-grid"'),
    '働きかけと論証札を横に比較できる');
@@ -139,7 +139,7 @@ ok(html.includes('所作を観たところ'), '印の文言が、観たのか聞
 {
   const cardsView = html.slice(html.indexOf('function viewCards()'),
                                html.indexOf('function viewDuelInline'));
-  ok(/E\.grudgeOf\(st, ui\.charId\)/.test(cardsView) && /E\.waryOf\(st\.currents, ui\.charId\)/.test(cardsView),
+  ok(/E\.grudgeOf\(st, ui\.charId\)/.test(cardsView) && /E\.waryOf\(st\.currents, ui\.charId, st\.chaos\)/.test(cardsView),
      '札を置く画面で、警戒と決裂の噂の両方を先に知らせる');
   ok(cardsView.includes('札を${nCards}枚とも当てても転向は通りません'),
      '減点が効いている相手には、満点でも転向が通らないと踏み切る前に言う');
@@ -670,7 +670,7 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
       ok(st1.origin === 2, '一手指しても出自が保たれる');
     }
     let rejected = 0;
-    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR8:1:3:1,0,0,0,000,0', 'IR8:1:x:1,0,0,0,000,0'])
+    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR9:1:3:1,0,0,0,000,0', 'IR9:1:x:1,0,0,0,000,0'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '旧版のコードと、不正な出自の番号を弾く');
   }
@@ -713,6 +713,45 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
         cards:c1.correct, probed:false, asked:1, approach:0, place:null }).next;
       ok(after.lastPlace === 3, '来訪に応じても直前の場は変わらない（連泊の抜け道を作らない）');
       ok(!E.placesOpen(after).includes(3), '来訪の翌ターンも、昨日の場へは続けて行けない');
+    }
+    {
+      /* 混沌。失敗で溜める案は決裂0.43〜1.23人/局・立ち合い敗北0.26〜0.47回/局しか
+         焚かれず、勝率は8%→6%とほとんど動かなかった。しかも溜まるのは負けている側だけ。
+         燃料を「荒っぽさ」に変え、効き方を獲得減ではなく警戒線に変えてある。 */
+      ok(E.CHAOS_CAUSES.length === 5 && E.CHAOS_CAUSES.every(c => c.d >= 1 && c.text),
+         '世を荒らす原因が5つ定めてある');
+      ok(E.waryLineOf(0) === E.WARY_LINE
+         && E.waryLineOf(E.CHAOS_STEP) === E.WARY_LINE - 1
+         && E.waryLineOf(999) === E.WARY_FLOOR,
+         `混沌${E.CHAOS_STEP}ごとに警戒線が1下がり、${E.WARY_FLOOR}で止まる`);
+      {
+        const st0 = E.createState(21);
+        const quiet = E.PLACES.findIndex(p => !p.hot && (p.unlockEra ?? 0) === 0);
+        const hot = E.PLACES.findIndex(p => p.hot);
+        const one = id => { const c = E.CHAR_BY_ID.get(id);
+          return { charId:id, ownF:c.factions[0], argueF:c.factions[0], cards:c.correct,
+                   probed:false, asked:1, approach:0 }; };
+        const calmId = E.meetingList(st0, quiet).normal[0];
+        const a1 = E.resolve(st0, Object.assign(one(calmId), { stance:'support', place:quiet }));
+        ok(a1.next.chaos === 0, '静かな場で支持を通しても、世は荒れない');
+        const hotId = E.meetingList(st0, hot).normal[0];
+        const a2 = E.resolve(st0, Object.assign(one(hotId), { stance:'support', place:hot, duel:0 }));
+        ok(a2.next.chaos >= 1, '荒事の場で会えば、それだけで世が荒れる');
+        const a3 = E.resolve(st0, Object.assign(one(calmId),
+          { stance:'convert', argueF:(E.CHAR_BY_ID.get(calmId).factions[0]+1)%5, place:quiet }));
+        ok(a3.next.chaos >= 1, '論破を仕掛ければ、通っても世が荒れる');
+        ok(a3.report.chaosAdded.some(c => c.key === 'convert'), '何が荒らしたのかを結果に返す');
+      }
+      /* 警戒は人脈の縁で通らない ―― 荒らした分は人脈で買い戻せる（詰みにしない） */
+      {
+        const cur = [0,0,0,0,0]; cur[2] = E.WARY_FLOOR;
+        const target = E.CHARACTERS.find(c => E.waryOf(cur, c.id, 999) >= 0);
+        ok(target, '混沌が極まれば、旗色が下限でも警戒が成立する相手がいる');
+        ok(E.waryOf(cur, target.id, 0) < 0, '混沌がなければ、同じ旗色では警戒されない');
+      }
+      ok(html.includes('警戒線') && html.includes('混沌 ${st.chaos}'),
+         '混沌と、いまの警戒線を盤面に出す');
+      ok(html.includes('混沌 +${r.chaosGain}'), '何がどれだけ荒らしたかを交渉結果に出す');
     }
     ok(html.includes('data-visit="1"') && html.includes('の来訪〕')
        && html.includes("if (el.dataset.visit) ui.place = null;"),
@@ -917,7 +956,7 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
   }
   ok(rt, '立ち合いの応じ方を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR8:1:0:1,0,0,0,000,0,9', 'IR8:1:0:1,0,0,0,000,0,x']) {
+  for (const bad of ['IR9:1:0:1,0,0,0,000,0,9', 'IR9:1:0:1,0,0,0,000,0,x']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
@@ -984,7 +1023,7 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
   }
   ok(rt, '働きかけを含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR8:1:0:1,0,0,0,000,0,9', 'IR8:1:0:1,0,0,0,000,0,x,0']) {
+  for (const bad of ['IR9:1:0:1,0,0,0,000,0,9', 'IR9:1:0:1,0,0,0,000,0,x,0']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な働きかけ番号を弾く');
@@ -1434,7 +1473,7 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   }
   ok(rt, '場を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR8:1:0:1,0,0,0,000,0,0,9', 'IR8:1:0:1,0,0,0,000,0,0,z']) {
+  for (const bad of ['IR9:1:0:1,0,0,0,000,0,0,9', 'IR9:1:0:1,0,0,0,000,0,0,z']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な場の番号を弾く');
@@ -1519,9 +1558,9 @@ head('5g. 第5・第8ターンの幕間');
     const legacy = E.decodeSave(code.replace(/#\d\./, '#'));
     ok(legacy.interludeChoice[0] === null && legacy.interludeChoice[1] != null,
        '点なしの旧コードは、その一度を後半の幕間として読む');
-    ok(E.decodeSave('IR8:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
+    ok(E.decodeSave('IR9:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
     let rejected = 0;
-    for (const bad of ['IR8:1:0:#9', 'IR8:1:0:#0.9', 'IR8:1:0:#a.b'])
+    for (const bad of ['IR9:1:0:#9', 'IR9:1:0:#0.9', 'IR9:1:0:#a.b'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '不正な幕間の選択番号を弾く');
   }
@@ -1569,7 +1608,7 @@ head('5g. 第5・第8ターンの幕間');
     if (E.hashState(run(seed, 1)) !== E.hashState(off)) moved++;
     /* IR5 で聞き出しの規則が変わった。旧版のコードは同じ手順でも別の結末になるので、
        黙って読まずに断ること。読めてしまうほうが害が大きい。 */
-    for (const old of ['IR3:', 'IR4:', 'IR7:']){
+    for (const old of ['IR3:', 'IR4:', 'IR8:']){
       try { E.decodeSave(old + E.encodeSave(off).slice(4)); compat = false; }
       catch (e) { if (!/旧版/.test(e.message)) compat = false; }
     }
@@ -1589,8 +1628,8 @@ head('5g. 第5・第8ターンの幕間');
   for (const bad of [9, -1, 1.5, null, 'a']) { try { E.applyInterlude(st, bad); } catch { threw++; } }
   ok(threw === 5, '幕間の選択番号が不正なら例外を投げる');
   let rejected = 0;
-  for (const code of ['IR8:1:0:1,0,0,0,000,0#9', 'IR8:1:0:1,0,0,0,000,0#x',
-                      'IR8:1:0:1,0,0,0,000,0#-1', 'IR8:abc:0:1,0,0,0,000,0']) {
+  for (const code of ['IR9:1:0:1,0,0,0,000,0#9', 'IR9:1:0:1,0,0,0,000,0#x',
+                      'IR9:1:0:1,0,0,0,000,0#-1', 'IR9:abc:0:1,0,0,0,000,0']) {
     try { E.decodeSave(code); } catch { rejected++; }
   }
   ok(rejected === 4, '不正な保存コード（幕間番号・seed）をすべて弾く');

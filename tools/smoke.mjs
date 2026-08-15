@@ -198,7 +198,7 @@ console.log('滞在した場:', visited.join(' → '));
 {
   await p.goto(pathToFileURL(resolve(root, 'index.html')).href);
   await p.$eval('details:has(#code)', e => e.open = true);
-  await p.fill('#code', 'IR8:2:0:25,0,4,4,354,0,0,0;7,0,1,1,552,0,0,2;26,0,4,4,124,0,0,0');
+  await p.fill('#code', 'IR9:2:0:25,0,4,4,354,0,0,0;7,0,1,1,552,0,0,2;26,0,4,4,124,0,0,0');
   await p.click('#load');
   await p.waitForSelector('.person.visit', { timeout: 5000 }).catch(() =>
     errs.push('seed 2 の第4ターンに来訪の札が出ない'));
