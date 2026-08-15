@@ -74,8 +74,9 @@ head('1d. 勝ち筋と旅程が画面に見えるか');
 ok(html.includes('class="route-guide"') && html.includes('通常ルート｜二つを育てる')
    && html.includes('高難度ルート｜一つに寄せ切る'),
    '複合と単独の二つの勝ち筋を、時勢チャートに常時表示する');
-ok(html.includes('遠路・通常候補 −1') && html.includes('class="travel-note'),
-   '行き先の札と現在地の両方に旅疲れを表示する');
+ok(html.includes('遠路・候補 −1') && html.includes('class="travel-note')
+   && html.includes('・候補${n}名'),
+   '行き先の札に人数と旅疲れを、現在地にも旅疲れを表示する');
 
 head('1e. 一手の画面を縦に伸ばしすぎないか');
 ok(html.includes('chartHTML(true)') && html.includes('棒グラフ・人脈・約束を見る'),
@@ -626,21 +627,22 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
     };
     const rosters = [0,1,2].map(rosterOf);
     ok(new Set(rosters).size === 3, '同じ seed でも、出自が違えば会える顔ぶれが違う');
-    /* 三枠目は出自の縁の語り口から来る */
-    let slot2 = 0, warmHit = 0;
+    /* 二枠目は出自の縁の語り口から来る。人数の少ない場でも二枠は必ずあるので、
+       場の好み（一枠目）と出自（二枠目）はどこへ行っても効く。 */
+    let slot1 = 0, warmHit = 0;
     for (let origin = 0; origin < 3; origin++){
       const warm = new Set(E.ORIGINS[origin].warm);
       for (let seed = 1; seed <= 40; seed++){
         const st = E.createState(seed, origin);
         for (const pl of E.placesOpen(st)){
           const ids = E.meetingList(st, pl).normal;
-          if (ids.length < 3) continue;
-          slot2++; if (warm.has(E.voiceOf(ids[2]))) warmHit++;
+          if (ids.length < 2) continue;
+          slot1++; if (warm.has(E.voiceOf(ids[1]))) warmHit++;
         }
       }
     }
-    ok(slot2 > 0 && warmHit === slot2,
-       `三枠目は必ず出自の縁のある語り口から来る（${warmHit}/${slot2}）`);
+    ok(slot1 > 0 && warmHit === slot1,
+       `二枠目は必ず出自の縁のある語り口から来る（${warmHit}/${slot1}）`);
     /* 保存コードの往復と、旧版の拒否 */
     let rt = true;
     for (let origin = 0; origin < 3; origin++){
@@ -668,7 +670,7 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
       ok(st1.origin === 2, '一手指しても出自が保たれる');
     }
     let rejected = 0;
-    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR7:1:3:1,0,0,0,000,0', 'IR7:1:x:1,0,0,0,000,0'])
+    for (const bad of ['IR5:1:1,0,0,0,000,0', 'IR8:1:3:1,0,0,0,000,0', 'IR8:1:x:1,0,0,0,000,0'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '旧版のコードと、不正な出自の番号を弾く');
   }
@@ -915,7 +917,7 @@ ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在�
   }
   ok(rt, '立ち合いの応じ方を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR7:1:0:1,0,0,0,000,0,9', 'IR7:1:0:1,0,0,0,000,0,x']) {
+  for (const bad of ['IR8:1:0:1,0,0,0,000,0,9', 'IR8:1:0:1,0,0,0,000,0,x']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な立ち合い番号を含む保存コードを弾く');
@@ -982,7 +984,7 @@ ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <=
   }
   ok(rt, '働きかけを含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR7:1:0:1,0,0,0,000,0,9', 'IR7:1:0:1,0,0,0,000,0,x,0']) {
+  for (const bad of ['IR8:1:0:1,0,0,0,000,0,9', 'IR8:1:0:1,0,0,0,000,0,x,0']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な働きかけ番号を弾く');
@@ -1188,7 +1190,25 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
   ok(E.revisitOf(bad, null) === -1, '行き先が決まる前は再訪もない');
   ok(E.meetingList(bad, hot[0]).revisit === 25, '面会リストに再訪枠が載る');
   ok(E.meetingList(bad, hot[0]).normal.every(id => id !== 25), '再訪の相手は通常枠には出ない');
-  ok(E.meetingList(bad, hot[0]).normal.length === 3, '再訪は通常枠を潰さず、枠がひとつ増える');
+  ok(E.meetingList(bad, hot[0]).normal.length === E.normalMeetingCount(bad, hot[0]),
+     '再訪は通常枠を潰さず、枠がひとつ増える');
+  {
+    /* 場ごとに通される人数が違う。荒事の場は人の出入りが多く、格式のある場は少ない。
+       短気な者の枠は常に1つなので、人数が増えるほどその偏りが薄まる。 */
+    ok(E.PLACE_SEATS.length === E.PLACES.length
+       && E.PLACE_SEATS.every(n => n >= 2 && n <= 4),
+       '場ごとの面会人数が2〜4名で定めてある');
+    ok(E.PLACE_SEATS.reduce((a, b) => a + b, 0) === E.PLACES.length * 3,
+       `面会人数の合計は全場3名だった頃と同じ（${E.PLACE_SEATS.join('+')}=${
+         E.PLACE_SEATS.reduce((a,b)=>a+b,0)}）`);
+    ok(new Set(E.PLACE_SEATS).size >= 3, '人数が場によって実際に違う');
+    ok(E.PLACES.every((p, i) => !p.hot || E.PLACE_SEATS[i] === 4),
+       '荒事の場は4名（短気な者の枠が1/4に薄まる）');
+    const st0 = E.createState(5);
+    ok(E.PLACES.every((p, i) =>
+       (p.unlockEra ?? 0) > 0 || E.meetingList(st0, i).normal.length === E.PLACE_SEATS[i]),
+       '定めた人数がそのまま面会候補の数になる');
+  }
 
   /* 判定は一段重く、紹介では消えない */
   const target = E.CHAR_BY_ID.get(25), f = target.factions[0];
@@ -1414,7 +1434,7 @@ ok(new Set(E.PLACES.map(p => p.name)).size === 6, '場の名が重複してい�
   }
   ok(rt, '場を含む保存コードが往復で一致する（60局）');
   let rejected = 0;
-  for (const bad of ['IR7:1:0:1,0,0,0,000,0,0,9', 'IR7:1:0:1,0,0,0,000,0,0,z']) {
+  for (const bad of ['IR8:1:0:1,0,0,0,000,0,0,9', 'IR8:1:0:1,0,0,0,000,0,0,z']) {
     try { E.decodeSave(bad); } catch { rejected++; }
   }
   ok(rejected === 2, '不正な場の番号を弾く');
@@ -1499,9 +1519,9 @@ head('5g. 第5・第8ターンの幕間');
     const legacy = E.decodeSave(code.replace(/#\d\./, '#'));
     ok(legacy.interludeChoice[0] === null && legacy.interludeChoice[1] != null,
        '点なしの旧コードは、その一度を後半の幕間として読む');
-    ok(E.decodeSave('IR7:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
+    ok(E.decodeSave('IR8:1:0:').interludeChoice === null, '幕間のない旧コードもそのまま読める');
     let rejected = 0;
-    for (const bad of ['IR7:1:0:#9', 'IR7:1:0:#0.9', 'IR7:1:0:#a.b'])
+    for (const bad of ['IR8:1:0:#9', 'IR8:1:0:#0.9', 'IR8:1:0:#a.b'])
       { try { E.decodeSave(bad); } catch { rejected++; } }
     ok(rejected === 3, '不正な幕間の選択番号を弾く');
   }
@@ -1549,13 +1569,13 @@ head('5g. 第5・第8ターンの幕間');
     if (E.hashState(run(seed, 1)) !== E.hashState(off)) moved++;
     /* IR5 で聞き出しの規則が変わった。旧版のコードは同じ手順でも別の結末になるので、
        黙って読まずに断ること。読めてしまうほうが害が大きい。 */
-    for (const old of ['IR3:', 'IR4:', 'IR6:']){
+    for (const old of ['IR3:', 'IR4:', 'IR7:']){
       try { E.decodeSave(old + E.encodeSave(off).slice(4)); compat = false; }
       catch (e) { if (!/旧版/.test(e.message)) compat = false; }
     }
   }
   ok(rt, '幕間の選択を含む保存コードが往復で一致する（100局×3選択）');
-  ok(compat, '旧版(IR3〜IR6)の保存コードは、理由を示して断られる');
+  ok(compat, '旧版(IR3〜IR7)の保存コードは、理由を示して断られる');
   ok(moved === 100, '幕間の選択は必ず盤面を動かす（飾りになっていない）');
 }
 
@@ -1569,8 +1589,8 @@ head('5g. 第5・第8ターンの幕間');
   for (const bad of [9, -1, 1.5, null, 'a']) { try { E.applyInterlude(st, bad); } catch { threw++; } }
   ok(threw === 5, '幕間の選択番号が不正なら例外を投げる');
   let rejected = 0;
-  for (const code of ['IR7:1:0:1,0,0,0,000,0#9', 'IR7:1:0:1,0,0,0,000,0#x',
-                      'IR7:1:0:1,0,0,0,000,0#-1', 'IR7:abc:0:1,0,0,0,000,0']) {
+  for (const code of ['IR8:1:0:1,0,0,0,000,0#9', 'IR8:1:0:1,0,0,0,000,0#x',
+                      'IR8:1:0:1,0,0,0,000,0#-1', 'IR8:abc:0:1,0,0,0,000,0']) {
     try { E.decodeSave(code); } catch { rejected++; }
   }
   ok(rejected === 4, '不正な保存コード（幕間番号・seed）をすべて弾く');

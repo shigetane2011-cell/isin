@@ -2096,7 +2096,13 @@ function travelFatigue(lastPlace, nextPlace){
   const from = PLACES[lastPlace]?.where, to = PLACES[nextPlace]?.where;
   return from !== to && CITY_AREAS.has(from) && CITY_AREAS.has(to);
 }
-const normalMeetingCount = (st, place) => travelFatigue(st.lastPlace, place) ? 2 : 3;
+/* 場ごとの面会人数。荒事の場は人の出入りが多く、格式のある場は通される相手が限られる。
+   短気な者の枠は常に1つなので、人数が増えるほどその偏りは薄まる ―― 短気な25名は
+   佐幕36%・抗戦56%・公武4%・雄藩4%・開国0% で、名簿の均等（各20%）を壊していた。
+   合計は 3+2+3+2+4+4=18 で、全場3名だった頃（6×3=18）と変えていない。 */
+const PLACE_SEATS = [3, 2, 3, 2, 4, 4];
+const normalMeetingCount = (st, place) => Math.max(2,
+  (place == null ? 3 : PLACE_SEATS[place]) - (travelFatigue(st.lastPlace, place) ? 1 : 0));
 
 /* --- 働きかけ -------------------------------------------------------------
    同じ「3枚当てる」を10ターン繰り返すと単調になる。そこで、相手への
@@ -2738,19 +2744,19 @@ function meetingList(st, place){
   const b = baseId(st);
   const taken = new Set(), normal = [];
   const free = id => !taken.has(id) && !st.contacts.includes(id) && !st.banned.includes(id);
-  /* 場が縛るのは3枠のうち1枠だけ。強く縛ると「毎ターン目当ての勢力を引ける」
-     ようになり、誰と会えるかの制約が消えてしまう。荒事の場はもう1枠を短気な者に充てる。 */
+  /* 枠の役目は 0=場の好み 1=出自の縁 2=荒事なら短気な者 3=自由。
+     人数が少ない場でも 0 と 1 は残るので、場の性格と出自はどこでも効く。
+     強く縛ると「毎ターン目当ての勢力を引ける」ようになるため、縛るのは前の枠だけ。 */
   const warm = new Set((ORIGINS[st.origin ?? 0] || ORIGINS[0]).warm);
   const suits = (id, slot) => {
-    /* 三枠目は出自の縁で寄ってくる者。旅疲れの日は枠ごと消える（自分の縁を辿る暇がない）。 */
-    if (slot === 2 && !warm.has(voiceOf(id))) return false;
+    if (slot === 1 && !warm.has(voiceOf(id))) return false;   /* 出自の縁 */
     if (!pl) return true;
     if (pl.minRank != null && rankOfId(id) < pl.minRank) return false;
     if (slot === 0) return CHAR_BY_ID.get(id).factions.some(f => pl.favor.includes(f));
-    if (slot === 1 && pl.hot) return HOTHEADS.has(id);
-    return true;
+    if (slot === 2 && pl.hot) return HOTHEADS.has(id);
+    return true;                                              /* 4枠目は自由 */
   };
-  [b, b + 37, b + 73].slice(0, normalMeetingCount(st, place)).forEach((raw, slot) => {
+  [b, b + 37, b + 73, b + 109].slice(0, normalMeetingCount(st, place)).forEach((raw, slot) => {
     const r = raw > ROSTER ? raw - ROSTER : raw;
     let id = rankOfId(r) > era ? (r % 30) + 1 : r;   // ランク補正（強制変換）
     /* 条件を満たす者を全部集めてから、基点IDで選ぶ。
@@ -3447,7 +3453,7 @@ function replay(seed, actions, interludeChoices, origin){
   return { state: st, reports };
 }
 function encodeSave(st){
-  return 'IR7:' + st.seed + ':' + (st.origin ?? 0) + ':' + st.actions
+  return 'IR8:' + st.seed + ':' + (st.origin ?? 0) + ':' + st.actions
     .map(a => [a.charId, a.stance === 'support' ? 0 : 1, a.ownF, a.argueF, a.cards.join(''),
                a.probed ? 1 : 0, a.approach ?? 0, a.place ?? ''].join(',')
               + (a.duel != null ? ',' + a.duel : ''))
@@ -3460,9 +3466,9 @@ function encodeSave(st){
 }
 function decodeSave(code){
   const s = String(code).trim();
-  /* IR7 で面会候補の選び方を直した（勢力の偏りを取った）。同じ seed と同じ手順でも
+  /* IR8 で場ごとの面会人数と枠の役目を変えた。同じ seed と同じ手順でも
      出てくる顔ぶれが変わるので、旧版は黙って読まずに断る。 */
-  if (!/^IR7:/.test(s)) throw new Error(/^IR[1-6]:/.test(s)
+  if (!/^IR8:/.test(s)) throw new Error(/^IR[1-7]:/.test(s)
     ? '旧版の保存コードです。面会候補の選び方が変わったため、同じ手順でも顔ぶれが変わります'
     : 'コードの形式が違います');
   const parts = s.slice(4).split(':');
@@ -3506,7 +3512,7 @@ const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_B
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, GESTURES, gestureOf, SCENE_SAYS, SCENE_ORDER, SCENE_KEYS, sceneOf, sceneSayOf, ORIGINS, RECEPTIONS, receptionKind, receptionOf, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
-  PLACES, placeAllows, placesOpen, visitOf, VISIT_TURN, VISIT_RATE, VISIT_SAYS, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
+  PLACES, PLACE_SEATS, placeAllows, placesOpen, visitOf, VISIT_TURN, VISIT_RATE, VISIT_SAYS, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
   playerStanding, playerEpilogue, encodeSave, decodeSave, hashState };
@@ -3818,7 +3824,7 @@ function viewTitle(){
       <div class="row"><button class="primary" id="start-guide">ガイド付きで開始</button><button id="start-normal">通常どおり開始</button></div>
     </div>` : ''}
     <details class="detail"><summary>保存コードから再開する</summary>
-      <textarea id="code" placeholder="IR7:1868:0:47,0,2,2,053,0;...#0.1"></textarea>
+      <textarea id="code" placeholder="IR8:1868:0:47,0,2,2,053,0;...#0.1"></textarea>
       <div class="row"><button id="load">再開する</button></div>
       <div id="err" class="warn"></div>
       <div class="small" style="margin-top:6px;opacity:.8">同じ seed と同じ選択なら、盤面は必ず同じになります（完全リプレイ可能）。</div>
@@ -3919,8 +3925,11 @@ function viewMeeting(){
   const pl = E.PLACES[ui.place];
   const fatigue = E.travelFatigue(st.lastPlace, ui.place);
   const from = st.lastPlace == null ? null : E.PLACES[st.lastPlace];
+  const seats = E.PLACE_SEATS[ui.place], shown = E.normalMeetingCount(st, ui.place);
   const travelNote = fatigue
-    ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。ここで会う相手を選ぶと、通常の面会候補は3名から2名になります。</div>`
+    ? (shown < seats
+      ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。ここで会う相手を選ぶと、通常の面会候補は${seats}名から${shown}名になります。</div>`
+      : `<div class="travel-note safe"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移りますが、ここはもともと${seats}名しか通されないため候補は減りません。</div>`)
     : pl.where === '街道'
       ? `<div class="travel-note safe"><b>街道を中継：</b>今夜はここで面会します。次に京・江戸・長崎へ入るときは旅疲れを受けません。</div>`
       : from?.where === '街道'
@@ -3956,11 +3965,12 @@ function viewMeeting(){
         <div class="chiprow">${openPlaces.map(i => {
           const q = E.PLACES[i];
           const tired = E.travelFatigue(st.lastPlace, i);
+          const n = E.normalMeetingCount(st, i);
           return `<button class="placechip ${i === ui.place ? 'on' : ''}" data-place="${i}"${
             q.hot ? ' data-hot="1"' : ''}><span class="nm">${esc(q.name)}</span>
             <span class="small">${q.favor.map(f => `<span class="${fac(f).cls}">${fac(f).name}</span>`).join('・')}${
-              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}</span>${
-              tired ? '<span class="travel">遠路・通常候補 −1</span>' : ''}</button>`;
+              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}・候補${n}名</span>${
+              tired && n < E.PLACE_SEATS[i] ? '<span class="travel">遠路・候補 −1</span>' : ''}</button>`;
         }).join('')}</div>
         ${lockedPlaces.length ? `<div class="small locked">${lockedPlaces.map(i =>
           `${esc(E.PLACES[i].name)}（${i === st.lastPlace ? '昨日も通った'
