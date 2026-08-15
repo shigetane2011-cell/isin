@@ -3188,6 +3188,14 @@ function resolve(st, action){
   const placeFits = action.place != null && PLACES[action.place].boost === approach;
   if (gain > 0 && !partial && (fits || placeFits)) gain += 1;
 
+  /* 転向が通った褒美。満点でしか通らず、外せば決裂とランク罰を負うのに、
+     獲得が支持と同額（相手の勢力を2削るだけ）では賭ける理由がなかった。
+     方針を固定した自動対局で、転向を狙う打ち方は勝率32%と最も弱く、
+     安全な「論じる支持のみ」49%・「型が合えば肚を割る」64%に負けていた。
+     +2 にすると 58% になり、三つの打ち方が 49/64/58 に散って支配的な手が消える。
+     ×1.5（67%）や ×2（83%）では今度は転向一辺倒になる。 */
+  if (allOrNothing && gain > 0) gain += 2;
+
   /* 探った代償: その交渉で得られる時勢が1下がる（最低1）。
      元の獲得が大きい大物ほど、相対的な代償は軽く済む。 */
   const gainBeforeProbe = gain;
@@ -3965,15 +3973,17 @@ function viewStance(){
         ${wb2 >= 0 && E.vouchOf(st, ui.charId) < 0
           ? `<div class="warn">この人物は、あなたが掲げる〔${fac(wb2).name}〕を警戒している。判定が一段下がる。</div>` : ''}
         <div class="row">
-          <button class="primary" data-stance="support">支持する<span class="small">（${fac(ui.ownF).name}を伸ばす）</span></button>
-          <button data-stance="convert" ${guidedTurn() ? 'disabled' : ''}>論破して転向させる<span class="small">（別の思想に引き込む）</span></button>
+          <button class="primary" data-stance="support">支持する<span class="small">（${fac(ui.ownF).name}を伸ばす・2枚一致でも通る）</span></button>
+          <button data-stance="convert" ${guidedTurn() ? 'disabled' : ''}>論破して転向させる<span class="small">（満点のみ・獲得<b>+2</b>と相手の勢力−2）</span></button>
         </div>
         ${E.HOTHEADS.has(ui.charId) ? '<div class="warn">この者は気が短い。<b>転向を仕掛ければ必ず刃が出る</b>。支持でも、通らなければ怒らせる。</div>' : ''}
         <details class="detail"><summary>支持と転向のちがい</summary>
           <div class="small"><b>支持</b>は一段下でも通る（さらに一段下なら「手応え」で時勢が1だけ動く）。
           だが伸びるのは相手の勢力〔${fac(ui.ownF).name}〕。<br>
-          <b>転向</b>は攻撃。<b>満点でしか通らない</b>全か無かの賭けだが、通れば自分の掲げる勢力が伸び、相手の勢力を削れる。
-          一段でも下がれば通らないので、警戒や読み違えがあると札が刺さっても届かない。</div>
+          <b>転向</b>は攻撃。<b>満点でしか通らない</b>全か無かの賭けだが、通れば<b>支持より2多く</b>自分の掲げる勢力が伸び、相手の勢力を2削れる。
+          一段でも下がれば通らないので、警戒や読み違えがあると札が刺さっても届かない。<br>
+          <b>安全な手が一番得とは限りません。</b>方針を固定した自動対局では、論じる支持だけで通す打ち方が最も弱く、
+          型の合う相手に肚を割る打ち方が最も強くなります。</div>
         </details>`;
     } else if (ui.stance === 'convert' && ui.argueF === null) {
       body = `<p><b>転向</b>を狙います。どの思想に引き込みますか？</p>
@@ -4144,7 +4154,8 @@ function viewCards(){
           ? `<div class="warn">${steps.join('と')}で、<b>判定は${steps.length}段下がります</b>${
               vouched ? '' : ''}。</div>` : '';
         if (ui.stance !== 'convert') return stepHTML;
-        return `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。${
+        return `<div class="warn">転向は<b>満点でしか通りません</b>。この働きかけで置くのは${nCards}枚、そのすべてが刺さって満点です。
+          通れば<b>獲得+2</b>と相手の勢力−2が付きます。${
           ui.approach >= 2 ? `<br>さらに<b>${esc(E.APPROACHES[ui.approach].name)}は相手を読み切った前提の賭け</b>です。
           <b>この人物が欲しているもの</b>を読み違えていれば一段下がり、
           置いた札が刺さっていても転向には届きません。` : ''}${

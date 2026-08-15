@@ -256,7 +256,15 @@ ok(probe(1, 1, 'support', 0, 0).gain === 0 && probe(1, 1, 'support', 0, 0).banne
 const pre = probe(1, 145, 'support', 1, 3);
 ok(pre.premature && pre.gain === 4, '初級期に伝説級 → 時期尚早でボーナス無効（+4のまま）');
 const cv3 = atEra(8, 1, 3, 'convert', 4), cv2 = atEra(8, 1, 2, 'convert', 4);
-ok(cv3.delta[4] === 4 && cv3.delta[0] === -2, '転向・3枚一致 → 主張属性+4 / 相手属性-2');
+/* 転向は満点でしか通らず外せば決裂を負うのに、獲得が支持と同額では賭ける理由がない。
+   方針を固定した自動対局で、転向を狙う打ち方は32%と最も弱かった（安全策49%・肚を割る64%）。
+   +2 で58%になり、三つの打ち方が散って支配的な手が消える。 */
+ok(cv3.delta[4] === 6 && cv3.delta[0] === -2,
+   '転向・3枚一致 → 主張属性+6（支持の+4より2多い）/ 相手属性-2');
+{
+  const sup3 = atEra(8, 1, 3, 'support', 4);
+  ok(cv3.gain - sup3.gain === 2, '転向の褒美は、同じ札運びの支持よりちょうど2多い');
+}
 ok(cv2.gain === 0 && cv2.delta.every(v => v === 0), '転向・2枚一致 → 通らない（全か無かの賭け）');
 ok(cv2.contactAdded === false, '転向・2枚一致では人脈にも加わらない');
 ok(atEra(8, 1, 2, 'support', 0).gain === 2, '支持・2枚一致は通る（転向とは非対称）');
