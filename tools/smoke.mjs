@@ -80,8 +80,13 @@ await p.screenshot({ path: shot('02-meeting.png'), fullPage: true });
 /* 1人目を選ぶ → 支持 → カード3枚 */
 await p.click('.person[data-id]');
 await p.waitForSelector('[data-stance], [data-own]');
+/* 相手を調べる: 観る（一項目が読める）と訊く（一項目が二択になる）を一度ずつ */
+await p.click('[data-see]');
+if (!(await p.$$eval('.gest', e => e.length))) errs.push('「観る」で所作が出ない');
+if (await p.$$eval('[data-see]', e => e.length)) errs.push('「観る」を使ったあとも別の項目を観られる');
 /* 通常の問いは正解を出さず、不正解を一つだけ除外する */
 await p.click('[data-ask]');
+if (await p.$$eval('[data-ask]', e => e.length)) errs.push('「訊く」を使ったあとも別の項目を訊ける');
 if (!(await p.$$eval('.say', e => e.map(x => x.textContent).join('\n')).then(t => t.includes('残り二択'))))
   errs.push('通常の問いで「残り二択」と表示されない');
 if (await p.$('[data-own]')) await p.click('[data-own]');

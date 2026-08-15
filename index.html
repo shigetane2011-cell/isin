@@ -278,7 +278,12 @@ button.primary .small{color:inherit;opacity:.82}
 .say{border-left:3px solid var(--ai);background:#fff;padding:9px 13px;margin:9px 0;font-size:.9rem}
 .say .q{font-size:.78rem;color:var(--ai);letter-spacing:.06em}
 .gest{border-left:3px solid var(--kin);background:#fffdf6;padding:7px 12px;margin:6px 0;font-size:.88rem}
-.gest .gcat{display:inline-block;min-width:5.2em;font-size:.72rem;letter-spacing:.1em;color:var(--kin);font-weight:600}
+.probe-table{margin:6px 0 10px}
+.prow{border-bottom:1px solid var(--line);padding:8px 0}
+.prow:last-child{border-bottom:none}
+.phead{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.phead .small{opacity:.7}
+.pacts{display:flex;gap:6px;margin-top:5px}
 .origin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin:8px 0}
 .origin{border:1px solid var(--line);background:#fff;padding:10px 12px;cursor:pointer}
 .origin:hover{border-color:var(--kin)}
@@ -1278,7 +1283,7 @@ const ENDINGS = {
 
 
 /* --- 対話（チップ式） ----------------------------------------------------
-   面会した相手には、踏み込んだ問いを **一つだけ** ぶつけられる。
+   面会した相手を調べる手は、**観る**と**訊く**を一度ずつ。
    通常の返答は「刺さらない型」を一つ否定し、対応するカードを三択から除外する。
    正解そのものは明かさず、残った二択を人物描写から読む余地を残す。
    その者の時勢観は、問わずとも情勢描写の下に出る（雰囲気のためのもので、手がかりではない）。
@@ -1665,16 +1670,16 @@ const SCENE_SAYS = {
 /* ブロックの並び。scene=情景 tie=札 open=開口一番 recv=迎えられ方
    sit=情勢の一言 world=世間話 gest=所作 chips=対話 */
 const SCENE_ORDER = {
-  blade:    ['scene','tie','open','gest','chips'],
-  escort:   ['scene','tie','recv','open','gest','sit','chips'],
-  revisit:  ['scene','tie','open','sit','gest','chips'],
-  challenge:['scene','tie','open','recv','gest','chips'],
-  haste:    ['scene','open','gest','chips'],
+  blade:    ['scene','tie','open','chips'],
+  escort:   ['scene','tie','recv','open','sit','chips'],
+  revisit:  ['scene','tie','open','sit','chips'],
+  challenge:['scene','tie','open','recv','chips'],
+  haste:    ['scene','open','chips'],
   /* 並の面会も一種類ではない。町人・女の座は雑談から、武家・公家の座は作法から入る。
      人物の語り口で決まるので、同じ相手はいつも同じ迎え方をする ―― それが人物像になる。 */
-  parlor:   ['scene','tie','recv','open','world','gest','sit','chips'],
-  formal:   ['scene','tie','open','recv','sit','gest','chips'],
-  plain:    ['scene','tie','open','recv','sit','world','gest','chips'],
+  parlor:   ['scene','tie','recv','open','world','sit','chips'],
+  formal:   ['scene','tie','open','recv','sit','chips'],
+  plain:    ['scene','tie','open','recv','sit','world','chips'],
 };
 const SCENE_KEYS = Object.keys(SCENE_ORDER);
 function sceneOf(st, charId, place){
@@ -3442,7 +3447,7 @@ let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
            place:null, picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
            interludeStandingBefore:null, interludeStandingAfter:null,
-           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null, originDraft:0 };
+           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null, originDraft:0, observed:null };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fac = i => E.FACTIONS[i];
@@ -3692,7 +3697,9 @@ function viewTitle(){
       <ol style="padding-left:1.2em;margin:6px 0">
         <li><b>どこへ行き、誰に会うか</b>を決める。場によって集まる者と、できる働きかけが変わります。
           京・江戸・長崎を直行した日は旅疲れで面会候補が1名減り、夜の街道を挟めば減りません。</li>
-        <li><b>対話</b>で相手を読む。踏み込んだ問いを一つ選ぶと、不正解が一つ消えて二択になります。全てを聞き出せる奥の手は一局に一度です。</li>
+        <li><b>相手を調べる</b>。3項目のうち、<b>観る</b>（その項目の所作が読める）と<b>訊く</b>（その項目の不正解が一つ消えて二択になる）を<b>一度ずつ</b>。
+          同じ項目に重ねれば一つを確実にでき、散らせば二つを半分ずつ掴めます。残りは紹介文から読むしかありません。
+          三項目とも開ける奥の手は一局に一度で、その交渉の獲得が1下がります。</li>
         <li><b>支持</b>するか、<b>論破して転向</b>させるかを決める。</li>
         <li><b>働きかけ</b>を選び、<b>論証カード</b>を組む。</li>
       </ol>
@@ -3705,7 +3712,10 @@ function viewTitle(){
       <b>転向</b>は攻撃なので<b>満点でしか通りません</b> ― 一段でも下がれば、札が刺さっていても届きません。</p>
       <p class="small"><b>旗色を鮮明にするほど、敵対する勢力の人物は耳を貸さなくなります</b>
       （いずれかの時勢が12以上で、対立勢力の人物は判定が一段下がる）。寄せ切るか、抑えて回るかが最大の判断です。</p>
-      <p class="small">面会した相手には<b>踏み込んだ問いを一つだけ</b>ぶつけられます。返答から、その項目の<b>不正解が一つ消えて二択</b>になります。
+      <p class="small">相手を調べる手は<b>面会ごとに二つ</b>です。<b>観る</b>はその項目の所作を読ませ（ほぼ正解に届く）、
+      <b>訊く</b>はその項目の不正解を一つ消して二択にします。<b>どちらも一度きり</b>なので、
+      同じ項目に重ねて一つを確実にするか、散らして二つを半分ずつ掴むかを選ぶことになります。
+      調べなかった項目は<b>紹介文と情景から推し量る</b>しかありません。<br>
       読み切れないときは<b>一局に一度だけの「さらに聞き出す」</b>で3つとも開けられますが、
       <b>その交渉の獲得が1下がります</b>。誰にこの奥の手を切るかも判断です。</p>
       <p class="small"><b>時代のうねり</b>：どの勢力を伸ばしても合計値は高まり、より高位の人物が現れます。
@@ -3895,7 +3905,7 @@ function viewMeeting(){
     if (el.dataset.id === undefined) return;
     ui.charId = +el.dataset.id; ui.intro = el.classList.contains('intro');
     ui.stance = null; ui.ownF = null; ui.argueF = null;
-    ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null;
+    ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null; ui.observed = null;
     ui.screen = 'stance'; render();
   });
 }
@@ -4005,30 +4015,32 @@ function viewStance(){
     }
   }
   const wb0 = E.waryOf(st.currents, ui.charId);
-  const said = [];
-  /* 通常の一問は不正解を一つ除外するだけ。奥の手と練習だけは三つの正解を開く。 */
-  if (ui.probed || guidedTurn()) {
-    for (const i of [0,1,2]) said.push(dialogueReplyHTML(c, i, true));
-  } else if (ui.asked !== null) {
-    said.push(dialogueReplyHTML(c, ui.asked, false));
-  }
 
-  const gestures = `
-    <div class="slot-h">所作 <span style="opacity:.7">— 相手の振る舞いが、そのまま三枚の手掛かりになる</span></div>
-    ${E.CATS.map((cat, i) => `<div class="gest"><span class="gcat">${esc(cat.name)}</span>${
-      esc(E.gestureOf(ui.charId, i))}</div>`).join('')}`;
-
+  /* 三項目とも並べて見せたら、読む仕事が消えて誰でも当たる（実測で勝率100%）。
+     手掛かりの量ではなく「どこを調べるか」を選ばせるのが釣り合いの取れる形だった。
+     観る＝一項目が読める／訊く＝一項目が二択になる／奥の手＝三項目とも開く。
+     どれも一度きりなので、狙いを一点に寄せるか散らすかが毎回の判断になる。 */
+  const open = ui.probed || guidedTurn();
   const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
-    <div class="slot-h">対話 <span style="opacity:.7">— 問いを一つ選ぶと<b>不正解が一つ消える</b>。奥の手は一局に一度</span></div>
-    <div class="row">
-      ${E.QUESTIONS.map((q, i) => (ui.probed || guidedTurn())
-        ? `<span class="chip used">${esc(q.chip)}</span>`
-        : ui.asked === i
-        ? `<span class="chip used">${esc(q.chip)}</span>`
-        : ui.asked !== null
-          ? `<span class="chip spent">${esc(q.chip)}</span>`
-          : `<button class="chip" data-ask="${i}">${esc(q.chip)}</button>`).join('')}
+    <div class="slot-h">相手を調べる <span style="opacity:.7">— <b>観る</b>と<b>訊く</b>を一度ずつ。同じ項目に重ねてもよい</span></div>
+    <div class="probe-table">
+      ${E.CATS.map((cat, i) => {
+        const seen = open || ui.observed === i, asked = open || ui.asked === i;
+        return `<div class="prow">
+          <div class="phead"><b>${i+1}. ${esc(cat.name)}</b><span class="small">${esc(cat.hint)}</span></div>
+          <div class="pacts">
+            ${seen ? '<span class="chip used">観た</span>'
+              : ui.observed !== null ? '<span class="chip spent">観る</span>'
+              : `<button class="chip" data-see="${i}">観る</button>`}
+            ${asked ? '<span class="chip used">訊いた</span>'
+              : ui.asked !== null ? '<span class="chip spent">訊く</span>'
+              : `<button class="chip" data-ask="${i}">訊く</button>`}
+          </div>
+          ${seen ? `<div class="gest">${esc(E.gestureOf(ui.charId, i))}</div>` : ''}
+          ${asked ? dialogueReplyHTML(c, i, open) : ''}
+        </div>`;
+      }).join('')}
     </div>
     <div class="row">
       ${guidedTurn()
@@ -4036,10 +4048,9 @@ function viewStance(){
         : ui.probed
         ? '<span class="probed">◎ 奥の手で残らず聞き出した — この交渉の獲得は 1 下がる</span>'
         : probeLeft > 0
-          ? `<button class="probe" id="probe">さらに聞き出す<span class="small">（一局に一度の奥の手・この交渉の獲得 −1）</span></button>`
+          ? `<button class="probe" id="probe">さらに聞き出す<span class="small">（一局に一度の奥の手・三項目とも開く・この交渉の獲得 −1）</span></button>`
           : '<span class="probed" style="opacity:.6">この一局の奥の手は、すでに使った</span>'}
     </div>
-    ${said.join('')}
     ${(() => {
       const n = E.NOTES.get(ui.charId);
       if (!n) return '';
@@ -4073,11 +4084,10 @@ function viewStance(){
     sit:   () => sit ? `<div class="opening sit">「── ${esc(sit.text)}」</div>` : '',
     world: () => `<div class="say worldview">${
         esc(E.SMALLTALK[0].lines[ui.ownF ?? c.factions[0]][E.TONE_OF_VOICE[E.voiceOf(ui.charId)]])}</div>`,
-    gest:  () => gestures,
     chips: () => chips,
   };
   const order = E.SCENE_ORDER[E.sceneOf(st, ui.charId, ui.place)];
-  const descAt = order.indexOf('gest');   /* 人物紹介は所作の直前に挟む */
+  const descAt = order.indexOf('chips');  /* 人物紹介は「調べる」の直前に挟む */
   app.innerHTML = headerHTML() + characterVisualHTML(c, true) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       ${order.slice(0, descAt).map(k => BLOCK[k]()).join('')}
@@ -4086,6 +4096,7 @@ function viewStance(){
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
   app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
+  app.querySelectorAll('[data-see]').forEach(b => b.onclick = () => { ui.observed = +b.dataset.see; render(); });
   const pb0 = document.getElementById('probe');
   if (pb0) pb0.onclick = () => { ui.probed = true; render(); };
   app.querySelectorAll('[data-own]').forEach(b => b.onclick = () => { ui.ownF = +b.dataset.own; render(); });
@@ -4136,7 +4147,8 @@ function viewCards(){
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.7">〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。</div>' : ''}
-        <div class="slot-gest">${esc(E.gestureOf(ui.charId, i))}</div>
+        ${ui.observed === i || ui.probed || guided
+          ? `<div class="slot-gest">${esc(E.gestureOf(ui.charId, i))}</div>` : ''}
         <div class="card-grid">${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
           const isAns = (ui.probed || guided) && isCorrect;

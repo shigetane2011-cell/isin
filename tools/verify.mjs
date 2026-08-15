@@ -105,9 +105,12 @@ ok(html.includes('奥の手 残り') && html.includes('一局に一度の奥の�
    '全開示を通常手順ではなく、一度きりの奥の手として示す');
 ok(html.includes('× 本人が否定した') && html.includes('ruled-out') && html.includes('残り二択'),
    '通常の問いは不正解カードを一枚だけ除外して二択にする');
-ok(html.includes('<div class="slot-h">所作') && html.includes('slot-gest')
+ok(html.includes('data-see=') && html.includes('相手を調べる')
    && (html.match(/E\.gestureOf\(ui\.charId, i\)/g) || []).length === 2,
-   '所作を面会画面と札の画面の両方に出す（手掛かりと選択肢を隣り合わせる）');
+   '所作は「観た」項目にだけ出す（面会画面と札の画面の両方）');
+ok(html.includes('ui.observed === i || ui.probed || guided')
+   && html.includes("ui.observed !== null ? '<span class=\"chip spent\">観る</span>'"),
+   '観るは一面会に一度だけで、使うと残りの項目には使えない');
 ok(!/探り[：:で]/.test(html),
    '一枚の除外を「探り」と呼んでいない（探り＝一局に一度の奥の手）');
 ok(html.includes('resultReactionHTML(c, r)') && html.includes('counterpart-reaction')
@@ -636,8 +639,8 @@ ok(E.SMALLTALK.every(t => t.lines.length === 5), '世間話が5勢力すべて�
     ok(keys.length === 8, `面会の入り口が8通りある（${keys.length}）`);
     ok(new Set(keys.map(k => E.SCENE_ORDER[k].join('>'))).size === keys.length,
        '8通りの並びが互いに違う（同じ形が二つない）');
-    ok(keys.every(k => E.SCENE_ORDER[k].includes('gest') && E.SCENE_ORDER[k].includes('chips')),
-       'どの入り口でも、所作と対話だけは必ず出る（手掛かりを落とさない）');
+    ok(keys.every(k => E.SCENE_ORDER[k].includes('chips')),
+       'どの入り口でも「相手を調べる」だけは必ず出る（手掛かりを落とさない）');
     /* 画面側の組み立て表に無い名前を並べると、そのブロックが黙って消える */
     const known = new Set((html.match(/\n    (\w+):\s+\(\) =>/g) || [])
       .map(x => x.trim().replace(/:.*/, '')));
