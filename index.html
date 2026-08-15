@@ -22,8 +22,8 @@
 <style>
 :root{
   --washi:#ece2cf; --washi2:#f6f0e1; --sumi:#1b1815; --sumi2:#3b342c;
-  --shu:#b0272d; --ai:#22384e; --kin:#a8853a; --line:#c9bca1;
-  --kobu:#6f4a8e; --kaikoku:#2c6f9c; --sabaku:#3f704d; --yuhan:#b17b24; --kosen:#a73732;
+  --shu:#b0272d; --ai:#22384e; --kin:#7d5c20; --line:#c9bca1;
+  --kobu:#6f4a8e; --kaikoku:#2c6f9c; --sabaku:#3f704d; --yuhan:#8d5f17; --kosen:#a73732;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -93,6 +93,18 @@ pre.chart .u{color:var(--shu);font-weight:700}
 .route-card .need{float:right;font-weight:700;color:var(--shu)}
 .route-card.reached .need{color:var(--sabaku)}
 .route-card .rule{display:block;color:var(--sumi2);font-size:.72rem;margin-top:2px}
+.chart-panel.compact{padding-top:11px;padding-bottom:10px}
+.chart-panel.compact h2{margin-bottom:6px}
+.chart-glance{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-bottom:7px;
+  color:var(--sumi2);font-size:.75rem}
+.chart-glance .heat{font-weight:700;color:var(--shu);margin-right:2px}
+.chart-glance .score{white-space:nowrap;font-weight:600}
+.chart-panel.compact .route-guide{margin-top:6px}
+.chart-panel.compact .route-card{padding-top:7px;padding-bottom:7px}
+.chart-more{margin-top:7px}
+.chart-more>summary{font-weight:600}
+.chart-more .chart{margin-top:7px}
+.chart-ledger{margin-top:7px;padding-top:7px;border-top:1px dotted var(--line)}
 .f-kobu{color:var(--kobu)}.f-kaikoku{color:var(--kaikoku)}.f-sabaku{color:var(--sabaku)}
 .f-yuhan{color:var(--yuhan)}.f-kosen{color:var(--kosen)}
 .faction-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:12px 0 4px;font-size:.78rem}
@@ -182,7 +194,9 @@ button.choice:disabled{background:var(--washi2);color:var(--sumi2)}
 .placechip .nm{font-weight:600}
 .placechip .small{display:block;opacity:.85;font-size:.72rem;margin-top:1px}
 .placechip .travel{display:block;color:var(--shu);font-size:.68rem;font-weight:700;margin-top:2px}
-.placechip.on{background:var(--sumi);color:var(--washi2);border-color:var(--sumi)}
+.placechip.on{background:var(--sumi);color:var(--washi2);border-color:var(--sumi);
+  box-shadow:inset 0 0 0 2px rgba(255,253,247,.48)}
+.placechip.on .nm::before{content:'✓ ';color:#fff}
 .placechip.on .small span{color:var(--washi2)}
 .placechip.on .travel{color:#ffd9cc}
 .placebar .locked{margin-top:6px;opacity:.5}
@@ -231,6 +245,10 @@ button.primary .small{color:inherit;opacity:.82}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .card{border:1px solid var(--line);background:var(--washi2);padding:10px 12px;margin:7px 0;cursor:pointer;
   font-size:.88rem;border-radius:2px;transition:.1s}
+.card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:7px}
+.card-grid .card{height:100%;margin:0;line-height:1.6}
+.approach-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
+.approach-grid .choice{height:100%;margin:0}
 .card:hover{border-color:var(--sumi2)}
 .card.sel{border-color:var(--ai);border-left:5px solid var(--ai);background:#fff}
 .chip{font-size:.8rem;padding:5px 14px;border-radius:14px;border-color:var(--ai);color:var(--ai)}
@@ -303,6 +321,9 @@ button.primary .small{color:inherit;opacity:.82}
 .portrait-source{position:absolute;z-index:5;right:12px;top:10px;max-width:52%;padding:3px 8px;
   color:#fff;background:rgba(27,24,21,.72);border:1px solid rgba(255,253,247,.55);border-radius:2px;
   font-size:.66rem;line-height:1.45;letter-spacing:.04em;text-shadow:0 1px 1px rgba(27,24,21,.55)}
+.story-visual.compact-person-visual{height:180px;aspect-ratio:auto;margin-bottom:12px}
+.portrait-stage.compact-person-visual{height:200px;aspect-ratio:auto;margin-bottom:12px}
+.compact-person-visual .visual-key span{padding:2px 8px}
 .small{font-size:.76rem;color:var(--sumi2)}
 code.seed{font-family:monospace;background:#fff;border:1px solid var(--line);padding:1px 6px}
 textarea{width:100%;font-family:monospace;font-size:.72rem;height:70px;border:1px solid var(--line);padding:6px;background:#fff}
@@ -323,6 +344,10 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .portrait-stage .visual-key{right:9px;bottom:8px}
   .portrait-source{right:9px;top:8px;max-width:44%;font-size:.59rem}
   .route-guide{grid-template-columns:1fr}
+  .chart-glance{gap:3px 8px}
+  .story-visual.compact-person-visual{height:135px}
+  .portrait-stage.compact-person-visual{height:160px}
+  .approach-grid,.card-grid{grid-template-columns:1fr}
   .interlude-figure{align-items:flex-start}
 }
 </style>
@@ -2848,23 +2873,24 @@ function storyVisualHTML(srcs, factions, alt, extraClass, eager){
     <div class="visual-images ${srcs.length > 1 ? 'split' : ''}">${imgs}</div>${keys}
   </figure>`;
 }
-function meetingVisualHTML(c){
+function meetingVisualHTML(c, compact){
   const fs = ui.ownF === null ? c.factions.slice() : [ui.ownF];
+  const sizeClass = compact ? ' compact-person-visual' : '';
   /* 本人の絵があればそれを出す。無い人物は勢力の情景で代える。 */
   const portrait = E.portraitOf(c.id);
   if (portrait)
-    return storyVisualHTML([portrait], fs, `${c.name} — ${c.nick}`, 'portrait-visual', false);
+    return storyVisualHTML([portrait], fs, `${c.name} — ${c.nick}`, `portrait-visual${sizeClass}`, false);
   const srcs = fs.map(f => `assets/factions/${fac(f).key}.webp`);
-  return storyVisualHTML(srcs, fs, `${c.name}が属する${fs.map(f => fac(f).full).join('と')}の情景`, 'faction-visual', false);
+  return storyVisualHTML(srcs, fs, `${c.name}が属する${fs.map(f => fac(f).full).join('と')}の情景`, `faction-visual${sizeClass}`, false);
 }
-function characterVisualHTML(c){
+function characterVisualHTML(c, compact){
   const portrait = E.PORTRAITS.get(c.id);
-  if (!portrait) return meetingVisualHTML(c);
+  if (!portrait) return meetingVisualHTML(c, compact);
   const fs = ui.ownF === null ? c.factions.slice() : [ui.ownF];
   const backdrops = fs.map(f => `<img src="assets/factions/${fac(f).key}.webp" alt="" loading="eager" decoding="async">`).join('');
   const keys = `<div class="visual-key">${fs.map(f =>
     `<span class="${fac(f).cls}" style="--key-rgb:${FACTION_RGB[f]}"><i aria-hidden="true"></i>${fac(f).name}</span>`).join('')}</div>`;
-  return `<figure class="portrait-stage" style="${toneStyle(fs)}" role="img" aria-label="${esc(c.name)}。${esc(portrait.basis)}">
+  return `<figure class="portrait-stage${compact ? ' compact-person-visual' : ''}" style="${toneStyle(fs)}" role="img" aria-label="${esc(c.name)}。${esc(portrait.basis)}">
     <div class="portrait-backdrop ${fs.length > 1 ? 'split' : ''}">${backdrops}</div>
     <img class="portrait-main" src="${portrait.src}" alt="" loading="eager" decoding="async">
     <div class="portrait-source" title="${esc(portrait.basis)}">創作彩色｜${esc(portrait.short)}</div>${keys}
@@ -2896,7 +2922,7 @@ function endingVisualHTML(e){
   return storyVisualHTML([`assets/endings/${file}.webp`], fs, `${e.t}――${label}が形づくった日本`, 'ending-visual', true);
 }
 
-function chartHTML(){
+function chartHTML(compact){
   const t = E.totalOf(st), era = E.ERAS[E.eraOfTotal(t)];
   const route = E.routeForecast(st.currents);
   const pair = route.combo.pair;
@@ -2911,7 +2937,20 @@ function chartHTML(){
   const list = st.contacts.length
     ? st.contacts.map(id => `<span class="pill">${esc(E.CHAR_BY_ID.get(id).name)}</span>`).join('')
     : '<span class="small">なし</span>';
-  return `<div class="panel"><h2>時勢チャート</h2><pre class="chart">${s.trimEnd()}</pre>
+  const foesHTML = foes.length
+    ? `<div class="small" style="margin-top:8px;color:var(--shu)">${foes.join('<br>')}</div>` : '';
+  const ledgerHTML = `<div class="chart-ledger"><div><span class="small">【獲得した人脈】</span> ${list}</div>
+    ${st.promises.length ? `<div style="margin-top:6px"><span class="small">【残した約束】</span> ${
+      st.promises.map(pm => `<span class="pill vow">${esc(E.CHAR_BY_ID.get(pm.id).name)}へ〔<span class="${
+        fac(pm.f).cls}">${fac(pm.f).name}</span>〕</span>`).join('')}</div>` : ''}
+    ${st.banned.length ? `<div style="margin-top:6px"><span class="small">【決裂・出現停止】</span> ${
+      st.banned.map(id=>`<span class="pill">${esc(E.CHAR_BY_ID.get(id).name)}</span>`).join('')}</div>` : ''}</div>`;
+  const detailHTML = `<pre class="chart">${s.trimEnd()}</pre>${foesHTML}${ledgerHTML}`;
+  const glanceHTML = `<div class="chart-glance" aria-label="現在の時勢">
+    <span class="heat">🔥 合計 ${pad(t)}・${era}</span>${E.FACTIONS.map((f,i) =>
+      `<span class="score ${f.cls}">${f.name} ${st.currents[i]}</span>`).join('')}</div>`;
+  return `<div class="panel chart-panel ${compact ? 'compact' : ''}"><h2>時勢チャート</h2>
+    ${compact ? glanceHTML : `<pre class="chart">${s.trimEnd()}</pre>`}
     <div class="route-guide" aria-label="エンディングへの進み具合">
       <div class="route-card combo ${comboReached ? 'reached' : ''}" style="--route-a:${FACTION_RGB[pair[0]]};--route-b:${FACTION_RGB[pair[1]]}">
         <span class="need">${comboReached ? '到達圏' : `あと${route.combo.need}`}</span>
@@ -2929,23 +2968,23 @@ function chartHTML(){
         <span class="rule">単独 ${route.solo.total} / ${E.GOAL}（30到達時はこちらが優先）</span>
       </div>
     </div>
-    ${foes.length ? `<div class="small" style="margin-top:8px;color:var(--shu)">${foes.join('<br>')}</div>` : ''}
-    <div style="margin-top:10px"><span class="small">【獲得した人脈】</span><br>${list}</div>
-    ${st.promises.length ? `<div style="margin-top:6px"><span class="small">【残した約束】</span> ${
-      st.promises.map(pm => `<span class="pill vow">${esc(E.CHAR_BY_ID.get(pm.id).name)}へ〔<span class="${
-        fac(pm.f).cls}">${fac(pm.f).name}</span>〕</span>`).join('')}</div>` : ''}
-    ${st.banned.length ? `<div style="margin-top:6px"><span class="small">【決裂・出現停止】</span> ${
-      st.banned.map(id=>`<span class="pill">${esc(E.CHAR_BY_ID.get(id).name)}</span>`).join('')}</div>` : ''}
+    ${compact
+      ? `<details class="detail chart-more"><summary>棒グラフ・人脈・約束を見る</summary>${detailHTML}</details>`
+      : `${foesHTML}${ledgerHTML}`}
   </div>`;
 }
 
 function headerHTML(){
+  const resultTurn = ui.screen === 'result' && ui.report ? st.actions.length : null;
+  const turnText = resultTurn !== null
+    ? `第 <b>${resultTurn}</b> ターンの結果${st.finished ? ' / 終局' : ` / 次は第 <b>${st.turn}</b> ターン`}`
+    : st.finished
+      ? '終局'
+      : `第 <b>${st.turn}</b> ターン / 残り <b>${E.MAX_TURN - st.turn + 1}</b>`;
   return `<header>
     <h1>維新の乱流<span class="sub">幕末、日本の夜明けを設計せよ</span></h1>
     <div class="meta">
-      <span>${st.finished
-        ? `全 <b>${E.MAX_TURN}</b> ターン 終了`
-        : `第 <b>${st.turn}</b> ターン / 残り <b>${E.MAX_TURN - st.turn + 1}</b>`}</span>
+      <span>${turnText}</span>
       <span>時代ランク <b>${E.ERAS[E.eraOf(st)]}</b></span>
       <span>聞き出し 残り <b>${E.PROBE_LIMIT - st.probesUsed}</b> / ${E.PROBE_LIMIT}</span>
     </div></header>`;
@@ -3099,11 +3138,11 @@ function viewMeeting(){
   const fatigue = E.travelFatigue(st.lastPlace, ui.place);
   const from = st.lastPlace == null ? null : E.PLACES[st.lastPlace];
   const travelNote = fatigue
-    ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移ったため旅疲れ。通常の面会候補が3名から2名になります。</div>`
+    ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。ここで会う相手を選ぶと、通常の面会候補は3名から2名になります。</div>`
     : pl.where === '街道'
-      ? `<div class="travel-note safe"><b>街道を中継：</b>今夜もここで面会できます。次に京・江戸・長崎へ入るときは旅疲れを受けません。</div>`
+      ? `<div class="travel-note safe"><b>街道を中継：</b>今夜はここで面会します。次に京・江戸・長崎へ入るときは旅疲れを受けません。</div>`
       : from?.where === '街道'
-        ? `<div class="travel-note safe"><b>街道経由：</b>道中を一晩かけたため、旅疲れなく${esc(pl.where)}へ入りました。</div>` : '';
+        ? `<div class="travel-note safe"><b>街道経由：</b>道中を一晩かけたため、旅疲れなく${esc(pl.where)}へ入れます。</div>` : '';
   const pfa = fac(pl.favor[0]).key, pfb = fac(pl.favor[pl.favor.length - 1]).key;
   const saidTies = new Set();          // 同じ画面で縁の台詞が重ならないように
   const card = (id, isIntro, isRevisit) => {
@@ -3128,10 +3167,10 @@ function viewMeeting(){
       <div class="desc">${isRevisit ? '[因縁] ' : isIntro ? '[人脈] ' : '[情勢] '}${esc(c.desc)}</div>
       ${again}${isRevisit ? '' : tie}${pre}${isRevisit ? '' : wary}${hot}</div>`;
   };
-  app.innerHTML = headerHTML() + chartHTML() +
+  app.innerHTML = headerHTML() + chartHTML(true) +
     `<div class="panel"><h2>どこへ行き、誰に会うか</h2>
       <div class="placebar">
-        <div class="small">行き先を選ぶと、下の面会候補もそのまま入れ替わります。都市間の直行は候補−1、街道を挟めば減りません。</div>
+        <div class="small">行き先を選ぶと、下の面会候補もそのまま入れ替わります。人物を選ぶまでは何度でも変更できます。都市間の直行は候補−1、街道を挟めば減りません。</div>
         <div class="chiprow">${openPlaces.map(i => {
           const q = E.PLACES[i];
           const tired = E.travelFatigue(st.lastPlace, i);
@@ -3146,7 +3185,7 @@ function viewMeeting(){
             : E.ERAS[E.PLACES[i].unlockEra] + 'から'}）`).join('　')}</div>` : ''}
       </div>
       <div class="here" style="--pf-a:var(--${pfa});--pf-b:var(--${pfb})">
-        <div><span class="lbl">現在地</span><span class="nm">${esc(pl.name)}</span><span class="tag">${esc(pl.where)}</span></div>
+        <div><span class="lbl">${st.lastPlace === null ? '最初の行き先' : '選択中の行き先'}</span><span class="nm">${esc(pl.name)}</span><span class="tag">${esc(pl.where)}</span></div>
         <div class="desc">${esc(pl.desc)}</div>
         <div class="small" style="margin-top:5px">使える働きかけ：${pl.allow.map(a => E.APPROACHES[a].name).join('・')}
           ／ ここで深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[pl.boost].name)}</span></div>
@@ -3194,7 +3233,7 @@ function viewInterlude(){
       ${interludeFigureHTML(iv)}
       <p>${esc(iv.scene)}</p>
       ${body}
-    </div>` + (picked === null ? '' : chartHTML());
+    </div>` + (picked === null ? '' : chartHTML(true));
   app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
     const i = +b.dataset.pick;
     st = E.applyInterlude(st, i); ui.interludePicked = i; render();
@@ -3251,7 +3290,7 @@ function viewStance(){
           esc(E.CATS[0].motives[knownMotive])}〕</span>。
           筋どおりなら <b>${esc(E.APPROACHES[impliedAp].name)}</b> が響きます
           <span style="opacity:.7">（そう見えて違う者もいます）</span></div>` : ''}
-        <div class="row" style="display:block">${E.APPROACHES.map((a, i) => {
+        <div class="approach-grid">${E.APPROACHES.map((a, i) => {
           const noGuide = guidedTurn() && i !== 0;
           const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
           const noConvert = ui.stance === 'convert' && !E.canConvert(i);
@@ -3324,7 +3363,7 @@ function viewStance(){
       : coachHTML('三', 'まずは支持と「論じる」で仕組みを覚える', '支持は<b>3枚中2枚一致でも成功</b>します。練習では転向と、論じる以外の働きかけを封じ、次の画面で正解と根拠を見ながら3枚を組みます。')
     : '';
 
-  app.innerHTML = headerHTML() + characterVisualHTML(c) +
+  app.innerHTML = headerHTML() + characterVisualHTML(c, true) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
       ${st.banned.includes(ui.charId)
         ? `<div class="tie bad"><span class="who">〔再訪〕</span>${esc(E.revisitSay(st, ui.charId))}
@@ -3391,7 +3430,7 @@ function viewCards(){
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.7">〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。</div>' : ''}
-        ${ui.opts[i].map(o => {
+        <div class="card-grid">${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
           const isAns = (ui.probed || guided) && isCorrect;
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
@@ -3399,7 +3438,7 @@ function viewCards(){
             isAns ? `<span class="mark">◎ ${guided ? '練習の正解' : 'これが刺さる'}</span> ` : ''
           }<span class="mv">〔${esc(E.CATS[i].motives[o.motive])}〕</span>${esc(o.text)}${
             guided && isCorrect ? tutorialReasonHTML(c, i) : ''}</div>`;
-        }).join('')}
+        }).join('')}</div>
       `).join('')}
       ${ready ? `<div class="slot-h">組み上がった論証（${Array.from(text).length} 字）</div>
         <div class="quote">「${esc(text)}」</div>` : ''}
@@ -3513,8 +3552,8 @@ function viewResult(){
         [...(E.TIE_GRAPH.get(r.charId) || [])].slice(0, 4).map(i => esc(E.CHAR_BY_ID.get(i).name)).join('・') || '縁者なし'
       }${(E.TIE_GRAPH.get(r.charId)?.size || 0) > 4 ? ' ほか' : ''} からの紹介が絶えた）</div>` : ''}
       <div class="small" style="margin-top:8px;opacity:.7">この論証は ${r.len} 字。次の面会者はこの数から導かれます。</div>
-    </div>` + chartHTML() +
-    `<div class="row"><button class="primary" id="next">${st.finished?'結末を見る':guidedResult?'第2ターンへ（通常進行）':'次のターンへ'}</button></div>`
+    </div>` + chartHTML(true) +
+    `<div class="row"><button class="primary" id="next">${st.finished?'結末を見る':guidedResult?'第2ターンへ（通常進行）':`第${st.turn}ターンへ`}</button></div>`
     + `<details class="detail savefold"><summary>この盤面を保存・共有する</summary>${saveBoxHTML()}</details>`;
   document.getElementById('next').onclick = () => {
     if (guidedResult) ui.guidedTutorial = false;
@@ -3625,7 +3664,7 @@ function render(){
   app.querySelectorAll('[role="button"]').forEach(el => el.onkeydown = e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
   });
-  app.insertAdjacentHTML('beforeend', CREDIT);
+  if (ui.screen === 'title' || ui.screen === 'ending') app.insertAdjacentHTML('beforeend', CREDIT);
   window.scrollTo(0,0);
 }
 render();

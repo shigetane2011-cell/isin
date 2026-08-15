@@ -64,7 +64,7 @@ ok(portraitURLs.every(url => existsSync(url) && statSync(url).size > 30_000),
 ok(portraitFiles.every(([id, file]) =>
    html.includes(`[${id},`) && html.includes(`assets/portraits/${file}`)),
    '8名のIDと肖像ファイルが画面定義に結び付いている');
-ok(html.includes('characterVisualHTML(c)') && html.includes('portraitThumbHTML(id)')
+ok(html.includes('characterVisualHTML(c, true)') && html.includes('portraitThumbHTML(id)')
    && html.includes('interludeFigureHTML(iv)'),
    '候補一覧・個別面会・幕間に肖像を表示する');
 ok(html.includes('本人と確定した写真はなく') && html.includes('キヨッソーネ肖像'),
@@ -76,6 +76,20 @@ ok(html.includes('class="route-guide"') && html.includes('通常ルート｜二�
    '複合と単独の二つの勝ち筋を、時勢チャートに常時表示する');
 ok(html.includes('遠路・通常候補 −1') && html.includes('class="travel-note'),
    '行き先の札と現在地の両方に旅疲れを表示する');
+
+head('1e. 一手の画面を縦に伸ばしすぎないか');
+ok(html.includes('chartHTML(true)') && html.includes('棒グラフ・人脈・約束を見る'),
+   '勝ち筋は残し、棒グラフと人脈を必要時だけ開く');
+ok(html.includes('class="approach-grid"') && html.includes('class="card-grid"'),
+   '働きかけと論証札を横に比較できる');
+ok(html.includes('compact-person-visual') && html.includes('characterVisualHTML(c, true)'),
+   '交渉中の人物・勢力画を短い帯にする');
+ok(html.includes('ターンの結果') && html.includes("`第${st.turn}ターンへ`"),
+   '結果ターンと次ターンの表記を分ける');
+ok(html.includes('選択中の行き先') && html.includes('人物を選ぶまでは何度でも変更できます'),
+   '移動確定前であることを明示する');
+ok(html.includes('--kin:#7d5c20') && html.includes('--yuhan:#8d5f17'),
+   '金色系の小さい文字を和紙上でも読める濃さにする');
 
 /* --- エンジン読み込み ---------------------------------------------------- */
 await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'));

@@ -9,10 +9,12 @@
    環境変数（任意）:
      CHROME_BIN  既存の Chromium を使う場合にその実行ファイルを指定する
      SP          スクリーンショットの出力先（既定はリポジトリ直下の .smoke/） */
-import { chromium } from 'playwright';
+import playwright from 'playwright';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { mkdir } from 'node:fs/promises';
+
+const { chromium } = playwright;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sp = process.env.SP || resolve(root, '.smoke');
