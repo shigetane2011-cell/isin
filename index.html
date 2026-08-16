@@ -3612,7 +3612,7 @@ let ui = { screen:'title', charId:null, stance:null, ownF:null, argueF:null,
            place:null, picks:[null,null,null], approach:null, probed:false, asked:null, chatted:[],
            tutorialDone:false, interludePicked:null, interludeData:null, duelAction:null,
            interludeStandingBefore:null, interludeStandingAfter:null,
-           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null, originDraft:0, observed:null };
+           opts:null, report:null, intro:false, guidedTutorial:false, seedDraft:null, originDraft:0, probe:{ see:null, ask:null, deep:null } };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fac = i => E.FACTIONS[i];
@@ -3637,6 +3637,29 @@ function markTutorialSeen(){
   catch { /* 保存できない環境でもゲームは続ける */ }
 }
 function guidedTurn(){ return !!(ui.guidedTutorial && st && st.turn === 1); }
+
+/* --- この手番で何を誰に使ったか -------------------------------------------
+   観る・訊く・奥の手は「面会ごとに一度」のはずだったが、人物を選び直すたびに
+   ui 側で戻していたため、同じ相手に何度でも使えてしまっていた。
+   奥の手はさらに悪く、st.probesUsed は交渉が成立して初めて増えるので、
+   全開示してから選び直せば、回数を払わずに候補全員の正解を覗けた。
+
+   使ったかどうかは手番に紐づけ、結果は「使った相手」にだけ出す。
+   相手を選び直しても札は戻らないが、別の相手に切り替えても代償は増えない
+   （奥の手の回数は交渉が成立したときにだけ引かれる）。 */
+const freshProbe = () => ({ see: null, ask: null, deep: null });
+const probeOn = slot => {
+  const r = ui.probe && ui.probe[slot];
+  return r && r.charId === ui.charId ? r : null;
+};
+const seenCat  = () => { const r = probeOn('see'); return r ? r.cat : null; };
+const askedCat = () => { const r = probeOn('ask'); return r ? r.cat : null; };
+const deepOpen = () => !!probeOn('deep');
+/* 使ってしまったが、いまの相手ではない ―― その相手の名を出して理由を示す */
+const spentOn = slot => {
+  const r = ui.probe && ui.probe[slot];
+  return r && r.charId !== ui.charId ? E.CHAR_BY_ID.get(r.charId).name : null;
+};
 
 /* --- 規則の文をたたむ -------------------------------------------------------
    画面の文字数を数えたら、表示文字の50〜70%が規則の説明だった（物語は最小）。
@@ -3961,7 +3984,7 @@ function viewTitle(){
     const v = parseInt(document.getElementById('seed').value, 10);
     st = E.createState(Number.isFinite(v) ? v : 1868, ui.originDraft);
     ui.seedDraft = st.seed; ui.guidedTutorial = guided; markTutorialSeen();
-    ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null; ui.place = null;
+    ui.tutorialDone = false; ui.interludePicked = null; ui.interludeData = null; ui.place = null; ui.probe = freshProbe();
     ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
     ui.screen = 'meeting'; render();
   };
@@ -3986,7 +4009,7 @@ function viewTitle(){
       const { seed, origin, actions, interludeChoice } = E.decodeSave(document.getElementById('code').value);
       st = E.replay(seed, actions, interludeChoice, origin).state;
       ui.seedDraft = seed; ui.originDraft = origin; ui.guidedTutorial = false; markTutorialSeen();
-      ui.interludePicked = null; ui.interludeData = null; ui.place = null;
+      ui.interludePicked = null; ui.interludeData = null; ui.place = null; ui.probe = freshProbe(); ui.probe = freshProbe();
       ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
       ui.screen = st.finished ? 'ending' : 'meeting'; render();
     } catch (e){ document.getElementById('err').textContent = '読み込めません: ' + e.message; }
@@ -4157,7 +4180,8 @@ function viewMeeting(){
     /* 来訪に応じた手は場を持たない。働きかけの縛りも旅疲れも掛からない */
     if (el.dataset.visit) ui.place = null;
     ui.stance = null; ui.ownF = null; ui.argueF = null;
-    ui.picks = [null,null,null]; ui.approach = null; ui.probed = false; ui.asked = null; ui.observed = null;
+    ui.picks = [null,null,null]; ui.approach = null;
+    /* 調べ札は手番のもの。人物を選び直しても戻さない（戻すと何度でも調べられた） */
     ui.screen = 'stance'; render();
   });
 }
@@ -4194,7 +4218,7 @@ function viewInterlude(){
   });
   const nx = document.getElementById('ilnext');
   if (nx) nx.onclick = () => {
-    ui.interludePicked = null; ui.interludeData = null; ui.place = null;
+    ui.interludePicked = null; ui.interludeData = null; ui.place = null; ui.probe = freshProbe();
     ui.interludeStandingBefore = null; ui.interludeStandingAfter = null;
     ui.screen = st.finished ? 'ending' : 'meeting'; render();
   };
@@ -4242,12 +4266,12 @@ function viewStance(){
          観ただけでは印が出ない作りにしていたため、所作から型を読めた人が
          それを働きかけに繋げられず、札を全部当てても肚を割るで落ちていた。
          札を三枚とも当てた転向のうち、型の読み違えで落ちるのが29.9%と最大の原因だった。 */
-      const knownMotive = (ui.probed || guidedTurn() || ui.observed === 0) ? c.correct[0] : null;
+      const knownMotive = (deepOpen() || guidedTurn() || seenCat() === 0) ? c.correct[0] : null;
       const impliedAp = knownMotive === null ? -1 : E.APPROACH_BY_MOTIVE[knownMotive];
       body = `<p>どう働きかけますか？</p>
         ${approachLegendHTML(impliedAp)}
         ${knownMotive !== null ? `<div class="small" style="margin:8px 0">
-          ${ui.probed || guidedTurn() ? '聞き出したところ' : '所作を観たところ'}、この人物が欲しているのは <span class="uibadge">〔${
+          ${deepOpen() || guidedTurn() ? '聞き出したところ' : '所作を観たところ'}、この人物が欲しているのは <span class="uibadge">〔${
           esc(E.CATS[0].motives[knownMotive])}〕</span>。
           筋どおりなら <b>${esc(E.APPROACHES[impliedAp].name)}</b> が響きます
           <span style="opacity:.7">（そう見えて違う者もいます）</span></div>` : ''}
@@ -4293,7 +4317,8 @@ function viewStance(){
      手掛かりの量ではなく「どこを調べるか」を選ばせるのが釣り合いの取れる形だった。
      観る＝一項目が読める／訊く＝一項目が二択になる／奥の手＝三項目とも開く。
      どれも一度きりなので、狙いを一点に寄せるか散らすかが毎回の判断になる。 */
-  const open = ui.probed || guidedTurn();
+  const open = deepOpen() || guidedTurn();
+  const seeSpent = spentOn('see'), askSpent = spentOn('ask'), deepSpent = spentOn('deep');
   const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
     <div class="slot-h">相手を調べる</div>
@@ -4301,15 +4326,15 @@ function viewStance(){
       '<b>観る</b>はその項目の所作を読ませ、<b>訊く</b>はその項目の不正解を一つ消して二択にします。どちらも<b>一度ずつ</b>。同じ項目に重ねて一つを確実にするか、散らして二つを半分ずつ掴むかを選びます。', 'small')}
     <div class="probe-table">
       ${E.CATS.map((cat, i) => {
-        const seen = open || ui.observed === i, asked = open || ui.asked === i;
+        const seen = open || seenCat() === i, asked = open || askedCat() === i;
         return `<div class="prow">
           <div class="phead"><b>${i+1}. ${esc(cat.name)}</b><span class="small">${esc(cat.hint)}</span></div>
           <div class="pacts">
             ${seen ? '<span class="chip used">観た</span>'
-              : ui.observed !== null ? '<span class="chip spent">観る</span>'
+              : seenCat() !== null || seeSpent ? `<span class="chip spent">観る</span>`
               : `<button class="chip" data-see="${i}">観る</button>`}
             ${asked ? '<span class="chip used">訊いた</span>'
-              : ui.asked !== null ? '<span class="chip spent">訊く</span>'
+              : askedCat() !== null || askSpent ? `<span class="chip spent">訊く</span>`
               : `<button class="chip" data-ask="${i}">訊く</button>`}
           </div>
           ${seen ? `<div class="gest">${esc(E.gestureOf(ui.charId, i))}</div>` : ''}
@@ -4320,8 +4345,10 @@ function viewStance(){
     <div class="row">
       ${guidedTurn()
         ? '<span class="probed">練習中 — 三つとも開示しています（回数は消費しません）</span>'
-        : ui.probed
+        : deepOpen()
         ? '<span class="probed">◎ 奥の手で残らず聞き出した — この交渉の獲得は 1 下がる</span>'
+        : deepSpent
+        ? `<span class="probed" style="opacity:.7">この手番の奥の手は${esc(deepSpent)}に使った（回数は交渉が成立するまで引かれない）</span>`
         : probeLeft > 0
           ? `<button class="probe" id="probe">さらに聞き出す<span class="small">（一局に一度の奥の手・三項目とも開く・この交渉の獲得 −1）</span></button>`
           : '<span class="probed" style="opacity:.6">この一局の奥の手は、すでに使った</span>'}
@@ -4376,10 +4403,12 @@ function viewStance(){
       ${order.slice(descAt).map(k => BLOCK[k]()).join('')}<hr id="decide">${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
-  app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => { ui.asked = +b.dataset.ask; render(); });
-  app.querySelectorAll('[data-see]').forEach(b => b.onclick = () => { ui.observed = +b.dataset.see; render(); });
+  app.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => {
+    ui.probe.ask = { charId: ui.charId, cat: +b.dataset.ask }; render(); });
+  app.querySelectorAll('[data-see]').forEach(b => b.onclick = () => {
+    ui.probe.see = { charId: ui.charId, cat: +b.dataset.see }; render(); });
   const pb0 = document.getElementById('probe');
-  if (pb0) pb0.onclick = () => { ui.probed = true; render(); };
+  if (pb0) pb0.onclick = () => { ui.probe.deep = { charId: ui.charId }; render(); };
   /* 面会画面は長い。スマホでは働きかけの一覧が画面上端から1400px下に出るので、
      画面内で選ぶたびに、次の選択へ視線を移してやる。最初の表示では動かさない。 */
   const toDecision = () => { render(); document.getElementById('decide')?.scrollIntoView({ block:'start' }); };
@@ -4411,7 +4440,7 @@ function viewCards(){
       <div class="quote">${esc(c.desc)}</div>
       <div class="small">語る言葉は〔${fac(ui.argueF).name}〕の思想のもの。だが<b>刺さるかどうかは、相手が何を欲しているか</b>で決まります。</div>
       ${guided ? coachHTML('三', '正解と根拠を見て三枚を組む', 'この1ターンだけ、正解のカードを金色で示し、通常は一つしか聞けない<b>三つの返答</b>を根拠として開示します。金色のカードを一枚ずつ選んでください。') : ''}
-      ${ui.asked !== null ? dialogueReplyHTML(c, ui.asked, ui.probed || guided) : ''}
+      ${askedCat() !== null ? dialogueReplyHTML(c, askedCat(), deepOpen() || guided) : ''}
       ${(() => {
         /* 踏み切る前に、いま効いている減点をここに全部並べる。面会画面にしか出ていない
            ものがあると「札は全部当てたのに落ちた」の理由が後からしか分からない。 */
@@ -4435,7 +4464,7 @@ function viewCards(){
       <div class="row" style="margin-top:12px">
         ${guided
           ? '<span class="probed">練習中 — 三つとも開示しています</span>'
-          : ui.probed
+          : deepOpen()
           ? '<span class="probed">◎ 奥の手で残らず聞き出した — この交渉の獲得は 1 下がる</span>'
           : `<span class="probed" style="opacity:.6">読み切れないときは、<b>戻る</b>と一局に一度の「さらに聞き出す」が使えます（残り ${left} 回）</span>`}
       </div>
@@ -4444,12 +4473,12 @@ function viewCards(){
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
         ${i === 0 ? ruleHTML('cards', '〔　〕＝その札が訴えかける先',
           '〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。', 'small') : ''}
-        ${ui.observed === i || ui.probed || guided
+        ${seenCat() === i || deepOpen() || guided
           ? `<div class="slot-gest">${esc(E.gestureOf(ui.charId, i))}</div>` : ''}
         <div class="card-grid">${ui.opts[i].map(o => {
           const isCorrect = o.motive === c.correct[i];
-          const isAns = (ui.probed || guided) && isCorrect;
-          const isRuledOut = !ui.probed && !guided && ui.asked === i
+          const isAns = (deepOpen() || guided) && isCorrect;
+          const isRuledOut = !deepOpen() && !guided && askedCat() === i
             && o.motive === E.deniedMotiveOf(st, ui.charId, i);
           const guideClass = guided ? (isCorrect ? 'guide-answer' : 'guide-decoy') : '';
           const disabled = (guided && !isCorrect) || isRuledOut;
@@ -4471,14 +4500,14 @@ function viewCards(){
   app.querySelectorAll('.card').forEach(el => el.onclick = () => {
     const cat = +el.dataset.cat, motive = +el.dataset.m;
     if (guided && motive !== c.correct[cat]) return;
-    if (!ui.probed && ui.asked === cat && motive === E.deniedMotiveOf(st, ui.charId, cat)) return;
+    if (!deepOpen() && askedCat() === cat && motive === E.deniedMotiveOf(st, ui.charId, cat)) return;
     ui.picks[cat] = motive; render();
   });
   document.getElementById('back').onclick = () => { ui.approach = null; ui.screen = 'stance'; render(); };
   document.getElementById('go').onclick = () => {
     const a = { charId: ui.charId, stance: ui.stance, ownF: ui.ownF, argueF: ui.argueF,
-                cards: ui.picks.map(v => v === null ? 0 : v), probed: ui.probed,
-                asked: ui.asked, approach: ui.approach, place: ui.place };
+                cards: ui.picks.map(v => v === null ? 0 : v), probed: deepOpen(),
+                asked: askedCat(), approach: ui.approach, place: ui.place };
     /* 刃が出ても画面は変えない。結果の流れの中で応じ方を訊く。 */
     if (E.duelPending(st, a)){ ui.duelAction = a; ui.report = null; ui.screen = 'result'; render(); return; }
     const r = E.resolve(st, a);
@@ -4589,6 +4618,7 @@ function viewResult(){
     commitHints();
     if (guidedResult) ui.guidedTutorial = false;
     ui.place = null;                       // ターンが変われば行き先から選び直す
+    ui.probe = freshProbe();               // 観る・訊く・奥の手も手番ごとに戻る
     ui.screen = st.finished ? 'ending' : 'meeting'; render();
   };
 }

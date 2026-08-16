@@ -146,12 +146,24 @@ ok(html.includes('× 本人が否定した') && html.includes('ruled-out') && ht
 ok(html.includes('data-see=') && html.includes('相手を調べる')
    && (html.match(/E\.gestureOf\(ui\.charId, i\)/g) || []).length === 2,
    '所作は「観た」項目にだけ出す（面会画面と札の画面の両方）');
-ok(html.includes('ui.observed === i || ui.probed || guided')
-   && html.includes("ui.observed !== null ? '<span class=\"chip spent\">観る</span>'"),
-   '観るは一面会に一度だけで、使うと残りの項目には使えない');
+ok(html.includes('seenCat() === i || deepOpen() || guided')
+   && html.includes("seenCat() !== null || seeSpent ? `<span class=\"chip spent\">観る</span>`"),
+   '観るは一手番に一度だけで、使うと残りの項目には使えない');
+/* 人物を選び直すたびに ui 側で戻していたため、同じ相手に何度でも調べられた。
+   奥の手はさらに悪く、st.probesUsed は交渉が成立して初めて増えるので、
+   全開示してから選び直せば回数を払わずに候補全員の正解を覗けた。 */
+ok(html.includes('const freshProbe = () =>') && html.includes("const probeOn = slot =>")
+   && html.includes('r.charId === ui.charId'),
+   '調べ札は手番に紐づき、結果は使った相手にだけ出る');
+ok(!/ui\.picks = \[null,null,null\]; ui\.approach = null; ui\.probed/.test(html),
+   '人物を選び直しても調べ札は戻らない');
+ok((html.match(/ui\.probe = freshProbe\(\)/g) || []).length >= 4,
+   '調べ札が戻るのは、開始・再開・幕間・次のターンだけ');
+ok(html.includes('この手番の奥の手は${esc(deepSpent)}に使った'),
+   '別の相手に奥の手を使っていたら、その相手の名を出して理由を示す');
 /* 札を三枚とも当てた転向のうち通るのは50.2%で、最大の落ちる原因は型の読み違え29.9%。
    利益提示を観れば型は導けるのに、印が奥の手のときしか出ていなかった。 */
-ok(html.includes('ui.probed || guidedTurn() || ui.observed === 0'),
+ok(html.includes('deepOpen() || guidedTurn() || seenCat() === 0'),
    '利益提示を観たら、そこから読める働きかけにも印が出る（奥の手と扱いを揃える）');
 ok(html.includes('所作を観たところ'), '印の文言が、観たのか聞き出したのかを言い分ける');
 {
