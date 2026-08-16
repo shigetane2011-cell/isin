@@ -75,8 +75,8 @@ ok(html.includes('class="route-guide"') && html.includes('通常ルート｜二�
    && html.includes('高難度ルート｜一つに寄せ切る'),
    '複合と単独の二つの勝ち筋を、時勢チャートに常時表示する');
 ok(html.includes('遠路・候補 −1') && html.includes('class="travel-note')
-   && html.includes('・候補${n}名'),
-   '行き先の札に人数と旅疲れを、現在地にも旅疲れを表示する');
+   && html.includes('／候補${n}名') && html.includes('1枠目 ${q.favor.map'),
+   '行き先の札に「1枠目の勢力」と人数と旅疲れを出す（場の縛りは1枠目だけ）');
 {
   /* 「通常の面会候補は3名から2名になります」と書いてあるのに札が3枚以上並ぶ、
      という報告があった。数は正しく（34,410件で食い違い0）、読めないのが問題だった。
@@ -108,9 +108,11 @@ ok(html.includes('遠路・候補 −1') && html.includes('class="travel-note')
 ok(html.includes('class="lineup"') && html.includes('この場の顔ぶれ')
      && html.includes('＝ 札 ${m.normal.length + extra.length}枚'),
      '面会候補の内訳（通常枠＋別枠＝札の枚数）を札の前に出す');
-  ok(html.includes('class="slotmark') && html.includes("'再訪' : isIntro ? '人脈の紹介' : '通常枠'")
+  ok(html.includes('class="slotmark') && html.includes("esc(E.slotRole(slot, ui.place))")
      && html.includes('<span class="slotmark visit">来訪</span>'),
      'どの札がどの枠から来たのかを、札そのものに書く');
+  /* 「この場は雄藩・佐幕」とだけ書くと嘘になる。実測では1枠目の一致率100%に対し、
+     2枠目以降は18〜43%＝名簿の素の割合で、場とは無関係である。 */
   ok(html.includes('人脈の紹介・再訪・来訪は別枠なので、札はこれより多く並びます'),
      '旅疲れの説明が、別枠の札の存在に触れている');
 }
@@ -1305,6 +1307,29 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
        `面会人数の合計は全場3名だった頃と同じ（${E.PLACE_SEATS.join('+')}=${
          E.PLACE_SEATS.reduce((a,b)=>a+b,0)}）`);
     ok(new Set(E.PLACE_SEATS).size >= 3, '人数が場によって実際に違う');
+  ok(E.slotRole(0, 3) === 'この場の縁' && E.slotRole(1, 3) === '出自の縁'
+       && E.slotRole(2, 4) === '荒事の枠' && E.slotRole(3, 4) === '行きずり'
+       && E.slotRole(2, 3) === '行きずり',
+       '通常枠の役目に名前があり、荒事の枠は荒事の場にだけ出る');
+    ok(html.includes('<b>この場が縛るのは1枠目だけ</b>'),
+       '「場が縛るのは1枠目だけ」と明記する');
+    {
+      /* 1枠目は必ず場の好みに一致し、2枠目以降は縛られていないこと */
+      let s0 = 0, s0n = 0, rest = 0, restn = 0;
+      for (let origin = 0; origin < 3; origin++) for (let seed = 1; seed <= 120; seed++){
+        const st = E.createState(seed, origin);
+        for (const pl of E.placesOpen(st)){
+          const fav = E.PLACES[pl].favor;
+          E.meetingList(st, pl).normal.forEach((id, slot) => {
+            const hit = E.CHAR_BY_ID.get(id).factions.some(f => fav.includes(f));
+            if (slot === 0) { s0n++; if (hit) s0++; } else { restn++; if (hit) rest++; }
+          });
+        }
+      }
+      ok(s0 === s0n, `1枠目は必ず場の好みの勢力から来る（${s0}/${s0n}）`);
+      ok(rest / restn < 0.55,
+         `2枠目以降は場に縛られていない（一致 ${Math.round(rest/restn*100)}%＝名簿の素の割合）`);
+    }
   /* 宣言した通常枠の数と、実際に返る通常枠の数が常に一致すること */
     let bad = 0, cases = 0, maxCards = 0;
     for (let origin = 0; origin < 3; origin++) for (let seed = 1; seed <= 60; seed++){

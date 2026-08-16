@@ -308,6 +308,7 @@ details.rule.folded[open]>summary{opacity:1}
 .slotmark{display:inline-block;font-size:.68rem;letter-spacing:.08em;padding:1px 6px;margin-right:6px;
   border:1px solid var(--line);color:var(--sumi2);vertical-align:middle}
 .slotmark.intro,.slotmark.visit{border-color:var(--kin);color:var(--kin)}
+.slotmark.favor{border-color:var(--ai);color:var(--ai)}
 .slotmark.revisit{border-color:var(--shu);color:var(--shu)}
 .chaos{margin-top:8px;border-left:3px solid var(--line);background:var(--washi2);padding:8px 12px}
 .chaos .lbl{font-size:.72rem;letter-spacing:.16em;color:var(--sumi2);margin-right:6px}
@@ -1746,6 +1747,14 @@ const SCENE_ORDER = {
   plain:    ['scene','tie','open','recv','sit','world','chips'],
 };
 const SCENE_KEYS = Object.keys(SCENE_ORDER);
+/* 通常枠の役目。場が縛るのは1枠目だけで、実測しても2枠目以降の一致率は
+   名簿の素の割合（18〜43%）と変わらない。「この場は雄藩・佐幕」とだけ書くと
+   嘘になるので、どの枠がどの理由で来たのかを画面に出す。 */
+const slotRole = (slot, place) =>
+  slot === 0 ? 'この場の縁'
+  : slot === 1 ? '出自の縁'
+  : slot === 2 && place != null && PLACES[place].hot ? '荒事の枠'
+  : '行きずり';
 function sceneOf(st, charId, place){
   if ((st.banned || []).includes(charId)) return 'revisit';
   if (HOTHEADS.has(charId) && place != null && PLACES[place].hot) return 'blade';
@@ -3595,7 +3604,7 @@ const ENGINE = { mulberry32, streamOf, FACTIONS, ERAS, RANKS, CHARACTERS, CHAR_B
   TIES, TIE_GRAPH, QUESTIONS, REPLIES, DENIAL_BASES, DENIAL_ENDS, VOICES, VOICE_IDS, voiceOf, replyOf, deniedMotiveOf, denialOf, TONES, TONE_OF_VOICE, VOUCH_SAYS, GRUDGE_SAYS, REVISIT_SAYS, SITUATIONS, situationOf, situationsOf, SMALLTALK, GESTURES, gestureOf, SCENE_SAYS, SCENE_ORDER, SCENE_KEYS, sceneOf, sceneSayOf, ORIGINS, RECEPTIONS, receptionKind, receptionOf, SAYS, NOTES,
   APPROACHES, APPROACH_BY_MOTIVE, APPROACH_EXCEPTION, approachOf, canConvert,
   REACTION_CUES, REACTION_LINES, REACTION_CONVERT_SCORE2, REACTION_DUEL, REACTION_RECONCILED, REACTION_OVERRIDES, reactionOf,
-  PLACES, PLACE_SEATS, placeAllows, placesOpen, visitOf, VISIT_TURN, VISIT_RATE, VISIT_SAYS, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf, CHAOS_STEP, WARY_FLOOR, waryLineOf, CHAOS_CAUSES,
+  PLACES, PLACE_SEATS, slotRole, placeAllows, placesOpen, visitOf, VISIT_TURN, VISIT_RATE, VISIT_SAYS, CITY_AREAS, travelFatigue, normalMeetingCount, INTERLUDES, INTERLUDES_EARLY, INTERLUDE_SETS, INTERLUDE_TURNS, INTERLUDE_FIGURES, ENDINGS, MAX_TURN, GOAL, COMBO_GOAL, CAP, COMBO_MIN, PROBE_LIMIT, INTERLUDE_TURN, HOTHEADS, PORTRAITS, portraitOf, DUELS, DUEL_ANSWER, duelPending, scoreOf, scoreBreakdown, vouchOf, grudgeOf, tieSay, revisitOf, revisitSay, FATES, FATE_TEMPLATE, PROMISE_FATES, promiseFate, promiseReport, winningFactions, fateOf, ROSTER, OPPOSED, WARY_LINE, waryOf, CHAOS_STEP, WARY_FLOOR, waryLineOf, CHAOS_CAUSES,
   topPairKey, pendingInterlude, applyInterlude, createState, totalOf, eraOf, eraOfTotal, rankOfId, baseId,
   meetingList, introPick, cardOptions, composeArgument, argumentFor, preambleOf, listenerGroup, PREAMBLE_BY_VOICE, PREAMBLE_BY_SIT, resolve, routeForecast, evaluateEnding, replay,
   playerStanding, playerEpilogue, encodeSave, decodeSave, hashState };
@@ -4082,7 +4091,7 @@ function viewMeeting(){
         ? `<div class="travel-note safe"><b>街道経由：</b>道中を一晩かけたため、旅疲れなく${esc(pl.where)}へ入れます。</div>` : '';
   const pfa = fac(pl.favor[0]).key, pfb = fac(pl.favor[pl.favor.length - 1]).key;
   const saidTies = new Set();          // 同じ画面で縁の台詞が重ならないように
-  const card = (id, isIntro, isRevisit) => {
+  const card = (id, isIntro, isRevisit, slot) => {
     const c = E.CHAR_BY_ID.get(id), rk = E.rankOfId(id);
     const fl = c.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('');
     const pre = rk > era
@@ -4099,8 +4108,8 @@ function viewMeeting(){
          <span class="small">※ 一度決裂した相手。<b>説き伏せれば和解し</b>、出現停止が解けて人脈に加わる</span></div>` : '';
     return `<div class="person ${E.PORTRAITS.has(id)?'has-portrait':''} ${isIntro?'intro':''} ${isRevisit?'revisit':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
       ${portraitThumbHTML(id)}
-      <div><span class="slotmark ${isRevisit ? 'revisit' : isIntro ? 'intro' : 'normal'}">${
-        isRevisit ? '再訪' : isIntro ? '人脈の紹介' : '通常枠'}</span><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
+      <div><span class="slotmark ${isRevisit ? 'revisit' : isIntro ? 'intro' : slot === 0 ? 'favor' : 'normal'}">${
+        isRevisit ? '再訪' : isIntro ? '人脈の紹介' : esc(E.slotRole(slot, ui.place))}</span><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
       <div class="desc">${esc(c.desc)}</div>
       ${again}${isRevisit ? '' : tie}${pre}${isRevisit ? '' : wary}${hot}</div>`;
@@ -4116,8 +4125,8 @@ function viewMeeting(){
           const n = E.normalMeetingCount(st, i);
           return `<button class="placechip ${i === ui.place ? 'on' : ''}" data-place="${i}"${
             q.hot ? ' data-hot="1"' : ''}><span class="nm">${esc(q.name)}</span>
-            <span class="small">${q.favor.map(f => `<span class="${fac(f).cls}">${fac(f).name}</span>`).join('・')}${
-              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}・候補${n}名</span>${
+            <span class="small">1枠目 ${q.favor.map(f => `<span class="${fac(f).cls}">${fac(f).name}</span>`).join('・')}${
+              q.hot ? '・<span style="color:var(--shu)">荒事</span>' : ''}／候補${n}名</span>${
               tired && n < E.PLACE_SEATS[i] ? '<span class="travel">遠路・候補 −1</span>' : ''}</button>`;
         }).join('')}</div>
         ${lockedPlaces.length ? `<div class="small locked">${lockedPlaces.map(i =>
@@ -4139,10 +4148,15 @@ function viewMeeting(){
         if (E.visitOf(st)) extra.push('来訪 1名');
         if (m.intro) extra.push('人脈の紹介 1名');
         if (m.revisit >= 0) extra.push('再訪 1名');
+        const roles = m.normal.map((_, i) => E.slotRole(i, ui.place));
         return `<div class="lineup"><span class="lbl">この場の顔ぶれ</span>
-          <b>通常枠 ${m.normal.length}名</b>${fatigue && shown < seats ? `（遠路の旅疲れで −1）` : ''}${
+          <b>${roles.join('・')}</b> の${m.normal.length}名${fatigue && shown < seats ? `（遠路の旅疲れで −1）` : ''}${
           extra.length ? '　＋　' + extra.join('　＋　') : ''}
-          <span class="small">＝ 札 ${m.normal.length + extra.length}枚</span></div>`;
+          <span class="small">＝ 札 ${m.normal.length + extra.length}枚</span>
+          ${ruleHTML('slots', '場が縛るのは1枠目だけ',
+            `<b>この場が縛るのは1枠目だけ</b>です。〔${pl.favor.map(f => fac(f).name).join('・')}〕の人物が必ず来ます。
+             2枠目は<b>あなたの出自の縁</b>、荒事の場の3枠目は<b>短気な者</b>、残りは<b>行きずり</b>で、
+             いずれも場の勢力とは関係がありません。`, 'small')}</div>`;
       })()}
       ${(() => {
         const v = E.visitOf(st);
@@ -4163,7 +4177,7 @@ function viewMeeting(){
             ただし<b>場の◎（獲得+1）は乗らず</b>、他の候補は選べません。`, 'small visit-note')}
         </div>`;
       })()}
-      ${m.normal.map(id => card(id, false)).join('')}
+      ${m.normal.map((id, i) => card(id, false, false, i)).join('')}
       ${m.intro ? card(m.intro, true) : ''}
       ${m.revisit >= 0 ? card(m.revisit, false, true) : ''}
       <details class="detail"><summary>この顔ぶれが選ばれた理由</summary>
