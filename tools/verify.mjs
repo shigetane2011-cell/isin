@@ -77,6 +77,19 @@ ok(html.includes('class="route-guide"') && html.includes('通常ルート｜二�
 ok(html.includes('遠路・候補 −1') && html.includes('class="travel-note')
    && html.includes('・候補${n}名'),
    '行き先の札に人数と旅疲れを、現在地にも旅疲れを表示する');
+{
+  /* 「通常の面会候補は3名から2名になります」と書いてあるのに札が3枚以上並ぶ、
+     という報告があった。数は正しく（34,410件で食い違い0）、読めないのが問題だった。
+     紹介・再訪・来訪は通常枠とは別に並ぶので、内訳と枠の名前を画面に出す。 */
+  ok(html.includes('class="lineup"') && html.includes('この場の顔ぶれ')
+     && html.includes('＝ 札 ${m.normal.length + extra.length}枚'),
+     '面会候補の内訳（通常枠＋別枠＝札の枚数）を札の前に出す');
+  ok(html.includes('class="slotmark') && html.includes("'再訪' : isIntro ? '人脈の紹介' : '通常枠'")
+     && html.includes('<span class="slotmark visit">来訪</span>'),
+     'どの札がどの枠から来たのかを、札そのものに書く');
+  ok(html.includes('人脈の紹介・再訪・来訪は別枠なので、札はこれより多く並びます'),
+     '旅疲れの説明が、別枠の札の存在に触れている');
+}
 
 head('1e. 一手の画面を縦に伸ばしすぎないか');
 ok(html.includes('chartHTML(true)') && html.includes('棒グラフ・混沌・人脈・約束を見る'),
@@ -1254,6 +1267,28 @@ head('5f3d. 再訪 ― 決裂した相手が、荒事の場で待っている');
        `面会人数の合計は全場3名だった頃と同じ（${E.PLACE_SEATS.join('+')}=${
          E.PLACE_SEATS.reduce((a,b)=>a+b,0)}）`);
     ok(new Set(E.PLACE_SEATS).size >= 3, '人数が場によって実際に違う');
+  /* 宣言した通常枠の数と、実際に返る通常枠の数が常に一致すること */
+    let bad = 0, cases = 0, maxCards = 0;
+    for (let origin = 0; origin < 3; origin++) for (let seed = 1; seed <= 60; seed++){
+      let st = E.createState(seed, origin);
+      for (let t = 0; t < 8 && !st.finished; t++){
+        if (E.pendingInterlude(st)) { st = E.applyInterlude(st, 1); continue; }
+        const open = E.placesOpen(st);
+        for (const pl of open){
+          const ml = E.meetingList(st, pl);
+          cases++;
+          if (ml.normal.length !== E.normalMeetingCount(st, pl)) bad++;
+          maxCards = Math.max(maxCards, ml.normal.length
+            + (ml.intro != null && ml.intro > 0 ? 1 : 0) + (ml.revisit >= 0 ? 1 : 0)
+            + (E.visitOf(st) ? 1 : 0));
+        }
+        const pl = open[0], id = E.meetingList(st, pl).normal[0], c = E.CHAR_BY_ID.get(id);
+        st = E.resolve(st, { charId:id, stance:'support', ownF:c.factions[0], argueF:c.factions[0],
+          cards:c.correct, probed:false, asked:1, approach:0, place:pl }).next;
+      }
+    }
+    ok(bad === 0, `宣言した通常枠の数と実際が常に一致する（食い違い ${bad} / ${cases}）`);
+    ok(maxCards >= 4, `別枠を含めると札は最大 ${maxCards} 枚まで並ぶ（だから内訳の表示が要る）`);
     ok(E.PLACES.every((p, i) => !p.hot || E.PLACE_SEATS[i] === 4),
        '荒事の場は4名（短気な者の枠が1/4に薄まる）');
     const st0 = E.createState(5);

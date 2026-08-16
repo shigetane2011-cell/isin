@@ -286,6 +286,12 @@ button.primary .small{color:inherit;opacity:.82}
 .phead{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
 .phead .small{opacity:.7}
 .pacts{display:flex;gap:6px;margin-top:5px}
+.lineup{margin:10px 0 6px;padding:7px 11px;background:var(--washi2);border-left:3px solid var(--line);font-size:.88rem}
+.lineup .lbl{font-size:.72rem;letter-spacing:.16em;color:var(--sumi2);margin-right:8px}
+.slotmark{display:inline-block;font-size:.68rem;letter-spacing:.08em;padding:1px 6px;margin-right:6px;
+  border:1px solid var(--line);color:var(--sumi2);vertical-align:middle}
+.slotmark.intro,.slotmark.visit{border-color:var(--kin);color:var(--kin)}
+.slotmark.revisit{border-color:var(--shu);color:var(--shu)}
 .chaos{margin-top:8px;border-left:3px solid var(--line);background:var(--washi2);padding:8px 12px}
 .chaos .lbl{font-size:.72rem;letter-spacing:.16em;color:var(--sumi2);margin-right:6px}
 .chaos b{font-size:1.05rem}
@@ -3992,7 +3998,8 @@ function viewMeeting(){
   const seats = E.PLACE_SEATS[ui.place], shown = E.normalMeetingCount(st, ui.place);
   const travelNote = fatigue
     ? (shown < seats
-      ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。ここで会う相手を選ぶと、通常の面会候補は${seats}名から${shown}名になります。</div>`
+      ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。
+          <b>通常枠が${seats}名から${shown}名へ減ります</b>（人脈の紹介・再訪・来訪は別枠なので、札はこれより多く並びます）。</div>`
       : `<div class="travel-note safe"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移りますが、ここはもともと${seats}名しか通されないため候補は減りません。</div>`)
     : pl.where === '街道'
       ? `<div class="travel-note safe"><b>街道を中継：</b>今夜はここで面会します。次に京・江戸・長崎へ入るときは旅疲れを受けません。</div>`
@@ -4017,9 +4024,10 @@ function viewMeeting(){
          <span class="small">※ 一度決裂した相手。<b>説き伏せれば和解し</b>、出現停止が解けて人脈に加わる</span></div>` : '';
     return `<div class="person ${E.PORTRAITS.has(id)?'has-portrait':''} ${isIntro?'intro':''} ${isRevisit?'revisit':''}" style="${toneStyle(c.factions)}" data-id="${id}" role="button" tabindex="0">
       ${portraitThumbHTML(id)}
-      <div><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
+      <div><span class="slotmark ${isRevisit ? 'revisit' : isIntro ? 'intro' : 'normal'}">${
+        isRevisit ? '再訪' : isIntro ? '人脈の紹介' : '通常枠'}</span><span class="nm">${esc(c.name)}</span><span class="tag">${E.RANKS[rk]}</span>${fl}</div>
       <div class="nick">— ${esc(c.nick)} —</div>
-      <div class="desc">${isRevisit ? '[因縁] ' : isIntro ? '[人脈] ' : '[情勢] '}${esc(c.desc)}</div>
+      <div class="desc">${esc(c.desc)}</div>
       ${again}${isRevisit ? '' : tie}${pre}${isRevisit ? '' : wary}${hot}</div>`;
   };
   app.innerHTML = headerHTML() + chartHTML(true) +
@@ -4049,6 +4057,16 @@ function viewMeeting(){
       </div>
       ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
       ${(() => {
+        const extra = [];
+        if (E.visitOf(st)) extra.push('来訪 1名');
+        if (m.intro) extra.push('人脈の紹介 1名');
+        if (m.revisit >= 0) extra.push('再訪 1名');
+        return `<div class="lineup"><span class="lbl">この場の顔ぶれ</span>
+          <b>通常枠 ${m.normal.length}名</b>${fatigue && shown < seats ? `（遠路の旅疲れで −1）` : ''}${
+          extra.length ? '　＋　' + extra.join('　＋　') : ''}
+          <span class="small">＝ 札 ${m.normal.length + extra.length}枚</span></div>`;
+      })()}
+      ${(() => {
         const v = E.visitOf(st);
         if (!v) return '';
         const g = E.CHAR_BY_ID.get(v.guest), h = E.CHAR_BY_ID.get(v.host);
@@ -4056,11 +4074,11 @@ function viewMeeting(){
         return `<div class="person visit ${E.PORTRAITS.has(v.guest)?'has-portrait':''}" style="${
           toneStyle(g.factions)}" data-id="${v.guest}" data-visit="1" role="button" tabindex="0">
           ${portraitThumbHTML(v.guest)}
-          <div><span class="nm">${esc(g.name)}</span><span class="tag">${E.RANKS[rk]}</span>${
+          <div><span class="slotmark visit">来訪</span><span class="nm">${esc(g.name)}</span><span class="tag">${E.RANKS[rk]}</span>${
             g.factions.map(f => `<span class="tag ${fac(f).cls}">${fac(f).name}</span>`).join('')}</div>
           <div class="nick">— ${esc(g.nick)} —</div>
           <div class="tie"><span class="who">〔${esc(h.name)}の来訪〕</span>${esc(v.say)}</div>
-          <div class="desc">[来訪] ${esc(g.desc)}</div>
+          <div class="desc">${esc(g.desc)}</div>
           <div class="small visit-note"><b>応じれば移動しません。</b>旅疲れを受けず、
             <b>場の縛りもないので四つの働きかけがすべて使えます</b>。${esc(h.name)}の顔が立つので警戒も悪評も通りません。
             ただし<b>場の◎（獲得+1）は乗らず</b>、他の候補は選べません。</div>
