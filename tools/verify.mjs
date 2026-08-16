@@ -81,7 +81,31 @@ ok(html.includes('遠路・候補 −1') && html.includes('class="travel-note')
   /* 「通常の面会候補は3名から2名になります」と書いてあるのに札が3枚以上並ぶ、
      という報告があった。数は正しく（34,410件で食い違い0）、読めないのが問題だった。
      紹介・再訪・来訪は通常枠とは別に並ぶので、内訳と枠の名前を画面に出す。 */
-  ok(html.includes('class="lineup"') && html.includes('この場の顔ぶれ')
+  {
+  /* 画面の文字数を数えたら、表示文字の50〜70%が規則の説明だった（物語は最小）。
+     しかも同じ文が毎ターン出る。初回は全文、一度読んだら1行に畳む。
+     覚えるのは localStorage だけで、盤面にも保存コードにも影響しない。 */
+  ok(html.includes("const HINT_KEY = 'isin:rules-read:v1'")
+     && html.includes('function ruleHTML(key, brief, full, cls)')
+     && html.includes('commitHints();'),
+     '一度読んだ規則を畳む仕掛けがあり、ターンの切れ目で覚える');
+  ok(html.includes('const folded = !guidedTurn() && hintsRead().has(key)'),
+     '練習中は畳まない（初めての人には全文を見せる）');
+  const keys = [...html.matchAll(/ruleHTML\('([a-z]+)'/g)].map(m => m[1]);
+  ok(keys.length >= 6 && new Set(keys).size === keys.length,
+     `毎ターン出る規則を6箇所以上、重複なく畳んでいる（${keys.join('・')}）`);
+  ok(html.includes('const settled = ui.stance !== null && !guidedTurn()')
+     && html.includes('との場面をもう一度読む'),
+     '立場を決めたら場面の描写を畳み、読み返せるようにする');
+  /* 畳んでも手掛かりは消さない ―― 所作と問いの返答は畳みの外に置く */
+  const stanceView = html.slice(html.indexOf('function viewStance()'),
+                                html.indexOf('function viewCards()'));
+  const foldAt = stanceView.indexOf('との場面をもう一度読む');
+  ok(stanceView.indexOf('chips: () => chips') > 0
+     && stanceView.lastIndexOf('BLOCK[k]()') > foldAt,
+     '「相手を調べる」は畳みの外に残る（観た所作と訊いた返答は消さない）');
+}
+ok(html.includes('class="lineup"') && html.includes('この場の顔ぶれ')
      && html.includes('＝ 札 ${m.normal.length + extra.length}枚'),
      '面会候補の内訳（通常枠＋別枠＝札の枚数）を札の前に出す');
   ok(html.includes('class="slotmark') && html.includes("'再訪' : isIntro ? '人脈の紹介' : '通常枠'")
@@ -996,6 +1020,8 @@ ok(String(E.APPROACHES.map(a => a.cards)) === '3,2,0,1',
    '決定の形が違う（カード 3枚 / 2枚 / 0枚 / 1枚）');
 ok(E.APPROACHES.filter(a => a.cap === 3).length === 2, '大成功まで届くのは2通りだけ');
 ok([0,1,2,3].filter(i => E.canConvert(i)).length === 2, '転向を仕掛けられるのも同じ2通り');
+ok(E.APPROACHES.every(a => a.brief && a.brief.length < a.desc.length),
+   '働きかけに、一度読んだあと用の短い説明がある（選ぶ前に四つ分の長文を読ませない）');
 ok(E.CHARACTERS.every(c => { const a = E.approachOf(c.id); return a >= 0 && a <= 3; }),
    '151名全員に響く働きかけが定まる');
 {

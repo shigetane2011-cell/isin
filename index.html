@@ -286,6 +286,23 @@ button.primary .small{color:inherit;opacity:.82}
 .phead{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
 .phead .small{opacity:.7}
 .pacts{display:flex;gap:6px;margin-top:5px}
+.scene-fold{margin:0 0 10px;border:none;background:none;padding:0}
+.scene-fold>summary{cursor:pointer;font-size:.8rem;color:var(--sumi2);opacity:.75;list-style:none;
+  padding:6px 0 6px 16px;position:relative;border-bottom:1px solid var(--line)}
+.scene-fold>summary::-webkit-details-marker{display:none}
+.scene-fold>summary::before{content:'▸';position:absolute;left:0}
+.scene-fold[open]>summary::before{content:'▾'}
+details.rule.folded{margin:6px 0;border:none;background:none;padding:0}
+details.rule.folded>summary{cursor:pointer;font-size:.78rem;color:var(--sumi2);opacity:.75;
+  list-style:none;padding:2px 0 2px 16px;position:relative}
+details.rule.folded>summary::-webkit-details-marker{display:none}
+details.rule.folded>summary::before{content:'ⓘ';position:absolute;left:0;opacity:.8}
+details.rule.folded[open]>summary{opacity:1}
+.rule-body{font-size:.82rem;color:var(--sumi2);line-height:1.7;padding:4px 0 2px 16px}
+.allowbar{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.allowbar .ap{font-size:.76rem;border:1px solid var(--line);padding:1px 7px;color:var(--sumi2)}
+.allowbar .ap.on{border-color:var(--kin);color:var(--kin);font-weight:600}
+.allowbar .ap.off{opacity:.35;text-decoration:line-through}
 .lineup{margin:10px 0 6px;padding:7px 11px;background:var(--washi2);border-left:3px solid var(--line);font-size:.88rem}
 .lineup .lbl{font-size:.72rem;letter-spacing:.16em;color:var(--sumi2);margin-right:8px}
 .slotmark{display:inline-block;font-size:.68rem;letter-spacing:.08em;padding:1px 6px;margin-right:6px;
@@ -2145,11 +2162,16 @@ const normalMeetingCount = (st, place) => Math.max(2,
    響く働きかけは「利益の型」からほぼ導ける（＝対話や奥の手で既に学んでいる
    知識がそのまま効く）。そのうえで、型から外れる人物を手で指定してある。
    ------------------------------------------------------------------------ */
+/* desc は初めて見るとき用。brief は一度読んだあとの一行（画面の縦が2.5画面あった） */
 const APPROACHES = [
-  { name:'論じる',     cards:3, cap:3, desc:'利益・文脈・論理の3枚を組む。最も高く積めるが、読みが要る' },
-  { name:'酌み交わす', cards:2, cap:2, desc:'利益と文脈の2枚だけ。論理は問わない。杯を交わした相手は刃を抜かない' },
-  { name:'金品を贈る', cards:0, cap:2, desc:'言葉を尽くさず物で通す。一局に一度の奥の手を使う。大義に生きる者には侮辱になる' },
-  { name:'肚を割る',   cards:1, cap:3, desc:'利益の一点に賭け、こちらの旗色も明かす。当たれば大きいが、外せば決裂。通れば約束が残る' },
+  { name:'論じる',     cards:3, cap:3, brief:'3枚。最も高く積める',
+    desc:'利益・文脈・論理の3枚を組む。最も高く積めるが、読みが要る' },
+  { name:'酌み交わす', cards:2, cap:2, brief:'2枚。刃を抜かせない',
+    desc:'利益と文脈の2枚だけ。論理は問わない。杯を交わした相手は刃を抜かない' },
+  { name:'金品を贈る', cards:0, cap:2, brief:'0枚。大義の人には侮辱',
+    desc:'言葉を尽くさず物で通す。一局に一度の奥の手を使う。大義に生きる者には侮辱になる' },
+  { name:'肚を割る',   cards:1, cap:3, brief:'1枚に賭ける。外せば決裂、通れば約束',
+    desc:'利益の一点に賭け、こちらの旗色も明かす。当たれば大きいが、外せば決裂。通れば約束が残る' },
 ];
 /* 利益の型 → 既定で響く働きかけ */
 const APPROACH_BY_MOTIVE = [3, 2, 1, 0, 3, 0];
@@ -3615,6 +3637,35 @@ function markTutorialSeen(){
   catch { /* 保存できない環境でもゲームは続ける */ }
 }
 function guidedTurn(){ return !!(ui.guidedTutorial && st && st.turn === 1); }
+
+/* --- 規則の文をたたむ -------------------------------------------------------
+   画面の文字数を数えたら、表示文字の50〜70%が規則の説明だった（物語は最小）。
+   しかも同じ文が毎ターン出る ―― 10ターンで10回読まされる。
+   初回は全文、一度読んだら次のターンから1行に畳む。開き直せる。
+   覚えるのは localStorage だけなので、盤面にも保存コードにも一切影響しない。
+   畳むのはターンの切れ目。同じターン中に画面が縮むと落ち着かないため。 */
+const HINT_KEY = 'isin:rules-read:v1';
+function hintsRead(){
+  try { return new Set(JSON.parse(localStorage.getItem(HINT_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function commitHints(){
+  if (!ui.hintsShown || !ui.hintsShown.size) return;
+  try {
+    const seen = hintsRead();
+    ui.hintsShown.forEach(k => seen.add(k));
+    localStorage.setItem(HINT_KEY, JSON.stringify([...seen]));
+  } catch { /* 保存できない環境でも遊べる */ }
+  ui.hintsShown = new Set();
+}
+/* key=覚える名前 brief=畳んだときの1行 full=全文 */
+function ruleHTML(key, brief, full, cls){
+  if (!ui.hintsShown) ui.hintsShown = new Set();
+  const folded = !guidedTurn() && hintsRead().has(key);
+  if (!folded){ ui.hintsShown.add(key); return `<div class="rule ${cls || ''}">${full}</div>`; }
+  return `<details class="rule folded ${cls || ''}"><summary>${brief}</summary>
+    <div class="rule-body">${full}</div></details>`;
+}
 function coachHTML(step, title, body){
   return `<div class="coach"><div class="title"><span class="step">${esc(step)}</span>${esc(title)}</div><p>${body}</p></div>`;
 }
@@ -3998,8 +4049,9 @@ function viewMeeting(){
   const seats = E.PLACE_SEATS[ui.place], shown = E.normalMeetingCount(st, ui.place);
   const travelNote = fatigue
     ? (shown < seats
-      ? `<div class="travel-note"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。
-          <b>通常枠が${seats}名から${shown}名へ減ります</b>（人脈の紹介・再訪・来訪は別枠なので、札はこれより多く並びます）。</div>`
+      ? ruleHTML('fatigue', `遠路を直行：通常枠 ${seats}→${shown}名`,
+          `<b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移るため旅疲れ。
+          <b>通常枠が${seats}名から${shown}名へ減ります</b>（人脈の紹介・再訪・来訪は別枠なので、札はこれより多く並びます）。`, 'travel-note')
       : `<div class="travel-note safe"><b>遠路を直行：</b>${esc(from.where)}から${esc(pl.where)}へ一息に移りますが、ここはもともと${seats}名しか通されないため候補は減りません。</div>`)
     : pl.where === '街道'
       ? `<div class="travel-note safe"><b>街道を中継：</b>今夜はここで面会します。次に京・江戸・長崎へ入るときは旅疲れを受けません。</div>`
@@ -4033,7 +4085,8 @@ function viewMeeting(){
   app.innerHTML = headerHTML() + chartHTML(true) +
     `<div class="panel"><h2>どこへ行き、誰に会うか</h2>
       <div class="placebar">
-        <div class="small">行き先を選ぶと、下の面会候補もそのまま入れ替わります。人物を選ぶまでは何度でも変更できます。都市間の直行は候補−1、街道を挟めば減りません。</div>
+        ${ruleHTML('place', '行き先の決め方',
+          '行き先を選ぶと、下の面会候補もそのまま入れ替わります。人物を選ぶまでは何度でも変更できます。都市間の直行は候補−1、街道を挟めば減りません。', 'small')}
         <div class="chiprow">${openPlaces.map(i => {
           const q = E.PLACES[i];
           const tired = E.travelFatigue(st.lastPlace, i);
@@ -4051,8 +4104,10 @@ function viewMeeting(){
       <div class="here" style="--pf-a:var(--${pfa});--pf-b:var(--${pfb})">
         <div><span class="lbl">${st.lastPlace === null ? '最初の行き先' : '選択中の行き先'}</span><span class="nm">${esc(pl.name)}</span><span class="tag">${esc(pl.where)}</span></div>
         <div class="desc">${esc(pl.desc)}</div>
-        <div class="small" style="margin-top:5px">使える働きかけ：${pl.allow.map(a => E.APPROACHES[a].name).join('・')}
-          ／ ここで深く刺さるのは <span class="uibadge">◎ ${esc(E.APPROACHES[pl.boost].name)}</span></div>
+        <div class="allowbar">${pl.allow.map(a =>
+          `<span class="ap ${a === pl.boost ? 'on' : ''}">${a === pl.boost ? '◎ ' : ''}${esc(E.APPROACHES[a].name)}</span>`).join('')}
+          ${E.APPROACHES.map((a, i) => pl.allow.includes(i) ? '' :
+            `<span class="ap off">${esc(a.name)}</span>`).join('')}</div>
         ${travelNote}
       </div>
       ${guidedTurn() ? coachHTML('一', '行き先と相手を決める', '毎ターン、行き先と面会相手をここで決めます。場によって集まる者と、できる働きかけが変わります。練習では祇園の茶屋に固定し、相手は自由に選べます。まずは各人物の<b>【情勢】</b>を読み比べてください。') : ''}
@@ -4079,9 +4134,10 @@ function viewMeeting(){
           <div class="nick">— ${esc(g.nick)} —</div>
           <div class="tie"><span class="who">〔${esc(h.name)}の来訪〕</span>${esc(v.say)}</div>
           <div class="desc">${esc(g.desc)}</div>
-          <div class="small visit-note"><b>応じれば移動しません。</b>旅疲れを受けず、
+          ${ruleHTML('visit', '応じれば移動なし・四手すべて使える・場の◎はなし',
+            `<b>応じれば移動しません。</b>旅疲れを受けず、
             <b>場の縛りもないので四つの働きかけがすべて使えます</b>。${esc(h.name)}の顔が立つので警戒も悪評も通りません。
-            ただし<b>場の◎（獲得+1）は乗らず</b>、他の候補は選べません。</div>
+            ただし<b>場の◎（獲得+1）は乗らず</b>、他の候補は選べません。`, 'small visit-note')}
         </div>`;
       })()}
       ${m.normal.map(id => card(id, false)).join('')}
@@ -4200,6 +4256,8 @@ function viewStance(){
              論じるが常に先頭、肚を割るは最後だった。押しやすい手に寄るのは当然である。
              ① 響く手・場に合う手を先頭へ ② 使えない手は末尾へ ③ 印はボタン自身に出す。
              並べ替えても data-approach は実際の番号のままなので、判定には影響しない。 */
+          /* 一度この画面を読んだ人には、四つの説明を一行ずつに縮める */
+          const knowsApproaches = !guidedTurn() && hintsRead().has('approach');
           const rows = E.APPROACHES.map((a, i) => {
             const noGuide = guidedTurn() && i !== 0;
             const noPlace = ui.place !== null && !E.placeAllows(ui.place, i);
@@ -4222,9 +4280,11 @@ function viewStance(){
             ${hitsHere ? '<span class="small uibadge">　◎ この場に合う</span>' : ''}
             ${ui.stance === 'convert' && i >= 2 && !off
               ? '<span class="small" style="color:var(--shu)">　※ 読み違えれば、札が刺さっても転向は通らない</span>' : ''}
-            <span class="small" style="display:block;opacity:.8">${esc(a.desc)}${why}</span></button>`).join('')}</div>`;
+            <span class="small" style="display:block;opacity:.8">${
+              esc(knowsApproaches ? a.brief : a.desc)}${why}</span></button>`).join('')}</div>`;
         })()}
-        <div class="small" style="margin-top:8px;opacity:.7">響けば獲得が1増えます。金品と肚を割るは<b>相手を読み切った前提の賭け</b>なので、外すと逆に一段下がります。</div>`;
+        ${ruleHTML('approach', '響けば獲得+1／金品と肚を割るは外すと一段下がる',
+          '響けば獲得が1増えます。金品と肚を割るは<b>相手を読み切った前提の賭け</b>なので、外すと逆に一段下がります。', 'small')}`;
     }
   }
   const wb0 = E.waryOf(st.currents, ui.charId, st.chaos);
@@ -4236,7 +4296,9 @@ function viewStance(){
   const open = ui.probed || guidedTurn();
   const probeLeft = E.PROBE_LIMIT - st.probesUsed;
   const chips = `
-    <div class="slot-h">相手を調べる <span style="opacity:.7">— <b>観る</b>と<b>訊く</b>を一度ずつ。同じ項目に重ねてもよい</span></div>
+    <div class="slot-h">相手を調べる</div>
+    ${ruleHTML('probe', '観ると訊くを一度ずつ',
+      '<b>観る</b>はその項目の所作を読ませ、<b>訊く</b>はその項目の不正解を一つ消して二択にします。どちらも<b>一度ずつ</b>。同じ項目に重ねて一つを確実にするか、散らして二つを半分ずつ掴むかを選びます。', 'small')}
     <div class="probe-table">
       ${E.CATS.map((cat, i) => {
         const seen = open || ui.observed === i, asked = open || ui.asked === i;
@@ -4301,10 +4363,16 @@ function viewStance(){
   };
   const order = E.SCENE_ORDER[E.sceneOf(st, ui.charId, ui.place)];
   const descAt = order.indexOf('chips');  /* 人物紹介は「調べる」の直前に挟む */
+  /* 立場を決めたあとは、場面の描写を畳んで決定へ寄せる。読み返したければ開ける。
+     縦を食っているのは規則文ではなく、決定のたびに全部残るこの場面ブロックだった。 */
+  const settled = ui.stance !== null && !guidedTurn();
+  const scene = order.slice(0, descAt).map(k => BLOCK[k]()).join('')
+    + `${guide}<div class="quote">${esc(c.desc)}</div>`;
   app.innerHTML = headerHTML() + characterVisualHTML(c, true) +
     `<div class="panel tone-panel" style="${toneStyle(activeFs)}"><h2>${esc(c.name)} — ${esc(c.nick)}</h2>
-      ${order.slice(0, descAt).map(k => BLOCK[k]()).join('')}
-      ${guide}<div class="quote">${esc(c.desc)}</div>
+      ${settled
+        ? `<details class="scene-fold"><summary>${esc(c.name)}との場面をもう一度読む</summary>${scene}</details>`
+        : scene}
       ${order.slice(descAt).map(k => BLOCK[k]()).join('')}<hr id="decide">${body}
       <div class="row" style="margin-top:14px"><button id="back">面会相手を選び直す</button></div>
     </div>`;
@@ -4374,7 +4442,8 @@ function viewCards(){
       <div class="pre">切り出し：「${esc(E.preambleOf(st, ui.charId, ui.place))} ──」</div>
       ${E.CATS.slice(0, nCards).map((cat, i) => `
         <div class="slot-h">${i+1}. ${cat.name} <span style="opacity:.7">— ${cat.hint}</span></div>
-        ${i === 0 ? '<div class="small" style="margin:2px 0 6px;opacity:.7">〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。</div>' : ''}
+        ${i === 0 ? ruleHTML('cards', '〔　〕＝その札が訴えかける先',
+          '〔　〕はその札が訴えかける先。この人物が何を欲しているかを当てます。', 'small') : ''}
         ${ui.observed === i || ui.probed || guided
           ? `<div class="slot-gest">${esc(E.gestureOf(ui.charId, i))}</div>` : ''}
         <div class="card-grid">${ui.opts[i].map(o => {
@@ -4517,6 +4586,7 @@ function viewResult(){
     `<div class="row"><button class="primary" id="next">${st.finished?'結末を見る':guidedResult?'第2ターンへ（通常進行）':`第${st.turn}ターンへ`}</button></div>`
     + `<details class="detail savefold"><summary>この盤面を保存・共有する</summary>${saveBoxHTML()}</details>`;
   document.getElementById('next').onclick = () => {
+    commitHints();
     if (guidedResult) ui.guidedTutorial = false;
     ui.place = null;                       // ターンが変われば行き先から選び直す
     ui.screen = st.finished ? 'ending' : 'meeting'; render();
