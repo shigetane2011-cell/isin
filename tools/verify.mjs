@@ -912,6 +912,19 @@ ok(E.DUEL_ANSWER.length === 6 && E.DUEL_ANSWER.every(a => a >= 0 && a <= 2),
    '6つの動機型すべてに、通じる応じ方が対応している');
 ok([...E.HOTHEADS].every(id => E.CHAR_BY_ID.has(id)), '短気な人物が実在するIDだけを指している');
 {
+  /* 短気な25名は 佐幕9・抗戦14・公武1・雄藩1・開国0 で、名簿の均等（各20%）を壊し、
+     荒事の枠がそのまま雄藩を沈めていた。雄藩から4名を足して5名にしてある。
+     開国は0のままが正しい ―― 名簿の開国32名は商人・学者・外交官・通詞で、
+     刀に手をかける人物像が一人もいない。 */
+  const hc = [0,0,0,0,0];
+  for (const id of E.HOTHEADS) E.CHAR_BY_ID.get(id).factions.forEach(f => hc[f]++);
+  ok(hc[3] >= 5, `短気な者に雄藩が5名以上いる（${hc[3]}名。直す前は1名）`);
+  ok([22, 61, 84, 127].every(id => E.HOTHEADS.has(id)),
+     '足した4名（土佐の郷士・板垣退助・前原一誠・山県有朋）が短気な者に入っている');
+  ok(hc[1] === 0,
+     '開国に短気な者はいない（人物像に合う者が名簿にいないため、数合わせで足さない）');
+}
+{
   const st = E.createState(1);
   const c = E.CHAR_BY_ID.get(47);                       // 近藤勇（短気・利益=名誉）
   const wrong = [0,1,2].map(k => [0,1,2,3,4,5].find(m => m !== c.correct[k]));
